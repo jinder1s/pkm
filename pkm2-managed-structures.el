@@ -41,7 +41,7 @@
                           managed-asset-specs) )
            (db-queries (-map #'pkm2--compile-full-db-query queries))
            (output (-map (lambda (db-query)
-                           (sqlite-select jinder_dbh db-query)) db-queries)))
+                           (sqlite-select pkm2-database-connection db-query)) db-queries)))
       output)))
 
 (provide 'pkm2-managed-structures)

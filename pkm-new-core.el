@@ -258,7 +258,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
       (push "is_archive" value-names)
       (push 1 values))
     (--> (pkm2--db-compile-insert-statement table-name value-names values)
-         (sqlite-execute jinder_dbh it)
+         (sqlite-execute pkm2-database-connection it)
          (car it)
          (car it)
          (make-pkm2-db-kvd-link :id2 it  :type type :node node-id :key_value_data key_value_data-id :context context-node-id :created_at timestamp))))
@@ -266,19 +266,19 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 (defun pkm2--db-delete-link-between-node-and-kvd (id type)
   (--> (pkm2--db-get-kvd-link-table-for-type type)
        (format "DELETE FROM %s WHERE id = %d" it id)
-       (sqlite-execute jinder_dbh it) ))
+       (sqlite-execute pkm2-database-connection it) ))
 
 (defun pkm2-db-archive-link-between-node-and-kvd (id type)
   (--> (pkm2--db-get-kvd-link-table-for-type type)
        (pkm2--db-compile-update-statement it (list "is_archive") (list 1) (format "id = %d" id) )
-       (sqlite-execute jinder_dbh it)))
+       (sqlite-execute pkm2-database-connection it)))
 
 (defun pkm2--db-delete-node (id)
   (--> (format "delete from node where id = %d" id)
-       (sqlite-execute jinder_dbh it)))
+       (sqlite-execute pkm2-database-connection it)))
 (defun pkm2--db-delete-link-between-nodes (id)
   (--> (format "delete from nodes_link where id = %d" id)
-       (sqlite-execute jinder_dbh it)))
+       (sqlite-execute pkm2-database-connection it)))
 
 
 (defun pkm2--db-insert-link-between-nodeA-and-nodeB (type from-node-id to-node-id timestamp &optional  context-node-id)
@@ -289,7 +289,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
       (push "context" value-names)
       (push context-node-id values))
     (--> (pkm2--db-compile-insert-statement table-name value-names values)
-         (sqlite-execute jinder_dbh it)
+         (sqlite-execute pkm2-database-connection it)
          (car it)
          (car it)
          (make-pkm2-db-nodes-link :id it :type type :node_a from-node-id :node_b to-node-id :context context-node-id :created_at timestamp))))
@@ -306,7 +306,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
       (push "content" value-names)
       (push content values))
     (--> (pkm2--db-compile-insert-statement table-name value-names values)
-         (sqlite-execute jinder_dbh it)
+         (sqlite-execute pkm2-database-connection it)
          (car it)
          (car it)
          (make-pkm2-db-node :id it :content content :created_at timestamp)
@@ -320,7 +320,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          (where-clause (format "id = %d" node-id))
          (returning-column-names '("id" "content" "created_at" "modified_at")))
     (--> (pkm2--db-compile-update-statement table-name value-names values where-clause returning-column-names)
-         (sqlite-execute jinder_dbh it)
+         (sqlite-execute pkm2-database-connection it)
          (car it)
          (make-pkm2-db-node :id (nth 0 it) :content (nth 1 it) :created_at (nth 2 it) :modified_at (nth 3 it)))))
 
@@ -329,14 +329,14 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          (value-names '("key" "value" "created_at"))
          (values `(,key ,value ,timestamp)))
     (--> (pkm2--db-compile-insert-statement table-name value-names values)
-         (sqlite-execute jinder_dbh it)
+         (sqlite-execute pkm2-database-connection it)
          (car it)
          (car it)
          (make-pkm2-db-kvd :type type :id it :key key :value value :created_at timestamp))))
 
 (defun pkm2--db-get-or-insert-kvd (key value &optional type)
   (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type) )
-         (db-info (car (sqlite-select jinder_dbh (format "SELECT id, key, value, created_at from %s WHERE key is '%s' AND value is %s" data-table key (pkm2--db-format-value-correctly value type))) )))
+         (db-info (car (sqlite-select pkm2-database-connection (format "SELECT id, key, value, created_at from %s WHERE key is '%s' AND value is %s" data-table key (pkm2--db-format-value-correctly value type))) )))
     (if db-info
         (make-pkm2-db-kvd :type type :id (nth 0 db-info) :key key :value value :created_at (nth 3 db-info))
       (pkm2--db-insert-kvd key value (pkm2-get-current-timestamp) type))))
@@ -365,7 +365,7 @@ Returns output in two formats:
 - either list of lists with first list being column names
 - if RETURN-ALIST non-nil, list of alists, with keys of alist being column names"
   (if return-plist
-      (let* ((table-with-columns-names (sqlite-select jinder_dbh query nil 'full))
+      (let* ((table-with-columns-names (sqlite-select pkm2-database-connection query nil 'full))
              (columns (car table-with-columns-names))
              (data (cdr table-with-columns-names))
              (plist-data (-map (lambda (datum)
@@ -377,7 +377,7 @@ Returns output in two formats:
                                    plist))
                                data)))
         plist-data)
-    (sqlite-select jinder_dbh query )))
+    (sqlite-select pkm2-database-connection query )))
 
 
 (defun pkm2--db-query-get-all-nodes-ids (&optional limit)
@@ -553,14 +553,14 @@ Returns output in two formats:
   (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type))
          (link-table (pkm2--db-get-kvd-link-table-for-type type))
          (query (format "SELECT link.node from %s as link WHERE link.key_value_data IN (SELECT id FROM %s WHERE key = '%s');" link-table data-table key)))
-    (-flatten (sqlite-execute jinder_dbh query) )))
+    (-flatten (sqlite-execute pkm2-database-connection query) )))
 
 (defun pkm2--db-query-get-nodes-with-links-to-kvds-with-key-and-values (key values type)
   (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type))
          (link-table (pkm2--db-get-kvd-link-table-for-type type))
          (query (format "SELECT link.node from %s as link WHERE link.key_value_data IN (SELECT id FROM %s WHERE key = '%s' AND value IN (%s));" link-table data-table key  (--> (-map #'pkm2--db-convert-object-to-string values)
                                                                                                                                                                                (string-join it ", ")))))
-    (-flatten (sqlite-execute jinder_dbh query) )))
+    (-flatten (sqlite-execute pkm2-database-connection query) )))
 
 (defun pkm2--db-compile-query-to-get-nodes-in-following-subquery-and--key-and-value (subquery key values type)
   (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type))

@@ -352,13 +352,13 @@ Has no effect when there's no `org-roam-node-at-point'."
   (let* ((queries (plist-get section-spec :queries))
          (queries-db-query (-map #'pkm2--compile-full-db-query queries))
          (nodes-ids (-flatten (-map (lambda (query)
-                                      (--> (sqlite-select jinder_dbh query)
+                                      (--> (sqlite-select pkm2-database-connection query)
                                            (-flatten it)))
                                     queries-db-query) )))
     nodes-ids))
 
 (defun pkm2--browse-get-query-nodes (query-spec)
-  (--> (pkm2--compile-full-db-query query-spec) (sqlite-select jinder_dbh it) (-flatten it)))
+  (--> (pkm2--compile-full-db-query query-spec) (sqlite-select pkm2-database-connection it) (-flatten it)))
 
 
 (defun pkm2--browse-section-next-node ())

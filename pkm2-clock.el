@@ -58,7 +58,7 @@
   ;; TODO implment and test this
   (--> `((:or structure-type (:structure-name clock-node)) (:not kvd (:key "clock-end" :data-type INTEGER)) )
        (pkm2--compile-full-db-query it)
-       (sqlite-select jinder_dbh it)
+       (sqlite-select pkm2-database-connection it)
        (-flatten it)
        (-map #'pkm2--db-query-get-node-with-id it)))
 
@@ -68,7 +68,7 @@
           (:not kvd (:key "clock-end" :data-type INTEGER))
           (:convert-and convert-to-parents (:levels 1 :link-type "clock")) )
        (pkm2--compile-full-db-query it)
-       (sqlite-select jinder_dbh it)
+       (sqlite-select pkm2-database-connection it)
        (-flatten it)
        (-map #'pkm2--db-query-get-node-with-id it)))
 
@@ -81,7 +81,7 @@
                                       (:convert-and convert-to-parents (:levels ALL))
                                       (:and structure-type (:structure-name ,s-type)))
                                     (pkm2--compile-full-db-query it)
-                                    (sqlite-select jinder_dbh it)
+                                    (sqlite-select pkm2-database-connection it)
                                     (-flatten it)
                                     ))
                              auto-clock-types) )))

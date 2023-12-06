@@ -11,8 +11,8 @@
                               "SELECT top, parent, node_id, level FROM subs_table"
                               ))
          (view-statement (format "CREATE VIEW  test_project_%d (top, parent, node_id, level) AS %s;" node-id query-for-children)))
-    ;; (sqlite-execute  jinder_dbh view-statement)
-    (sqlite-select jinder_dbh query-for-children)
+    ;; (sqlite-execute  pkm2-database-connection view-statement)
+    (sqlite-select pkm2-database-connection query-for-children)
     ;; view-statement
     ))
 

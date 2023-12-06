@@ -115,7 +115,7 @@
          (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (pkm2-db-node-id it)))
          (level-parents (or level-parents (read (completing-read "How many levels of parents would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
          (query (pkm2--db-query-get-parent-nodes level-parents '("sub") (format "%s" db-id) t))
-         (query-results (sqlite-select jinder_dbh query))
+         (query-results (sqlite-select pkm2-database-connection query))
          (browse-nodes
           (-map (lambda (result)
                   (message "result: %S" result)
@@ -312,7 +312,7 @@
                       sub-query))
          (full-query (pkm2--create-query nil sub-query :and))
          (sql-query (pkm2--compile-full-db-query full-query))
-         (db-nodes-ids (-flatten (sqlite-select jinder_dbh sql-query) )))
+         (db-nodes-ids (-flatten (sqlite-select pkm2-database-connection sql-query) )))
     (pkm2--browse-see-nodes-as-children browse-id db-nodes-ids)))
 
 

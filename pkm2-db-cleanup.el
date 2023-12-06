@@ -4,7 +4,7 @@
                         "LEFT JOIN data_or_properties_link_integer link "
                         "ON kvd.id = link.key_value_data "
                         "WHERE link.node IS NULL;"))
-         (output (sqlite-select jinder_dbh query)))
+         (output (sqlite-select pkm2-database-connection query)))
     output))
 (defun pkm2--db-delete-kvds-with-no-links ()
   (-each (doom-plist-keys pkm2--key_value_data-type-to-table-plist)
@@ -15,6 +15,6 @@
                                    "ON kvd.id = link.key_value_data "
                                    "WHERE link.node IS NULL"))
              (delete-query (format "DELETE FROM %s WHERE id IN (%s)" data-table select-query)))
-        (sqlite-execute jinder_dbh delete-query)))))
+        (sqlite-execute pkm2-database-connection delete-query)))))
 
 (provide 'pkm2-db-cleanup)

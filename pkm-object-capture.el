@@ -89,7 +89,7 @@ Commit everything.
   (setq jinder-final-schema structure-schema)
   (setq jinder-final-assets created-assets)
   (unless within-transaction
-    (sqlite-transaction jinder_dbh) )
+    (sqlite-transaction pkm2-database-connection) )
   (condition-case-unless-debug err
       (let* ((pkm-structure-types (doom-plist-keys pkm-structure-undefined-schemas-plist))
              (assets-by-group (-group-by (lambda (asset)
@@ -185,11 +185,11 @@ Commit everything.
                            :links commited-links)))
         (if within-transaction
             output
-          (sqlite-commit jinder_dbh)
-          ;; (sqlite-rollback jinder_dbh)
+          (sqlite-commit pkm2-database-connection)
+          ;; (sqlite-rollback pkm2-database-connection)
           ))
     (error (message "Received Error %s" (error-message-string err))
-           (sqlite-rollback jinder_dbh))))
+           (sqlite-rollback pkm2-database-connection))))
 
 
 (defun pkm--object-get-specified-node-db-ids (node-specifier assets-infos)
