@@ -1,4 +1,4 @@
-;;; pkm/pkm2-object-behaviours.el -*- lexical-binding: t; -*-
+;;; pkm/pkm2-object-behavior.el -*- lexical-binding: t; -*-
 
 
 (defvar pkm-structure-defined-behavior-plist ())
@@ -14,4 +14,4 @@
                (plist-put asset :link-to link-to))
              it)))
 
-(provide 'pkm2-object-behaviours)
+(provide 'pkm2-object-behavior)
