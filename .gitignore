@@ -1,11 +1,17 @@
-# Compiled
+# ignore these directories
+/.git
+/recipes
+
+# ignore log files
+/.log
+
+# ignore generated files
 *.elc
 
-# Packaging
-.cask
+# eask packages
+.eask/
+dist/
 
-# Backup files
-*~
-
-# Undo-tree save-files
-*.~undo-tree
+# packaging
+*-autoloads.el
+*-pkg.el
