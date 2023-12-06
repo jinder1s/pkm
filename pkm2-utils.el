@@ -36,3 +36,5 @@
   (--> (read-string (or prompt "Timestamp: ") (format-time-string "%FT%T %z" (or default-time (current-time)) ))
        (date-to-time it)
        (time-convert it 'integer)))
+
+(provide 'pkm2-utils)

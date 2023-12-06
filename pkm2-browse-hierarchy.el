@@ -53,3 +53,6 @@
 (defun pkm2-browse-see-parent-nodes (child levels))
 (defun pkm2-browse-refresh-tree (browse))
 (defun pkm2-browse-get-tree-nodes (browse))
+
+
+(provide 'pkm2-browse-hierarchy)

@@ -72,3 +72,5 @@
 (define-minor-mode pkm2-browse-mode
   "Minor mode for simple finish/cancel keybindings."
   :keymap pkm2-browse-mode-map)
+
+(provide 'pkm2-browse-mode-map)

@@ -18,3 +18,5 @@
                                   '(:pkm-type kvd :name "is-flash-card" :key "node-type" :value "flash-card" :link-to (primary) :data-type TEXT))
                          :links (list
                                  '(:pkm-link-label "sub" :child "back" :parent "front"))))
+
+(provide 'pkm2-questions)

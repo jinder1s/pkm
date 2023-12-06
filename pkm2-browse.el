@@ -365,3 +365,5 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2--browse-section-previous-node ())
 
 (defun pkm2--browse-section-parent-node ())
+
+(provide 'pkm-browse)

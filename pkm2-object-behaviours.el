@@ -13,3 +13,5 @@
        (-map (lambda (asset)
                (plist-put asset :link-to link-to))
              it)))
+
+(provide 'pkm2-object-behaviours)

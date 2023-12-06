@@ -115,3 +115,5 @@
                                    kvds))
 (defun pkm--object-get-time-related-kvd-keys ()
   (plist-get pkm-data-type-to-kvd-key-plist 'DATETIME))
+
+(provide 'pkm2-object-kvd)

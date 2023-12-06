@@ -202,3 +202,5 @@
 (defun pkm--convert-into-get-spec-active-clock ())
 
 (pkm2--register-query-spec-option 'active-clock '() #'pkm--convert-into-get-spec-active-clock #'pkm2--convert-into-db-query-active-clock)
+
+(provide 'pkm2-clock)

@@ -178,3 +178,5 @@
                   (pkm-objectp (plist-get pkm-structure-defined-schemas-plist structure-name) pkm-node)) it)))
 
 
+
+(provide 'pkm-object)

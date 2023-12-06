@@ -381,3 +381,5 @@
          (new-section-spec (plist-put section-spec :queries (-concat queries (list new-query)))))
     (setf (pkm2-browse-section-spec section) new-section-spec)
     (pkm2--refresh-current-buffer buffer-name)))
+
+(provide 'pkm2-browse-interactivity)

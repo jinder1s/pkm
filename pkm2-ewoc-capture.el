@@ -169,3 +169,5 @@
          (message "schema: %S" (plist-get it :schema))
          it)
        (pkm--object-capture-finializer (plist-get it :schema) (plist-get it :capture-info))))
+
+(provide 'pkm2-ewoc-capture)

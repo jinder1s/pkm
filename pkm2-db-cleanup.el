@@ -16,3 +16,5 @@
                                    "WHERE link.node IS NULL"))
              (delete-query (format "DELETE FROM %s WHERE id IN (%s)" data-table select-query)))
         (sqlite-execute jinder_dbh delete-query)))))
+
+(provide 'pkm2-db-cleanup)

@@ -47,3 +47,5 @@
         (pkm2-db-archive-link-between-node-and-kvd old-link-id kvd-type)
       (pkm2--db-delete-link-between-node-and-kvd old-link-id kvd-type))
     new-link))
+
+(provide 'pkm2-log)

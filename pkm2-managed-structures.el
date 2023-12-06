@@ -43,3 +43,5 @@
            (output (-map (lambda (db-query)
                            (sqlite-select jinder_dbh db-query)) db-queries)))
       output)))
+
+(provide 'pkm2-managed-structures)

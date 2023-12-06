@@ -23,3 +23,5 @@
 (pkm2--register-link-label 'HIERARCHICAL "related")
 (pkm2--register-link-label 'HIERARCHICAL "clock")
 (pkm2--register-link-label 'HIERARCHICAL "type-of")
+
+(provide 'pkm2-nodes-links)

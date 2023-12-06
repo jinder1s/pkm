@@ -62,3 +62,5 @@
                            (car-safe (car-safe (sqlite-select jinder_dbh query))) )
                          queries)))
     node-ids))
+
+(provide 'pkm2-search)

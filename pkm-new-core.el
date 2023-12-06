@@ -1,6 +1,7 @@
 ;;; pkm-new-core.el -*- lexical-binding: t; -*-
 
 (require 'cl-lib)
+(require 'pkm2-utils)
 (defgroup pkm2 nil
   "Personal knowledge management package."
   :group 'outlines)
@@ -49,6 +50,7 @@
   (flat-links nil :type list)
   (kvds nil :type list))
 
+(defvar pkm2-database-connection nil)
 
 (defun pkm2--core-trace-sqlite-execute (DB QUERY &optional VALUES RETURN-TYPE)
   (message "Running Query: %S" QUERY))
@@ -601,3 +603,5 @@ Returns output in two formats:
 
 
 
+
+(provide 'pkm-new-core)

@@ -72,3 +72,5 @@
     (when (plist-get spec :face)
       (setq output-string (propertize output-string 'face (plist-get spec :face))))
     output-string ))
+
+(provide 'pkm2-browse-insert)

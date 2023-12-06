@@ -180,3 +180,5 @@
 (defun pkm-habit-manage-habits ()
   (pkm-habit-setup-habits))
 
+
+(provide 'pkm2-habit)

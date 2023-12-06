@@ -158,3 +158,5 @@
                               :assets (list
                                        '(:pkm-type kvd :name "is-project" :key "node-type" :value "project" :link-to ("base-node") :data-type TEXT))
                               ))
+
+(provide 'pkm2-object-registrations)

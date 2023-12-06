@@ -477,3 +477,5 @@
     (kill-buffer buffer-name)
     (setq pkm2-browse-saved-queries (-concat (list output) pkm2-browse-saved-queries))
     output))
+
+(provide 'pkm2-compile-queries)

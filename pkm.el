@@ -12,4 +12,6 @@
 
 ;;; Code:
 
+(require 'pkm-new-core)
+
 (provide 'pkm)

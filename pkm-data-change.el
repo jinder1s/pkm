@@ -78,3 +78,5 @@
   (add-column-to-table jinder_dbh "data_or_properties_link_integer" "is_archive" "INTEGER")
   (add-column-to-table jinder_dbh "data_or_properties_link_real" "is_archive" "INTEGER")
   (add-column-to-table jinder_dbh "data_or_properties_link_blob" "is_archive" "INTEGER"))
+
+(provide 'pkm-data-change)

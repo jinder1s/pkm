@@ -204,3 +204,5 @@ Commit everything.
                 (progn (message "after filter: %S" it)
                        it)
                 (-map (lambda (asset-info) (plist-get asset-info :db-id)) it))) )))
+
+(provide 'pkm-object-capture)

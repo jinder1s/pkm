@@ -68,3 +68,5 @@
              (link-type (or link-type "sub")))
         (pkm--object-capture-sub node-db-id structure-name link-type))
     (message "No capture cadidates, please set capture candidate")))
+
+(provide 'pkm2-quick-capture)

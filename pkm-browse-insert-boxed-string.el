@@ -92,3 +92,5 @@ a"))
     (mapc (lambda (line) (insert (funcall segment-line line)))
           (split-string text "\n"))
     ))
+
+(provide 'pkm-browse-insert-boxed-string)
