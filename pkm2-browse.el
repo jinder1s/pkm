@@ -1,5 +1,12 @@
 ;;; pkm2-browse.el -*- lexical-binding: t; -*-
 
+
+(require 'persist)
+(require 'dash)
+(require 'cl-lib)
+(require 'cl-macs)
+(require 'pkm-new-core)
+(require 'pkm2-compile-queries)
 (cl-defstruct pkm2-browse-node-state
   (show-hidden nil)
   (from nil :type marker)
@@ -37,7 +44,6 @@
 
 ;;;; Persistent buffer
 (defvar pkm2-browse-buffer "*pkm2-browse*"
-
 
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
 (persist-defvar pkm2-browse-saved-queries () "Individual queries to get pkm nodes")
@@ -366,4 +372,4 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 (defun pkm2--browse-section-parent-node ())
 
-(provide 'pkm-browse)
+(provide 'pkm2-browse)

@@ -1,5 +1,7 @@
 ;;; pkm-data-change.el -*- lexical-binding: t; -*-
 
+(require 'dash)
+(require 'pkm-new-core)
 (defun change-key-value-to-integer (db)
   (let* ((query1 "INSERT INTO data_or_properties_link_integer (node, key_value_data, created_at) SELECT node, 61, created_at FROM data_or_properties_link WHERE key_value_data = 18;")
          (query "DELETE FROM key_value_data WHERE key = 'todo-priority';"))

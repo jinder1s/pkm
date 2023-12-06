@@ -1,5 +1,5 @@
 ;;; pkm2-ewoc-capture.el -*- lexical-binding: t; -*-
-;;;
+
 (defvar pkm2-buffer-capture-data-equal-plist ())
 
 (defun pkm2--capture-verify-insert (buffer-name text read-only create-markers)

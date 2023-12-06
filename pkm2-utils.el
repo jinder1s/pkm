@@ -1,5 +1,8 @@
 ;;; pkm2-utils.el -*- lexical-binding: t; -*-
 
+(require 'ts)
+(require 'dash)
+
 (defun pkm2--db-sanatize-text (input)
   "Single-quote (scalar) input for use in a SQL expression."
   (with-temp-buffer
@@ -36,5 +39,30 @@
   (--> (read-string (or prompt "Timestamp: ") (format-time-string "%FT%T %z" (or default-time (current-time)) ))
        (date-to-time it)
        (time-convert it 'integer)))
+
+(defun doom-plist-keys (plist)
+  "Return the keys in PLIST."
+  (let (keys)
+    (while plist
+      (push (car plist) keys)
+      (setq plist (cddr plist)))
+    keys))
+(defun mm-alist-to-plist (alist)
+  "Convert association list ALIST into the equivalent property-list form.
+The plist is returned.  This converts from
+
+\((a . 1) (b . 2) (c . 3))
+
+into
+
+\(a 1 b 2 c 3)
+
+The original alist is not modified."
+  (let (plist)
+    (while alist
+      (let ((el (car alist)))
+	(setq plist (cons (cdr el) (cons (car el) plist))))
+      (setq alist (cdr alist)))
+    (nreverse plist)))
 
 (provide 'pkm2-utils)

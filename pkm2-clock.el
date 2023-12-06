@@ -1,6 +1,14 @@
 ;;; pkm2-clock.el -*- lexical-binding: t; -*-
 
+(require 'dash)
+(require 'pkm2-utils)
+(require 'pkm-new-core)
+(require 'pkm-object)
+(require 'pkm2-compile-queries)
+(require 'pkm2-browse)
+(require 'pkm2-search)
 
+(require 'pkm2-ewoc-capture)
 
 (defvar pkm2-clock-auto-clock-into-parent t)
 (defvar pkm2-clock-auto-clock-node-types '(project-s area-s task-n))
@@ -44,13 +52,6 @@
                                          :link-to ("base-node") :data-type DATETIME :managed t))))
 
 
-(defun pkm2-clock--check-if-node-has-clock (node)
-  (when (pkm-node-get-links-of-link-type node "clock") t))
-
-
-
-(defun pkm2-clock--check-if-node-is-clock (node)
-  (error "Not yet implemented"))
 
 
 
@@ -165,32 +166,6 @@
           (message "No parent clock to clock into")))
     (message "No active clock")))
 
-(defun pkm2--clock-edit-clock (node-rowid)
-  (let* ((browse-node (pkm--browse-get-browse-node-at-point))
-         (node (pkm--db-query-get-node-with-rowid node-rowid))
-         (start (pkm-get-value-for-key node "clock-start"))
-         (end (pkm-get-value-for-key node "clock-end"))
-         (total (when end (/ (- end start) 60)))
-         (action (completing-read "What would you like to do?" (list "change-start-time" "change-end-time" "change-duration-keep-start-same")))
-         (new-start (if (equal action "change-start-time") (pkm-get-user-selected-timestamp nil start) start))
-         (new-end (if (equal action "change-end-time") (pkm-get-user-selected-timestamp nil end) end))
-         (new-end (if (equal action "change-duration-keep-start-same") (+ new-start (* (read-number "How many minutes was this clock active for?" total) 60)) new-end))
-         (new-total (when new-end (/ (- new-end new-start) 60)))
-         (clock-string (concat (current-time-string (seconds-to-time new-start ))
-                               (when new-end
-                                 (concat "--"
-                                         (current-time-string  (seconds-to-time new-end ) )
-                                         "=="
-                                         (format "%d mins" new-total) ))))
-         (make-changes (completing-read (format "New clock: %s, is that okay?" clock-string) '(("yes" t) ("no" nil)))))
-    (when make-changes
-      (when (not (= start new-start)) (pkm--db-modify-node-key-value-data node-rowid "clock-start" start new-start 'INTEGER))
-      (when (not (= end new-end)) (pkm--db-modify-node-key-value-data node-rowid "clock-end" end new-end 'INTEGER))
-      (pkm-browse-refresh-node browse-node))))
-
-(defun pkm2-clock-edit-clock-at-point ()
-  (interactive)
-  (pkm--clock-edit-clock (pkm--browse-get-node-rowid-at-point)))
 
 
 (defun pkm2--convert-into-db-query-active-clock (input &optional nodes-queries)

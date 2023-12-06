@@ -1,4 +1,8 @@
 ;;; pkm/pkm2-log.el -*- lexical-binding: t; -*-
+(require 'pkm2-search)
+(require 'pkm-object-capture)
+(require 'pkm2-clock)
+
 (defvar pkm2--capture-parent-nodes-candidates ())
 
 (defun pkm2-log-into-active-clock ()

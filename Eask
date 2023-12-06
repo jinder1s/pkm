@@ -1,8 +1,8 @@
 (package "pkm"
          "0.0.1"
-         "Personal knowledge manager")
+         "Personal Knowledge Manager")
 
-(website-url "")
+(website-url "https://hello.com")
 (keywords "notes" "tasks" "habits" "clocks")
 
 (package-file "pkm.el")
@@ -12,11 +12,12 @@
 (source "gnu")
 (source "melpa")
 
-(depends-on "emacs" "26.1")
+(depends-on "emacs" "29.0")
 (depends-on "dash")
 (depends-on "ts")
+(depends-on "persist")
 (files
-    "pkm2.el"
+    "pkm.el"
     "pkm2-browse.el"
     "pkm2-browse-hierarchy.el"
     "pkm2-browse-insert.el"

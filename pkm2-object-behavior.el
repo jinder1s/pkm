@@ -1,5 +1,6 @@
 ;;; pkm/pkm2-object-behavior.el -*- lexical-binding: t; -*-
 
+(require 'dash)
 
 (defvar pkm-structure-defined-behavior-plist ())
 

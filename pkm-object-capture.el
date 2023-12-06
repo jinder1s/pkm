@@ -1,5 +1,9 @@
 ;;; pkm-object-capture.el -*- lexical-binding: t; -*-
 
+(require 'pkm-new-core)
+(require 'pkm2-utils)
+(require 'pkm-object)
+(require 'pkm2-ewoc-capture)
 (defun pkm--object-add-node-to-db (s-node)
   (when (plist-get s-node :asset-capture-info)
     (let* ((temp (plist-get s-node :asset-capture-info))
@@ -35,10 +39,10 @@
           (progn (display-warning 'pkm-object "Did not succed in making kvd: %S" s-kvd)
                  (error "Did not succed in creating kvd: %S" s-kvd)))) ))
 
-(setq pkm--object-capture-alist `((node ,#'pkm--object-capture-node)
+(defvar pkm--object-capture-alist `((node ,#'pkm--object-capture-node)
                                     (kvd ,#'pkm--object-capture-kvd)))
 
-(setq pkm--object-add-to-db-alist `((node ,#'pkm--object-add-node-to-db)
+(defvar pkm--object-add-to-db-alist `((node ,#'pkm--object-add-node-to-db)
                                     (kvd ,#'pkm--object-add-kvd-to-db)))
 
 (defun pkm--object-capture ()
