@@ -9,8 +9,8 @@
 
 (defun pkm2-object-clock--insert-at-point (browse-node)
   "Assume browse-node is a Task structure. Insert a string representing it at point."
-  ;;  TODO What do I want to do about null text in nodes?
-  ;;  Should I show empty string or should I just not show node?
+  ;  TODO What do I want to do about null text in nodes?
+  ;  Should I show empty string or should I just not show node?
 (let* ((pkm-node (pkm2-browse-node-pkm-node browse-node))
        (state (pkm2-browse-node-state browse-node))
        (show-hidden (pkm2-browse-node-state-show-hidden state))
@@ -50,7 +50,7 @@
 
 
 (defun pkm2-clock--get-current-clock-pkm-nodes ()
-  ;; TODO implment and test this
+  ; TODO implment and test this
   (--> `((:or structure-type (:structure-name clock-node)) (:not kvd (:key "clock-end" :data-type INTEGER)) )
        (pkm2--compile-full-db-query it)
        (sqlite-select pkm2-database-connection it)
@@ -58,7 +58,7 @@
        (-map #'pkm2--db-query-get-node-with-id it)))
 
 (defun pkm2-clock--get-current-clock-parent-pkm-nodes ()
-  ;; TODO implment and test this
+  ; TODO implment and test this
   (--> `((:or structure-type (:structure-name clock-node))
           (:not kvd (:key "clock-end" :data-type INTEGER))
           (:convert-and convert-to-parents (:levels 1 :link-type "clock")) )

@@ -31,7 +31,7 @@
 
 (pkm-register-structure 'dependent-n
                         (list :parent 'base-n
-                              :must-be-sub t ;; TODO implement must be sub
+                              :must-be-sub t ; TODO implement must be sub
                               :assets (list
                                        `(:pkm-type kvd :name "is-dependent" :key "node-type" :value "DEPENDENT" :link-to ("base-node") :data-type TEXT))))
 
@@ -68,7 +68,7 @@
                               :behaviors (list `(:name log :link-to (primary)))))
 
 (pkm-register-structure 'observation-log-n
-                        ;; TODO this should be both a note and a log
+                        ; TODO this should be both a note and a log
       (list :parent 'log-n
             :assets (list
                      `(:pkm-type kvd :name "is-observation" :key "node-type" :value "observation" :link-to (primary) :data-type TEXT))))

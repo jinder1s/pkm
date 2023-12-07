@@ -28,8 +28,8 @@
 
 (cl-defstruct pkm2-browse-buffer-state
   (sections nil)
-  ;; (buffer-nodes nil)
-  ;; (sections-nodes nil)
+  ; (buffer-nodes nil)
+  ; (sections-nodes nil)
   )
 
 (cl-defstruct pkm2-browse-section
@@ -111,7 +111,7 @@
   (if section-spec
       (--> (pkm2--browse-get-section-nodes section-spec)
            (-distinct it)
-           ;; (progn (message "out nodes: %S" it) it)
+           ; (progn (message "out nodes: %S" it) it)
            (-map (lambda (id)
                    (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id id) :state (make-pkm2-browse-node-state))) it))
     (--> (pkm2--db-query-get-all-nodes-ids)
@@ -323,11 +323,11 @@ Has no effect when there's no `org-roam-node-at-point'."
       )))
 
 (defun pkm2--browse-remove-node (browse-id)
-  ;; Remove node from pkm2-browse--browse-nodes-alist
-  ;; Remove node from section pkm2-browse--browse-sections-alist
-  ;; Remove node from its children
-  ;; Remove node from its parent
-  ;; Also delete children
+  ; Remove node from pkm2-browse--browse-nodes-alist
+  ; Remove node from section pkm2-browse--browse-sections-alist
+  ; Remove node from its children
+  ; Remove node from its parent
+  ; Also delete children
   (let* ((browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
          (state (pkm2-browse-node-state browse-node))
          (section (pkm2-browse-node-state-section state))
@@ -431,7 +431,7 @@ Has no effect when there's no `org-roam-node-at-point'."
                                                       new-kvd ; Replace modified kvd with new kvd
                                                     temp-kvd)) kvds))
           new-kvd))
-      ;; browse-node should have been modified by values above
+      ; browse-node should have been modified by values above
       (pkm2-browse--refresh-insert-browse-node browse-node))))
 
 
@@ -633,7 +633,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 
 (defun pkm2--browse-promote-node-at-point ()
-  ;;  TODO Complete and test
+  ;  TODO Complete and test
   (let* ((buffer-name (buffer-name))
          (browse-node (get-text-property (point) :pkm2-browse-node))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
@@ -664,7 +664,7 @@ Has no effect when there's no `org-roam-node-at-point'."
                                                    connecting-context-id)
     (pkm2--db-delete-link-between-nodes connecting-link-id)
     (pkm2--refresh-current-buffer buffer-name)
-    ;; TODO move node up in hierarchy in browser
+    ; TODO move node up in hierarchy in browser
     ))
 
 (defun pkm2--browse-filter-children-nodes-at-point (&optional arg)
@@ -791,8 +791,8 @@ Has no effect when there's no `org-roam-node-at-point'."
                                              (children-browse-nodes (-map (lambda (index)
                                                                             (nth index browse-nodes))
                                                                           children-indexes-list))
-                                             ;; Only modify child nodes that don't already have parent
-                                             ;; In the future, I might want to duplicate here
+                                             ; Only modify child nodes that don't already have parent
+                                             ; In the future, I might want to duplicate here
                                              (c-b-n-with-no-parent (-filter (lambda (c-b-n)
                                                                               (not (pkm2-browse-node-parent c-b-n)))
                                                                             children-browse-nodes)))
@@ -888,18 +888,18 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defvar pkm2-browse-mode-map (make-sparse-keymap))
 
 (map! :map pkm2-browse-mode-map
-      ;; Recently, a [tab] keybind in `outline-mode-cycle-map' has begun
-      ;; overriding org's [tab] keybind in GUI Emacs. This is needed to undo
-      ;; that, and should probably be PRed to org.
+      ; Recently, a [tab] keybind in `outline-mode-cycle-map' has begun
+      ; overriding org's [tab] keybind in GUI Emacs. This is needed to undo
+      ; that, and should probably be PRed to org.
 
       "C-M-RET"      #'pkm--browse-capture-node-as-child-of-node-at-point
       [C-M-return] #'pkm--browse-capture-node-as-child-of-node-at-point
 
-      ;; TODO modify functions to add captured note to browser below
+      ; TODO modify functions to add captured note to browser below
       "C-RET"      #'pkm--browse-capture-node-as-sibling-of-node-at-point
       [C-return]   #'pkm--browse-capture-node-as-sibling-of-node-at-point
 
-      ;; TODO modify functions to add captured note to browser above
+      ; TODO modify functions to add captured note to browser above
       "C-S-RET"    #'pkm--browse-capture-node-as-sibling-of-node-at-point
       [C-S-return] #'pkm--browse-capture-node-as-sibling-of-node-at-point
       (:when IS-MAC

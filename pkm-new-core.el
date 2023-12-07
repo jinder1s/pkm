@@ -127,7 +127,7 @@ The original alist is not modified."
 (defun pkm2--core-trace-sqlite-execute (DB QUERY &optional VALUES RETURN-TYPE)
   (message "Running Query: %S" QUERY))
 (advice-add #'sqlite-execute :before #'pkm2--core-trace-sqlite-execute)
-;; (advice-add #'sqlite-select :before #'pkm2--core-trace-sqlite-execute)
+; (advice-add #'sqlite-select :before #'pkm2--core-trace-sqlite-execute)
 
 (defun pkm2-setup-database (database_handle)
   "Set up database with initial schema.
@@ -429,7 +429,7 @@ VAlue can be a number, string, or list of numbers or strings."
        (-filter (lambda (kvd)
                   (equal (pkm2-db-kvd-key kvd) key)) it)))
 
-;; QUERY stuff
+; QUERY stuff
 
 (defun pkm2--db-do-sql-query-and-get-all-rows (query &optional return-plist)
   "Run sql QUERY on database.
@@ -471,7 +471,7 @@ Returns output in two formats:
                            :is_archive (plist-get link-data "is_archive" #'equal)
                            :context (plist-get link-data "context" #'equal))))
 (defun pkm2--db-query-get-kvds-for-node-with-id (id &optional allow-archive)
-  ;; TODO test
+  ; TODO test
   (let* ((query (concat
                  "SELECT key_value_data.key as key, key_value_data.value as value, link.id as link_id, key_value_data.id as data_id, 'TEXT' as type, link.context as context_id "
                  "FROM data_or_properties_link as link "
@@ -522,7 +522,7 @@ Returns output in two formats:
     kvds))
 
 (defun pkm2--db-query-get-archived-kvds-for-node-with-id (id)
-  ;; TODO test
+  ; TODO test
   (let* ((query (concat
                  "SELECT key_value_data.key as key, key_value_data.value as value, link.id as link_id, key_value_data.id as data_id, 'TEXT' as type, link.context as context_id "
                  "FROM data_or_properties_link as link "
@@ -924,7 +924,7 @@ Returns output in two formats:
 (defun pkm-objectp (object-schema pkm-node)
   "Check if pkm-NODE is the primary pkm-node of OBJECT-SCHEMA"
 
-  ;; (message "schema: %S" object-schema)
+  ; (message "schema: %S" object-schema)
   (let* ((name (plist-get object-schema :name))
          (fully-specified (plist-get pkm-structure-fully-specified-kvds-plist name))
          (has-kvd (-non-nil (-map (lambda (kvd-schema)
@@ -934,11 +934,11 @@ Returns output in two formats:
                                            (-any (lambda (choice)
                                                    (let* ((actual-choice (if (listp choice) (cdr choice) choice))
                                                           (key (plist-get kvd-schema :key)))
-                                                     ;; (message "in choices: %S, key: %s, choice: %s, %S" name key actual-choice (pkm2-node-has-key-value pkm-node key actual-choice))
+                                                     ; (message "in choices: %S, key: %s, choice: %s, %S" name key actual-choice (pkm2-node-has-key-value pkm-node key actual-choice))
                                                      (pkm2-node-has-key-value pkm-node key actual-choice)))
                                                  (plist-get kvd-schema :choices)))))
                                   fully-specified) )))
-    ;; (message "fs: %S, hk: %S\nkvd:%S" fully-specified has-kvd (pkm2-node-kvds pkm-node))
+    ; (message "fs: %S, hk: %S\nkvd:%S" fully-specified has-kvd (pkm2-node-kvds pkm-node))
     (eq (length fully-specified ) (length has-kvd))))
 
 
@@ -966,7 +966,7 @@ Returns output in two formats:
       (lambda (structure-name)
         (--> (pkm--object-find-unique-identifiers structure-name pkm-structure-defined-schemas-plist pkm-structure-required-kvds-plist)
              (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it)))))
-    ;; For behaviour based structures, only compare with other behivor based structures
+    ; For behaviour based structures, only compare with other behivor based structures
     (let* ((structure-to-behavior-schema-plist  (mm-alist-to-plist (-map (lambda (s-name)
                                                                            (cons s-name
                                                                                  (--> (plist-get pkm-structure-undefined-schemas-plist s-name)
@@ -1103,13 +1103,13 @@ Commit everything.
                                                               :db-structure commited-structure
                                                               :db-id (plist-get commited-structure :db-id))))
                                                          uncommitted-pkm-structures))
-             ;; TODO NEXT handle none-node and none-kvd assets
+             ; TODO NEXT handle none-node and none-kvd assets
              (uncommited-nodes (assoc-default 'node assets-by-group))
              (commited-nodes-with-db-ids (-map #'pkm--object-add-node-to-db uncommited-nodes))
              (commited-nodes-and-structures-with-db-ids (-concat commited-nodes-with-db-ids committed-pkm-structures-with-db-ids))
              (uncommited-kvds (assoc-default 'kvd assets-by-group))
              (commited-kvds-with-db-ids  (-map #'pkm--object-add-kvd-to-db uncommited-kvds))
-             ;; for each node specifier, get node-db-id and create link between kvd and node-db-id
+             ; for each node specifier, get node-db-id and create link between kvd and node-db-id
              (commited-kvds-with-db-ids-and-links
               (-map (lambda (kvd-info)
                       (let* ((kvd-asset-schema (plist-get kvd-info :asset-schema))
@@ -1173,7 +1173,7 @@ Commit everything.
         (if within-transaction
             output
           (sqlite-commit pkm2-database-connection)
-          ;; (sqlite-rollback pkm2-database-connection)
+          ; (sqlite-rollback pkm2-database-connection)
           ))
     (error (message "Received Error %s" (error-message-string err))
            (sqlite-rollback pkm2-database-connection))))
@@ -1294,14 +1294,14 @@ Commit everything.
           (t (error "Unable to get nodes for structure-type %S" structure-name)))))
 
 (defun pkm2--db-compile-get-nodes-between (after before &optional node-subquery)
-  ;; created_at and modified_at between after and before
-  ;; Node linked to any kvd with datetime type between after and before
-  ;; If any of the nodes above are dependent types, get its parent node
+  ; created_at and modified_at between after and before
+  ; Node linked to any kvd with datetime type between after and before
+  ; If any of the nodes above are dependent types, get its parent node
   (let* ((keys (pkm--object-get-time-related-kvd-keys))
          (query-nodes-with-keys (-reduce-from (lambda (init-subquery key) (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range key after before init-subquery))
                                               nil
                                               keys))
-         ;; TODO query creation can def be improved below
+         ; TODO query creation can def be improved below
          (query (concat "SELECT id FROM node WHERE "
                         "("
                         (when after (format "(created_at > %d OR modified_at > %d) " after after))
@@ -1355,7 +1355,7 @@ Commit everything.
           (when node-subquery (format "AND node in (%s)" node-subquery))))
 
 (defun pkm2--db-query-get-sub-nodes (levels link-labels node-subquery &optional get-parent-id)
-  ;; TODO TEST
+  ; TODO TEST
   (let* ((link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
          (link-labels-string (--> (-map #'pkm2--db-convert-object-to-string link-labels)
                                               (string-join it ", ")))
@@ -1375,7 +1375,7 @@ Commit everything.
     query))
 
 (defun pkm2--db-query-get-parent-nodes (levels link-labels node-subquery &optional get-child-id)
-  ;; TODO modify to only return query
+  ; TODO modify to only return query
   (let* ((link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
          (link-labels-string (--> (-map #'pkm2--db-convert-object-to-string link-labels)
                                   (string-join it ", ")))
@@ -1518,7 +1518,7 @@ Commit everything.
                     ("I'm done" .  "DONE")))
          (action (or initial-action :or))
          (options (doom-plist-keys pkm2--query-spec-options-plist)
-                  ;; '("all" "structure-type" "between" "kvd" "between" "children-num" "parent-num" "with-children" "with-parent" "text" "db-node")
+                  ; '("all" "structure-type" "between" "kvd" "between" "children-num" "parent-num" "with-children" "with-parent" "text" "db-node")
                   )
          (convert-options '("convert-to-parents" "convert-to-children" "convert-dependent-to-parent"))
          (query-spec (-copy initial-queries)))

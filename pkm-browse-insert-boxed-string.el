@@ -10,8 +10,8 @@
          (border-width 5)
 
          ( stipple
-           ;; Everything can be converted to bits, so as far as I can tell,
-           ;; everything will work.
+           ; Everything can be converted to bits, so as far as I can tell,
+           ; everything will work.
            '(2 2 "a
 a"))
          ( segment-left-margin
@@ -56,7 +56,7 @@ a"))
                                       :height (,shadow-distance))
                            'face `(:foreground "Black" :stipple ,stipple))
                (propertize "\n" 'line-height t))
-              ;; 'point-entered 'mb-kick-cursor
+              ; 'point-entered 'mb-kick-cursor
               )))
          ( segment-tb-padding
            (lambda ()
@@ -64,7 +64,7 @@ a"))
               (concat
                (funcall segment-left-margin  `(:height (,padding)))
                (funcall segment-filler  `(:height (,padding))))
-              ;; 'point-entered 'mb-kick-cursor
+              ; 'point-entered 'mb-kick-cursor
               )))
          ( segment-line
            (lambda (text)
@@ -72,7 +72,7 @@ a"))
                       (concat
                        (funcall segment-left-margin)
                        (funcall segment-lr-padding))
-                      ;; 'point-entered 'mb-kick-cursor
+                      ; 'point-entered 'mb-kick-cursor
                       )
                      (propertize text
                                  'wrap-prefix
@@ -85,7 +85,7 @@ a"))
                        (funcall segment-filler)
                        (funcall segment-r-shadow)
                        "\n")
-                      ;; 'point-entered 'mb-kick-cursor
+                      ; 'point-entered 'mb-kick-cursor
                       )))))
 
 

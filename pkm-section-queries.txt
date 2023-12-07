@@ -9,3 +9,5 @@
 (:queries (((:or active-clock nil) (:convert-or convert-to-children (:levels ALL)) (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "TODO" "HOLD"))))))
 (:queries (((:or structure-type (:structure-name project-s)) (:and kvd (:key "task-status" :data-type TEXT :value "DOING")))))
 (:queries (((:or structure-type (:structure-name area-s)))))
+(:queries (((:or text (:text "package")))))
+(:queries (((:or all nil))))

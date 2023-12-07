@@ -5,7 +5,7 @@
 (defun change-key-value-to-integer (db)
   (let* ((query1 "INSERT INTO data_or_properties_link_integer (node, key_value_data, created_at) SELECT node, 61, created_at FROM data_or_properties_link WHERE key_value_data = 18;")
          (query "DELETE FROM key_value_data WHERE key = 'todo-priority';"))
-    ;; (sqlite-execute db query1)
+    ; (sqlite-execute db query1)
 
     (sqlite-execute db query)))
 
@@ -53,20 +53,20 @@
 (defun move-data-over ()
   (sqlite-execute pkm2-database-connection "ATTACH database '/USERS/msingh15/.doom.d/test_pkm.sqlite3' as old_db")
 
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO node (id, content, created_at, modified_at)  SELECT ROWID, text, created_at, modified_at FROM old_db.node;")
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO nodes_link (id, type, created_at, node_a, node_b)  SELECT ROWID, type, created_at, node_a, node_b FROM old_db.nodes_link;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO node (id, content, created_at, modified_at)  SELECT ROWID, text, created_at, modified_at FROM old_db.node;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO nodes_link (id, type, created_at, node_a, node_b)  SELECT ROWID, type, created_at, node_a, node_b FROM old_db.nodes_link;")
 
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data;")
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_integer (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_integer;")
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_real (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_real;")
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_blob (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_blob;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_integer (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_integer;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_real (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_real;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_blob (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_blob;")
 
 
 
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link;")
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_integer (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_integer;")
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_real (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_real;")
-  ;; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_blob (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_blob;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_integer (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_integer;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_real (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_real;")
+  ; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_blob (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_blob;")
   (sqlite-execute pkm2-database-connection "DETACH database 'old_db';")
   )
 
