@@ -4,7 +4,7 @@
 
 ;; Author: Manjinder Singh
 ;; Maintainer: Manjinder Singh
-;; URL: https://hello.com
+;; URL: https://github.com/jinder1s/pkm.git
 ;; Version: 0.0.1
 ;; Package-Requires: ((emacs "29.1"))
 ;; Keywords: notes, tasks, habits, clocks

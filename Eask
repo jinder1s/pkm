@@ -2,7 +2,7 @@
          "0.0.1"
          "Personal Knowledge Manager")
 
-(website-url "https://hello.com")
+(website-url "https://github.com/jinder1s/pkm.git")
 (keywords "notes" "tasks" "habits" "clocks")
 
 (package-file "pkm.el")
@@ -13,9 +13,9 @@
 (source "melpa")
 
 (depends-on "emacs" "29.0")
-(depends-on "dash")
-(depends-on "ts")
-(depends-on "persist")
+(depends-on "dash" "2.13")
+(depends-on "ts" "0.3")
+(depends-on "persist" "0.5")
 (files
     "pkm.el"
     "pkm2-browse.el"
