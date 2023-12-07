@@ -6,7 +6,7 @@
 (require 'cl-lib)
 (require 'cl-macs)
 (require 'pkm-new-core)
-(require 'pkm2-compile-queries)
+
 (cl-defstruct pkm2-browse-node-state
   (show-hidden nil)
   (from nil :type marker)

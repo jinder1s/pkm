@@ -1,14 +1,8 @@
 ;;; pkm2-clock.el -*- lexical-binding: t; -*-
 
 (require 'dash)
-(require 'pkm2-utils)
 (require 'pkm-new-core)
-(require 'pkm-object)
-(require 'pkm2-compile-queries)
 (require 'pkm2-browse)
-(require 'pkm2-search)
-
-(require 'pkm2-ewoc-capture)
 
 (defvar pkm2-clock-auto-clock-into-parent t)
 (defvar pkm2-clock-auto-clock-node-types '(project-s area-s task-n))
