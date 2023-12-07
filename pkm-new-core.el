@@ -3,7 +3,6 @@
 (require 'cl-lib)
 (require 'cl-generic)
 (require 'cl-macs)
-(require 'pkm2-utils)
 (require 'ts)
 (defgroup pkm2 nil
   "Personal knowledge management package."
