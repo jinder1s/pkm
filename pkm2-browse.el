@@ -47,30 +47,35 @@
 
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
 (persist-defvar pkm2-browse-saved-queries () "Individual queries to get pkm nodes")
+(persist-defvar pkm2-browse-saved-named-queries () "Individual queries to get pkm nodes")
 (persist-defvar pkm2-browse-saved-section-specs () "Created Section specs")
-(unless  pkm2-browse-saved-section-specs (persist-load 'pkm2-browse-saved-queries) )
+(persist-defvar pkm2-browse-saved-named-section-specs () "Created Section specs")
+(unless  pkm2-browse-saved-queries (persist-load 'pkm2-browse-saved-queries) )
+(unless  pkm2-browse-saved-named-queries (persist-load 'pkm2-browse-saved-named-queries) )
 (unless  pkm2-browse-saved-section-specs (persist-load 'pkm2-browse-saved-section-specs) )
+(unless  pkm2-browse-saved-named-section-specs (persist-load 'pkm2-browse-saved-named-section-specs) )
 
 (defvar-local pkm2-browse--browse-nodes-alist ())
 (defvar-local pkm2-browse--browse-sections-alist ())
 
 (defun pkm2-browse (&optional numeric-prefix-argument)
   (interactive "p")
-  (let* ((sections-specs (if pkm2-browse-saved-section-specs
-                             (-map (lambda (spec)
-                                     (if (equal spec "NEW")
-                                         spec
-                                       (read spec))
-                                     ) (completing-read-multiple "What sections-specs to display: " (-concat '("NEW") pkm2-browse-saved-section-specs )) )
+  (let* ((completing-read-choices (-concat '("NEW") pkm2-browse-saved-named-section-specs (-map (lambda (section-spec) (cons  section-spec section-spec)) pkm2-browse-saved-section-specs)))
+         (chosen-sections (if (length> completing-read-choices 1)
+                              (completing-read-multiple "Which sections would you like to add to this section: "
+                                                             completing-read-choices)
                            (list "NEW")))
-         (sections-specs (if (member "NEW" sections-specs)
-                             (--> (pkm2--create-section-spec) (-concat (list it) (-filter (lambda (spec)
-                                                                                            (not (equal "NEW" spec))) sections-specs )))
+         (sections-specs (--> (-filter (lambda (spec) (not (equal "NEW" spec))) chosen-sections)
+                              (-map (lambda (choice) (assoc-default choice completing-read-choices)) it)
+                              (-map #'read it)))
+
+         (sections-specs (if (member "NEW" chosen-sections)
+                             (--> (pkm2--create-section-spec) (-concat (list it) sections-specs))
                            sections-specs))
          (sections (-map (lambda (sections-spec)
                            (make-pkm2-browse-section :spec  sections-spec))
                          sections-specs)))
-    (message "sections-spec: %S" sections-specs)
+    (message "sections-spec: %S, chosed-sections: %S" sections-specs chosen-sections)
     (pkm2--browse (make-pkm2-browse-buffer-state :sections sections) nil)))
 
 
@@ -111,12 +116,10 @@
   (if section-spec
       (--> (pkm2--browse-get-section-nodes section-spec)
            (-distinct it)
-           ; (progn (message "out nodes: %S" it) it)
+                                        ; (progn (message "out nodes: %S" it) it)
            (-map (lambda (id)
                    (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id id) :state (make-pkm2-browse-node-state))) it))
-    (--> (pkm2--db-query-get-all-nodes-ids)
-         (-map (lambda (id)
-                 (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id id))) it))))
+    (error "Received nil as section-spec")))
 (defun pkm2--browse-get-browse-id-of-node-with-db-id (db-id)
   (car (-find (lambda (b-n-cons) (equal
                                   db-id
@@ -149,7 +152,6 @@
                                                            (insert "\n"))
                                                          (pkm2-browse--insert-browse-node b-n) ))
                     (set-marker (make-marker) (point)))))
-
     (setf (pkm2-browse-section-from section) from)
     (setf (pkm2-browse-section-to section) to)
     (setf (pkm2-browse-section-state section) nil)
@@ -279,17 +281,6 @@
       (pkm2-browse--insert-browse-node browse-node nil t)
       (setq buffer-read-only nil))))
 
-
-
-(defun pkm2-browse--add-another-query-to-section ()
-  (interactive)
-  (let* ((section (get-text-property (point) :pkm2-browse-section))
-         (new-query (--> (pkm2--create-section-query ) (read it) ))
-         (section-spec (pkm2-browse-section-spec section))
-         (old-queries (plist-get section-spec :queries))
-         (all-queries (-concat old-queries (list new-query)))
-         (new-section-spec (plist-put section-spec :queries all-queries)))
-    (setf (pkm2-browse-section-spec section) new-section-spec )))
 
 
 (defun pkm2-browse--buffer--visibility (&optional buffer-name)
@@ -949,12 +940,20 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 ;;; browse-section
 
-(defvar pkm2-section-queries-file "pkm-section-queries.txt")
 (defun pkm2--create-section-spec ()
   (let* ((buffer-name "* create-section *")
-         queries
+         (completing-read-choices (-concat '("NEW") pkm2-browse-saved-named-queries (-map (lambda (query) (cons (format "%S" query) query)) pkm2-browse-saved-queries)))
+         (chosen-queries (if (or pkm2-browse-saved-named-queries pkm2-browse-saved-queries)
+                             (completing-read-multiple "Which queries would you like to add to this section: "
+                                                             completing-read-choices)
+                           (list "NEW")))
+
+         (initial-queries (--> (-filter (lambda (spec) (not (equal "NEW" spec))) chosen-queries)
+                               (-map (lambda (choice) (assoc-default choice completing-read-choices)) it)
+                               (-map #'read it)))
+         (queries (-copy initial-queries))
          output
-         (create-query t)
+         (create-query (member "NEW" chosen-queries))
          (print-section (lambda (queries)
                           (erase-buffer)
                           (princ (format "(queries:\n%s)"
@@ -980,26 +979,44 @@ Has no effect when there's no `org-roam-node-at-point'."
         (funcall print-section queries)
         (setq create-query (y-or-n-p "Would you like to add another query to this section?"))))
     (kill-buffer buffer-name)
+    (let* ((completing-read-choices (--> (-filter (lambda (query) (not (member query initial-queries) )) queries)
+                                         (-map (lambda (query) (cons (format "%S" query) query)) it) ))
+           (choices (when completing-read-choices (completing-read-multiple "Would you like to name any of the following queries?" completing-read-choices) ))
+           (choice-or-not-choice-group (-group-by (lambda (possible-choice)
+                                                    (when (member (car possible-choice ) choices) t))
+                                                  completing-read-choices) )
+           (choices-to-not-name (--> (assoc-default nil choice-or-not-choice-group)
+                                     (-map (lambda (not-choice)
+                                             (assoc-default not-choice completing-read-choices)) it)) )
+           (choices-to-name (--> (assoc-default t choice-or-not-choice-group)
+                                 (-map (lambda (choice)
+                                         (assoc-default (car choice ) completing-read-choices)) it) ))
+           (choices-with-names (-map (lambda (choice) (cons (read-string (format "Name for: %S" choice)) (format "%S" choice ))) choices-to-name)))
+      (setq pkm2-browse-saved-named-queries (-concat pkm2-browse-saved-named-queries choices-with-names))
+      (-each choices-to-not-name
+        (lambda (query)
+          (setq pkm2-browse-saved-queries (-concat pkm2-browse-saved-queries (list (format "%S" query)))))))
     (setq output `(:queries ,queries ))
-    (setq pkm2-browse-saved-section-specs (-concat (list (format "%S" output)) pkm2-browse-saved-section-specs))
-    (with-temp-buffer
-      (insert (format "%S\n" output))
-      (append-to-file (point-min) (point-max) pkm2-section-queries-file))
+    (--> (y-or-n-p (format "Would you like to name this section spec: %S?" output))
+         (when it (read-string (format "What would you name this section spec: %S" output)))
+         (if it
+             (setq pkm2-browse-saved-named-section-specs (-concat pkm2-browse-saved-named-section-specs (list (cons it (format "%S" output)))))
+           (setq pkm2-browse-saved-section-specs (-concat (list (format "%S" output)) pkm2-browse-saved-section-specs))))
     output))
 
 (defun pkm2--create-section-query ()
-(let* ((buffer-name "* create-query *")
-       (print-query (lambda (query)
-                      (erase-buffer)
-                      (princ (format "%S" query))))
-       (output (with-output-to-temp-buffer buffer-name
-                 (unless (equal (buffer-name) buffer-name)
-                   (switch-to-buffer-other-window buffer-name))
-                 (-->
-                  (pkm2--create-query print-query)
-                  (if (y-or-n-p "Would you like children for this?")
-                      (-concat it (list `(:convert-or convert-to-children ,(pkm--convert-into-get-spec-covert-children)) ))
-                    it)))))
+  (let* ((buffer-name "* create-query *")
+         (print-query (lambda (query)
+                        (erase-buffer)
+                        (princ (format "%S" query))))
+         (output (with-output-to-temp-buffer buffer-name
+                   (unless (equal (buffer-name) buffer-name)
+                     (switch-to-buffer-other-window buffer-name))
+                   (-->
+                    (pkm2--create-query print-query)
+                    (if (y-or-n-p "Would you like children for this?")
+                        (-concat it (list `(:convert-or convert-to-children ,(pkm--convert-into-get-spec-covert-children)) ))
+                      it)))))
 
     (kill-buffer buffer-name)
     (setq pkm2-browse-saved-queries (-concat (list output) pkm2-browse-saved-queries))
