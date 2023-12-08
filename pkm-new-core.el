@@ -1386,10 +1386,10 @@ Commit everything.
 (defun pkm2--link-get-link-child-id (link)
   (pkm2-db-nodes-link-node_b link))
 
-
 (pkm2--register-link-label 'HIERARCHICAL "sub")
 (pkm2--register-link-label 'HIERARCHICAL "related")
 (pkm2--register-link-label 'HIERARCHICAL "clock")
+(pkm2--register-link-label 'HIERARCHICAL "instance")
 (pkm2--register-link-label 'HIERARCHICAL "type-of")
 
 

@@ -1,10 +1,5 @@
 ;;; pkm-object-todo.el -*- lexical-binding: t; -*-
 
-(defvar  pkm-todo-status-types (list "TODO" "DOING" "DONE" "HOLD" "KILL"))
-(defvar pkm-todo-status-face-plist '(TODO org-todo DOING org-todo DONE org-done KILL +org-todo-cancel HOLD +org-todo-onhold ))
-(defvar  pkm-todo-priority-types (list '("1" . 1) '("2" . 2) '("3" . 3) '("4" . 4) '("5" . 5)))
-
-
 
 (pkm2-register-behavior `(:name log :assets ((:pkm-type kvd :name "is-log" :key "node-type" :value "log"  :data-type TEXT)
                                              (:pkm-type kvd :name "timestamp" :key "timestamp" :value ,#'pkm2-get-current-timestamp  :data-type DATETIME))))
