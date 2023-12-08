@@ -35,6 +35,8 @@
 ; Happy coding! ;)
 
 (require 'pkm-new-core )
+(require 'pkm2-browse)
+(require 'pkm2-tasks)
 (require 'pkm2-clock )
 (require 'pkm2-habit )
 (require 'pkm2-object-registrations)
