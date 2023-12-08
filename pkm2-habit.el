@@ -144,7 +144,7 @@
                                     (ts-unix it)
                                     (truncate it))))
 
-         (link-label "sub")
+         (link-label "instance")
          (link-definition (list :pkm-link-label link-label
                                 :parent 'parent
                                 :child 'child))
