@@ -1113,7 +1113,7 @@ TODO TEST!"
                                                                  t)))
          (from (car from-to))
          (to (cdr from-to)))
-    (list :asset-schema asset-spec :asset-capture-info (list :content content :db-id db-id :from from :to to))))
+    (list :asset-schema asset-spec :asset-capture-info (list :content content :db-id db-id :from from :to to) :asset-name asset-name)))
 
 (defun pkm2--object-capture-kvd (asset-spec values buffer-name)
   (let* ((asset-name (plist-get asset-spec :name))
@@ -1154,10 +1154,10 @@ TODO TEST!"
                      t)))
          (from (car from-to))
          (to (cdr from-to)))
-    (list :asset-schema asset-spec :asset-capture-info (list :key key :value value :from from :to to))))
+    (list :asset-schema asset-spec :asset-capture-info (list :key key :value value :from from :to to) :asset-name asset-name)))
 
 
-(defun pkm2--object-capture-object-verify (structure-name-or-schema &optional external-buffer-name skip-verify values is-sub)
+(defun pkm2--object-capture-object-verify (structure-name-or-schema &optional external-buffer-name skip-verify values sub-asset-name)
   (let* ((structure-schema (if (plistp structure-name-or-schema)
                                structure-name-or-schema
                              (pkm--object-define structure-name-or-schema)))
@@ -1211,13 +1211,13 @@ TODO TEST!"
                                                                         buffer-name
                                                                         nil
                                                                         (assoc-default asset-name values)
-                                                                        t))))
-                                        (list :asset-schema asset-spec :asset-capture-info nil))))
+                                                                        asset-name))))
+                                        (list :asset-schema asset-spec :asset-capture-info nil :asset-name asset-name))))
                                   asset-specs)))
-         (output (list :pkm-type structure-name :schema structure-schema :capture-info captured-assets)))
-    (if (and skip-verify (not is-sub))
+         (output (list :pkm-type structure-name :schema structure-schema :capture-info captured-assets :asset-name sub-asset-name)))
+    (if (and skip-verify (not sub-asset-name))
         (pkm--object-capture-finializer structure-schema captured-assets)
-      (unless (or is-sub external-buffer-name)
+      (unless (or sub-asset-name external-buffer-name)
         (setq pkm2-buffer-capture-data-equal-plist (plist-put pkm2-buffer-capture-data-equal-plist buffer-name output #'equal))))
     output))
 
