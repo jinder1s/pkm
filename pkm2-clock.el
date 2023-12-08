@@ -7,30 +7,9 @@
 (defvar pkm2-clock-auto-clock-into-parent t)
 (defvar pkm2-clock-auto-clock-node-types '(project-s area-s task-n))
 
-(defun pkm2-object-clock--insert-at-point (browse-node)
-  "Assume browse-node is a Task structure. Insert a string representing it at point."
-  ;  TODO What do I want to do about null text in nodes?
-  ;  Should I show empty string or should I just not show node?
-(let* ((pkm-node (pkm2-browse-node-pkm-node browse-node))
-       (state (pkm2-browse-node-state browse-node))
-       (show-hidden (pkm2-browse-node-state-show-hidden state))
-       (clock-start (--> (pkm2-node-get-kvds-with-key pkm-node "clock-start")
-                         (car it)
-                         (when it (pkm2-db-kvd-value it))
-                         (format-time-string "%Y-%m-%d %H:%M:%S %z" it) ))
-       (clock-end (--> (pkm2-node-get-kvds-with-key pkm-node "clock-end")
-                       (car it)
-                       (when it (pkm2-db-kvd-value it ))
-                       (when it
-                         (format-time-string "%Y-%m-%d %H:%M:%S %z" it) ) ))
-       (string-to-display (concat (format "[%s]--[%s]" (pkm2--browse-convert-object-to-string clock-start) (pkm2--browse-convert-object-to-string clock-end))
-                                  (when show-hidden
-                                      (pkm2-browse--default-hidden-info-string browse-node)))))
-  (insert  string-to-display)))
 
 (pkm-register-structure 'clock-node
                         (list :parent 'dependent-node
-                              :browse-insert-func #'pkm2-object-clock--insert-at-point
                               :browse-insert-format-string (concat
                                                             "[<insert>(:display kvd-value :key \"clock-start\")</insert>]"
                                                             "--"
