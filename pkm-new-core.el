@@ -1209,17 +1209,15 @@ TODO TEST!"
                                                    :asset-capture-info (pkm2--object-capture-object-verify
                                                                         (plist-get asset-spec :pkm-type)
                                                                         buffer-name
-                                                                        nil
+                                                                        skip-verify
                                                                         (assoc-default asset-name values)
                                                                         asset-name))))
                                         (list :asset-schema asset-spec :asset-capture-info nil :asset-name asset-name))))
                                   asset-specs)))
          (output (list :pkm-type structure-name :schema structure-schema :capture-info captured-assets :asset-name sub-asset-name)))
-    (if (and skip-verify (not sub-asset-name))
-        (pkm--object-capture-finializer structure-schema captured-assets)
-      (unless (or sub-asset-name external-buffer-name)
-        (setq pkm2-buffer-capture-data-equal-plist (plist-put pkm2-buffer-capture-data-equal-plist buffer-name output #'equal))))
-    output))
+    (cond ((and skip-verify (not sub-asset-name)) (pkm--object-capture-finializer structure-schema captured-assets))
+          ((not (or sub-asset-name external-buffer-name)) (setq pkm2-buffer-capture-data-equal-plist (plist-put pkm2-buffer-capture-data-equal-plist buffer-name output #'equal)))
+          (t output))))
 
 (defun pkm2-kill-buffer-hook ()
   (--> (buffer-name)
