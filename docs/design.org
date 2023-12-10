@@ -1,0 +1,32 @@
+#+title: Design documents
+* Base node types
+** note
+** log
+Has a timestamp
+** dependent
+** Instance
+** task
+Has status and priority
+** Time interval
+
+* Time intervals
+** Functional Description
+- Design abstraction for time intervals
+- has a start and end
+- If node is an one time event, start and end can be directly linked to node
+  + If there are multiple, new instance nodes will be created with their independent start and ends
+** Examples
+- Schedule a event
+- Clocking into something
+- Schedule an interval to work on
+** Log
+For now, lets just not do this. Lets jump implment more of these and see what happens
+
+* tasks
+** Functional Description
+- Allow user to track of tasks
+- Allows users to track deadlines for tasks
+- Allows users to schedule when
+** User Interface
+** Goals and milestones
+** implementation track

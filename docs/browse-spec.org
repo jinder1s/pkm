@@ -1,0 +1,28 @@
+#+title: Browse Spec
+* active-clock :query:
+** (:or active-clock nil)
+* active-clock with children for past 2 days :query:
+** (:or active-clock nil) :filter:
+** (:convert-or convert-to-children (:levels ALL)) :filter:
+** (:and time-between (after (day -2))) :filter:
+* active-clock with children logs for past 2 days :query:
+** (:or active-clock nil) :filter:
+** (:convert-or convert-to-children (:levels ALL)) :filter:
+** (:and structure-type (:structure-name task-n)) :filter:
+** (:and time-between (after (day -2))) :filter:
+* Pressing Tasks :query:
+** (:or structure-type (:structure-name task-n)) :filter:
+** (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "HOLD" "TODO")))
+** (:name open-tasks)
+** (:and kvd (:key "deadline" :data-type DATETIME :after (day -2) :before (day 2)) open-tasks)
+** (:and kvd (:key "schedule" :data-type DATETIME :after (day -2) :before (day 2)) open-tasks)
+
+* Active Project Tasks :query:
+** (:or structure-type (:structure-name project-s)) :filter:
+** (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "HOLD")))
+** (:name open-projects)
+** (:convert-and convert-to-children (:levels ALL) open-projects)
+** (:name open-project-children)
+** (:or structure-type (:structure-name log-n) open-project-children)
+** (:combine-or (open-project))
+
