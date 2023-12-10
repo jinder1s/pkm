@@ -1630,10 +1630,18 @@ Commit everything.
   (pkm2--db-compile-query-get-nodes-of-structure-type (plist-get type-values :structure-name)))
 
 (defun pkm2--compile-db-query-between (type-values nodes-subquery)
-  (pkm2--db-compile-get-nodes-between
-   (plist-get type-values :after)
-   (plist-get type-values :before)
-   nodes-subquery))
+   (let* ((after (plist-get type-values :after))
+          (after (if (and (plistp after) (length> after 1) )
+                     (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
+                   after))
+         (before (plist-get type-values :before))
+         (before  (if (and (plistp before) (length> before 1) )
+                     (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now)))) ) )
+                   before)))
+    (pkm2--db-compile-get-nodes-between
+     after
+     before
+     nodes-subquery) ))
 
 (defun pkm2--compile-db-query-children-num (type-values nodes-subquery)
   (pkm2--db-compile-get-nodes-with-num-children (plist-get type-values :children-num)))
@@ -1760,16 +1768,36 @@ Commit everything.
 
 (defun pkm--convert-into-get-spec-between ()
   (let* ((what-to-get (completing-read "What would you like to set?" '("after" "before" "both")))
-                (after (when (or (equal "after" what-to-get) (equal "both" what-to-get))
-                         (--> (read-string "Time after:\n" (format-time-string "%FT%T%z" (current-time) ))
-                              (date-to-time it)
-                              (time-convert it 'integer))
-                         ))
-                (before (when (or (equal "before" what-to-get) (equal "both" what-to-get))
-                          (--> (read-string "Time before:\n" (format-time-string "%FT%T%z" (current-time) ))
-                               (date-to-time it)
-                               (time-convert it 'integer))
-                          )))
+         (relative-time (y-or-n-p "Default is absolute time. Would you like to switch to relative time now?"))
+
+         (after (when (or (equal "after" what-to-get) (equal "both" what-to-get))
+                  (if relative-time
+                      (let* ((relative-by (completing-read-multiple "How would you like to specify after?"
+                                                                    '("hour" "day" "minute" "second" "week" "month")))
+                             (units-amounts (-map (lambda (time-unit)
+                                                    (cons (intern time-unit ) (read-number (format "Relative by %s?" time-unit)) )) relative-by))
+                             output)
+
+                        (-each units-amounts (lambda (unit-amount) (setq output (-concat output (list (car unit-amount) (cdr unit-amount))))))
+                        output)
+                      (--> (read-string "Time after:\n" (format-time-string "%FT%T%z" (current-time) ))
+                           (date-to-time it)
+                           (time-convert it 'integer)) )
+                  ))
+         (before (when (or (equal "before" what-to-get) (equal "both" what-to-get))
+                   (if relative-time
+                       (let* ((relative-by (completing-read-multiple "How would you like to specify before?"
+                                                                     '("hour" "day" "minute" "second" "week" "month")))
+                              (units-amounts (-map (lambda (time-unit)
+                                                     (cons (intern time-unit ) (read-number (format "Relative by %s?" time-unit)) )) relative-by))
+                              output)
+
+                         (-each units-amounts (lambda (unit-amount) (setq output (-concat output (list (car unit-amount) (cdr unit-amount))))))
+                         output)
+                     (--> (read-string "Time before:\n" (format-time-string "%FT%T%z" (current-time) ))
+                          (date-to-time it)
+                          (time-convert it 'integer)) )
+                   )))
     (list :after after :before before)))
 
 
