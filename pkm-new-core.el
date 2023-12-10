@@ -1,5 +1,5 @@
-;;; pkm-new-core.el -*- lexical-binding: t; -*-
 
+;;; pkm-new-core.el -*- lexical-binding: t; -*-
 (require 'cl-lib)
 (require 'cl-generic)
 (require 'cl-macs)
@@ -1734,6 +1734,41 @@ Commit everything.
       (when print-output (funcall print-output query-spec) )
       (setq action (--> (completing-read "What would you like to do next?" prompts)
                         (assoc-default it prompts))))
+    query-spec))
+
+
+(defun pkm2--create-query-filter (&optional action)
+  (let* ((action-options '(:or :and :not :convert-or :convert-and :name :combine-or :combine-and))
+         (action (or action (intern (completing-read "What action would you like to do?" action-options) ) ))
+         (options (doom-plist-keys pkm2--query-spec-options-plist))
+         (convert-options '("convert-to-parents" "convert-to-children" "convert-dependent-to-parent"))
+         (query-spec (-as-> (cond ((equal action :or)
+                                   (--> (completing-read "How would you like to select nodes to add to current selection?" options)
+                                        (intern it)
+                                        (list it (pkm--convert-into-get-spec it))))
+                                  ((equal action :and)
+                                   (--> (completing-read "How would you filter current nodes?" options)
+                                        (intern it)
+                                        (list it (pkm--convert-into-get-spec it))))
+                                  ((equal action :not)
+                                   (--> (completing-read "How would you remove nodes from current selection?" options)
+                                        (intern it)
+                                        (list it (pkm--convert-into-get-spec it))))
+                                  ((equal action :convert-and)
+                                   (--> (completing-read "How would you like to convert current selection?" convert-options)
+                                        (intern it)
+                                        (list it (pkm--convert-into-get-spec it))))
+                                  ((equal action :convert-or)
+                                   (--> (completing-read "How would you like to convert current selection?" convert-options)
+                                        (intern it)
+                                        (list it (pkm--convert-into-get-spec it))))
+                                  ((equal action :name)
+                                   (list nil (list :name (read-string "Name for current selection: "))))
+                                  ((not (equal action "DONE"))
+                                   (error "Something weird happened")))
+                            it2
+                            (pkm2--create-query-2 action (nth 0 it2) (nth 1 it2)))))
+
     query-spec))
 
 (defvar pkm2--query-spec-options-plist ())
