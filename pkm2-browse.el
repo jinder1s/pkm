@@ -45,8 +45,14 @@
 
 ;;;; Persistent buffer
 (defvar pkm2-browse-buffer "*pkm2-browse*"
-
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
+
+
+
+(when (and  (boundp 'pkm2-browse-saved-queries ) pkm2-browse-saved-queries ) (persist-save 'pkm2-browse-saved-queries) )
+(when (and  (boundp 'pkm2-browse-saved-named-queries ) pkm2-browse-saved-named-queries ) (persist-save 'pkm2-browse-saved-named-queries) )
+(when (and  (boundp 'pkm2-browse-saved-section-specs ) pkm2-browse-saved-section-specs ) (persist-save 'pkm2-browse-saved-section-specs) )
+(when (and  (boundp 'pkm2-browse-saved-named-section-specs ) pkm2-browse-saved-named-section-specs ) (persist-save 'pkm2-browse-saved-named-section-specs) )
 (persist-defvar pkm2-browse-saved-queries () "Individual queries to get pkm nodes")
 (persist-defvar pkm2-browse-saved-named-queries () "Individual queries to get pkm nodes")
 (persist-defvar pkm2-browse-saved-section-specs () "Created Section specs")
@@ -120,6 +126,8 @@
         (pkm2-browse--insert-section section)))
     (setq buffer-read-only t) ))
 
+
+
 (defun pkm2--browse-create-new-id (browse-nodes)
   (--> (-map #'car browse-nodes) (if it (-max it) -1)  (+ 1 it)))
 
@@ -144,6 +152,7 @@
   (pkm2-browse-hierarchy-organize-as-hierarchy nodes))
 
 (defun pkm2-browse--insert-section (section)
+  (setq buffer-read-only nil)
   (let* ((nodes-spec (pkm2-browse-section-spec section))
          (section-state (pkm2-browse-section-state section))
          (show-as-hierarchy (pkm2-browse-section-show-as-hierarchy section))
@@ -166,7 +175,6 @@
     (setf (pkm2-browse-section-from section) from)
     (setf (pkm2-browse-section-to section) to)
     (setf (pkm2-browse-section-state section) nil)
-
     (--> (-map #'pkm2-browse-node-state section-nodes)
          ( -each it (lambda (state)
                       (setf (pkm2-browse-node-state-section state) section))))
@@ -181,6 +189,7 @@
                              ('show-children (pkm2--browse-see-children nil (plist-get action :node-db-id) (plist-get action :level-children) )))))))
 
 (defun pkm2-browse--insert-browse-node (browse-node &optional insert-func only-node)
+  (setq buffer-read-only nil)
   (let* ((state (or (pkm2-browse-node-state browse-node) (setf (pkm2-browse-node-state browse-node)(make-pkm2-browse-node-state))))
          (level (pkm2-browse-node-state-level state))
          (prefix (concat (propertize " " 'display `(space :width (,(*  20 (abs (or level 0) )))))))
@@ -894,35 +903,10 @@ Has no effect when there's no `org-roam-node-at-point'."
       ; overriding org's [tab] keybind in GUI Emacs. This is needed to undo
       ; that, and should probably be PRed to org.
 
-      "C-M-RET"      #'pkm--browse-capture-node-as-child-of-node-at-point
-      [C-M-return] #'pkm--browse-capture-node-as-child-of-node-at-point
-
-      ; TODO modify functions to add captured note to browser below
-      "C-RET"      #'pkm--browse-capture-node-as-sibling-of-node-at-point
-      [C-return]   #'pkm--browse-capture-node-as-sibling-of-node-at-point
-
-      ; TODO modify functions to add captured note to browser above
-      "C-S-RET"    #'pkm--browse-capture-node-as-sibling-of-node-at-point
-      [C-S-return] #'pkm--browse-capture-node-as-sibling-of-node-at-point
-      (:when IS-MAC
-        [s-return]   #'pkm--browse-capture-node-as-sibling-of-node-at-point
-        [s-S-return] #'pkm--browse-capture-node-as-sibling-of-node-at-point
-        [s-M-return] #'pkm--browse-capture-node-as-child-of-node-at-point)
-
       :localleader
       [tab]        #'pkm2--browse-toggle-hidden-info-at-point
       (:prefix ("e" . "edit")
                "e" #'pkm2--browse-edit-object-at-point)
-      (:prefix ("a" . "a")
-               "c" #'pkm--browse-capture-node-as-child-of-node-at-point
-               "s" #'pkm--browse-capture-node-as-sibling-of-node-at-point
-               )
-      (:prefix ("r" . "relations")
-               "c" #'pkm2--browse-add-node-as-child-to-node-at-point
-               "p" #'pkm2--browse-add-node-as-parent-to-node-at-point
-               (:prefix ("s" . "show")
-                :desc "Children" "c" #'pkm2--browse-see-children-at-point
-                :desc "Parents"  "p" #'pkm2--browse-see-parents-at-point))
       (:prefix ("b" . "buffer")
                "r" #'pkm2--refresh-current-buffer)
       (:prefix ("s" . "section")
@@ -933,11 +917,13 @@ Has no effect when there's no `org-roam-node-at-point'."
                 "c" #'pkm--browse-capture-node-as-child-of-node-at-point
                 "s" #'pkm--browse-capture-node-as-sibling-of-node-at-point )
                (:prefix ("c" . "clock")
-                "e" #'pkm2-clock-edit-clock-at-point
-                "i" #'pkm2-clock-in
-                "o" #'pkm2-clock-out
-                "s" #'pkm2-clock-switch)
-
+                        "e" #'pkm2-clock-edit-clock-at-point
+                        "i" #'pkm2-clock-in
+                        "o" #'pkm2-clock-out
+                        "s" #'pkm2-clock-switch)
+               (:prefix ("s" . "show")
+                :desc "Children" "c" #'pkm2--browse-see-children-at-point
+                :desc "Parents"  "p" #'pkm2--browse-see-parents-at-point)
                "f" #'pkm2--browse-filter-children-nodes-at-point
                "n" #'pkm2--narrow-to-node-and-children-at-point
                "d" #'pkm2--browse-delete-node-at-point))
