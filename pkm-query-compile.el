@@ -43,8 +43,8 @@
 
 (defvar-keymap pkm-query-compile-mode-map
   :doc ""
-  "C-c C-c" (lambda () (funcall pkm-query-compile-finish-func))
-  "C-c C-k" (lambda () (funcall pkm-query-compile-cancel-finish-func))
+  "C-c C-c" (lambda () (interactive) (funcall pkm-query-compile-finish-func))
+  "C-c C-k" (lambda () (interactive) (funcall pkm-query-compile-cancel-finish-func))
   "a b q" #'pkm-compile-add-query-before
   "a b s" #'pkm-compile-add-section-before
   "a b f" #'pkm-compile-add-filter-before
@@ -54,6 +54,21 @@
   "d f" #'pkm-compile-remove-current-filter
   "d q" #'pkm-compile-remove-current-query
   "d s" #'pkm-compile-remove-current-section)
+
+(setq pkm-query-compile-mode-map
+      (define-keymap
+          ;; :doc ""
+          "C-c C-c" (lambda () (interactive) (funcall pkm-query-compile-finish-func))
+          "C-c C-k" (lambda () (interactive) (funcall pkm-query-compile-cancel-finish-func))
+          "C-c a b q" #'pkm-compile-add-query-before
+          "C-c a b s" #'pkm-compile-add-section-before
+          "C-c a b f" #'pkm-compile-add-filter-before
+          "C-c a a q" #'pkm-compile-add-query-after
+          "C-c a a s" #'pkm-compile-add-section-after
+          "C-c a a f" #'pkm-compile-add-filter-after
+          "C-c d f" #'pkm-compile-remove-current-filter
+          "C-c d q" #'pkm-compile-remove-current-query
+          "C-c d s" #'pkm-compile-remove-current-section))
 (define-minor-mode pkm2-query-compile-mode
   "Minor mode for simple finish/cancel keybindings."
   :keymap pkm-query-compile-mode-map)
@@ -84,14 +99,14 @@
       (setq pkm-query-compile-ewoc browse-ewoc)
       (setq pkm-query-compile-finish-func
             (lambda ()
-              (interactive)
               (with-current-buffer buffer
-                (funcall post-create-function (pkm-compile-collect-queries)) ) ))
+                (let* ((browse-spec (pkm-compile-collect-queries)))
+                  (kill-buffer buffer)
+                  (funcall post-create-function browse-spec)))))
       (setq pkm-query-compile-cancel-finish-func
             (lambda ()
-              (interactive)
               (kill-buffer buffer-name)))
-      (add-hook 'kill-buffer-hook #'pkm2-kill-buffer-hook nil t))
+      (pkm2-query-compile-mode))
     (-each ewoc-data (lambda (filter) (ewoc-enter-last browse-ewoc filter)))))
 
 (defun pkm-compile-add-filter-before (&optional filter)

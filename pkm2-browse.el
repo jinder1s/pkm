@@ -6,6 +6,7 @@
 (require 'cl-lib)
 (require 'cl-macs)
 (require 'pkm-new-core)
+(require 'pkm-query-compile)
 
 (cl-defstruct pkm2-browse-node-state
   (show-hidden nil)
@@ -77,6 +78,16 @@
                          sections-specs)))
     (message "sections-spec: %S, chosed-sections: %S" sections-specs chosen-sections)
     (pkm2--browse (make-pkm2-browse-buffer-state :sections sections) nil)))
+
+(defun pkm2-browse-2 ()
+  (interactive)
+  (let* ((query-create-callback (lambda (browse-spec)
+                                  (let* ((sections (-map (lambda (section-spec)
+                                                           (make-pkm2-browse-section :spec  section-spec))
+                                                         (plist-get browse-spec :sections)))
+                                         (browse-state (make-pkm2-browse-buffer-state :sections sections)))
+                                    (pkm2--browse browse-state nil)))))
+    (pkm-compile-create-browse-spec query-create-callback)))
 
 
 (defvar pkm2-browse-buffer-states-equal-plist ())
