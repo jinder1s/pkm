@@ -10,6 +10,15 @@
 
 (require 'dash)
 
+
+(require 'persist)
+
+(persist-defvar pkm2-browse-saved-queries () "Individual queries to get pkm nodes")
+(persist-defvar pkm2-browse-saved-named-queries () "Individual queries to get pkm nodes")
+
+(unless  pkm2-browse-saved-queries (persist-load 'pkm2-browse-saved-queries) )
+(unless  pkm2-browse-saved-named-queries (persist-load 'pkm2-browse-saved-named-queries) )
+
 ;;; pkm utils
 (defun pkm2--db-sanatize-text (input)
   "Single-quote (scalar) input for use in a SQL expression."
@@ -1568,7 +1577,6 @@ Commit everything.
 
 
 (defun pkm2--compile-full-db-query (query-plist)
-  (message "q-plist: %S" query-plist)
   (let* ((query query-plist)
          (output
           (-reduce-from
@@ -1694,10 +1702,11 @@ Commit everything.
                     ("Remove nodes" . :not)
                     ("Convert nodes to thier parents or children" . :convert-and)
                     ("Also get children or parents of current nodes." . :convert-or)
+                    ("Done and name query" . "DONE-NAME")
                     ("I'm done" .  "DONE")))
          (action (or initial-action :or))
          (options (doom-plist-keys pkm2--query-spec-options-plist)
-                  ; '("all" "structure-type" "between" "kvd" "between" "children-num" "parent-num" "with-children" "with-parent" "text" "db-node")
+                                        ; '("all" "structure-type" "between" "kvd" "between" "children-num" "parent-num" "with-children" "with-parent" "text" "db-node")
                   )
          (convert-options '("convert-to-parents" "convert-to-children" "convert-dependent-to-parent"))
          (query-spec (-copy initial-queries)))
@@ -1734,6 +1743,14 @@ Commit everything.
       (when print-output (funcall print-output query-spec) )
       (setq action (--> (completing-read "What would you like to do next?" prompts)
                         (assoc-default it prompts))))
+    (if (equal action "DONE-NAME")
+        (--> (read-string (format "Name for: %S" query-spec))
+             (-concat pkm2-browse-saved-named-queries (list (cons it (format "%S" query-spec )) ))
+             (setq pkm2-browse-saved-named-queries it))
+      (--> (-concat pkm2-browse-saved-queries (format "%S" query-spec))
+           (setq pkm2-browse-saved-queries it)))
+    (persist-save pkm2-browse-saved-queries)
+    (persist-save pkm2-browse-saved-named-queries)
     query-spec))
 
 

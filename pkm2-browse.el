@@ -47,15 +47,14 @@
 (defvar pkm2-browse-buffer "*pkm2-browse*"
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
 
-(persist-defvar pkm2-browse-saved-queries () "Individual queries to get pkm nodes")
-(persist-defvar pkm2-browse-saved-named-queries () "Individual queries to get pkm nodes")
 (persist-defvar pkm2-browse-saved-section-specs () "Created Section specs")
 (persist-defvar pkm2-browse-saved-named-section-specs () "Created Section specs")
-(unless  pkm2-browse-saved-queries (persist-load 'pkm2-browse-saved-queries) )
-(unless  pkm2-browse-saved-named-queries (persist-load 'pkm2-browse-saved-named-queries) )
 (unless  pkm2-browse-saved-section-specs (persist-load 'pkm2-browse-saved-section-specs) )
 (unless  pkm2-browse-saved-named-section-specs (persist-load 'pkm2-browse-saved-named-section-specs) )
 
+
+(persist-defvar pkm2-browse-saved-named-browse-specs () "Created browse specs")
+(unless  pkm2-browse-saved-named-browse-specs (persist-load 'pkm2-browse-saved-named-browse-specs) )
 (defvar-local pkm2-browse--browse-nodes-alist ())
 (defvar-local pkm2-browse--browse-sections-alist ())
 
@@ -86,8 +85,21 @@
                                                            (make-pkm2-browse-section :spec  section-spec))
                                                          (plist-get browse-spec :sections)))
                                          (browse-state (make-pkm2-browse-buffer-state :sections sections)))
+                                    (message "b-s2: %S" browse-state)
                                     (pkm2--browse browse-state nil)))))
     (pkm-compile-create-browse-spec query-create-callback)))
+
+(defun pkm2-browse-3 ()
+  (interactive)
+  (let* ((browse-spec (--> (completing-read "Which Browse spec?" pkm2-browse-saved-named-browse-specs )
+                           (assoc-default it pkm2-browse-saved-named-browse-specs)
+                           (read it)))
+         (sections (-map (lambda (section-spec)
+                           (make-pkm2-browse-section :spec  section-spec))
+                         (plist-get browse-spec :sections)))
+         (browse-state (make-pkm2-browse-buffer-state :sections sections)))
+    (message "b-s3: %S" browse-state)
+    (pkm2--browse browse-state nil)))
 
 
 (defvar pkm2-browse-buffer-states-equal-plist ())
@@ -752,13 +764,10 @@ Has no effect when there's no `org-roam-node-at-point'."
   (interactive)
   (let* ((buffer-name (buffer-name))
          (section-id (get-text-property (point) :pkm2-browse-section-id))
-         (section (assoc-default section-id pkm2-browse--browse-sections-alist))
-         (section-spec (pkm2-browse-section-spec section))
-         (queries (plist-get section-spec :queries))
-         (new-query (pkm2--create-section-query))
-         (new-section-spec (plist-put section-spec :queries (-concat queries (list new-query)))))
-    (setf (pkm2-browse-section-spec section) new-section-spec)
+         (section (assoc-default section-id pkm2-browse--browse-sections-alist)))
+    (pkm-browse-section-add-query section)
     (pkm2--refresh-current-buffer buffer-name)))
+
 
 ;;; hierarchy
 ;;
@@ -783,11 +792,11 @@ Has no effect when there's no `org-roam-node-at-point'."
                                  (-map (lambda (index)
                                          (nth index browse-nodes)) it)))
          (present-children-indexes (-map (lambda (c-ids)
-                                                (-non-nil
-                                                 (-map (lambda (c-id)
-                                                         (-elem-index c-id db-ids))
-                                                       c-ids)))
-                                              children-db-ids-list)))
+                                           (-non-nil
+                                            (-map (lambda (c-id)
+                                                    (-elem-index c-id db-ids))
+                                                  c-ids)))
+                                         children-db-ids-list)))
     (-each parent-less-nodes (lambda (b-n)
                                (--> (pkm2-browse-node-state b-n) (setf (pkm2-browse-node-state-level it) 0))))
     (-each-indexed browse-nodes (lambda (index p-b-n)
@@ -796,8 +805,8 @@ Has no effect when there's no `org-roam-node-at-point'."
                                              (children-browse-nodes (-map (lambda (index)
                                                                             (nth index browse-nodes))
                                                                           children-indexes-list))
-                                             ; Only modify child nodes that don't already have parent
-                                             ; In the future, I might want to duplicate here
+                                        ; Only modify child nodes that don't already have parent
+                                        ; In the future, I might want to duplicate here
                                              (c-b-n-with-no-parent (-filter (lambda (c-b-n)
                                                                               (not (pkm2-browse-node-parent c-b-n)))
                                                                             children-browse-nodes)))
@@ -902,11 +911,21 @@ Has no effect when there's no `org-roam-node-at-point'."
       (:prefix ("e" . "edit")
                "e" #'pkm2--browse-edit-object-at-point)
       (:prefix ("b" . "buffer")
-               "r" #'pkm2--refresh-current-buffer)
+               "r" #'pkm2--refresh-current-buffer
+               "a" #'pkm2-browse-add-section
+               "s" #'pkm2-browse-save-browse-spec
+               )
       (:prefix ("s" . "section")
-               "r" #'pkm2--refresh-current-buffer)
+               "r" #'pkm2--refresh-current-buffer
+               "q" #'pkm2--add-query-to-section-at-point
+               "e" #'pkm-browse-section-edit-spec
+               "s" #'pkm-browse-section-save-spec
+               )
       (:prefix "n"
                (:prefix ("a" . "add")
+                (:prefix ("r" . "relationship")
+                         "p" #'pkm2--browse-add-node-as-parent-to-node-at-point
+                         "c" #'pkm2--browse-add-node-as-child-to-node-at-point)
                 :desc "Add kvd" "k" #'pkm2--browse-add-kvd-at-point
                 "c" #'pkm--browse-capture-node-as-child-of-node-at-point
                 "s" #'pkm--browse-capture-node-as-sibling-of-node-at-point )
@@ -929,11 +948,37 @@ Has no effect when there's no `org-roam-node-at-point'."
   :keymap pkm2-browse-mode-map)
 
 
+
+(defun pkm2-browse-add-section (&optional buffer-name)
+  (interactive)
+  (let* ((buffer-name (or buffer-name (buffer-name) ))
+         (buffer-state (plist-get pkm2-browse-buffer-states-equal-plist buffer-name #'equal))
+         (sections (pkm2-browse-buffer-state-sections buffer-state))
+         (completing-read-choices (-concat (list '("NEW" . "NEW") ) pkm2-browse-saved-named-section-specs))
+         (chosen-section (if (length> completing-read-choices 1)
+                             (completing-read "Which section would you like to add: " completing-read-choices)
+                           "NEW"))
+         (new-section (make-pkm2-browse-section :spec  (if (equal "NEW" chosen-section)
+                                                           (pkm2--create-section-spec)
+                                                         (read (assoc-default chosen-section completing-read-choices) ))))
+         (new-sections (-concat sections (list new-section))))
+    (setf (pkm2-browse-buffer-state-sections buffer-state) new-sections)
+    (pkm2--browse buffer-state buffer-name)))
+
+(defun pkm2-browse-save-browse-spec (&optional buffer-name)
+  (interactive)
+  (let* ((buffer-name (or buffer-name (buffer-name) ))
+         (buffer-state (plist-get pkm2-browse-buffer-states-equal-plist buffer-name #'equal))
+         (sections (--> (pkm2-browse-buffer-state-sections buffer-state) (-map #'pkm2-browse-section-spec it) ))
+         (browse-spec `(:sections ,sections) )
+         (name (read-string "Browse name: ")))
+    (setq pkm2-browse-saved-named-browse-specs (-concat (list (cons name (format "%S" browse-spec)) ) pkm2-browse-saved-named-browse-specs))))
+
 ;;; browse-section
 
 (defun pkm2--create-section-spec ()
   (let* ((buffer-name "* create-section *")
-         (completing-read-choices (-concat '("NEW") pkm2-browse-saved-named-queries (-map (lambda (query) (cons (format "%S" query) query)) pkm2-browse-saved-queries)))
+         (completing-read-choices (-concat '("NEW") pkm2-browse-saved-named-queries))
          (chosen-queries (if (or pkm2-browse-saved-named-queries pkm2-browse-saved-queries)
                              (completing-read-multiple "Which queries would you like to add to this section: "
                                                        completing-read-choices)
@@ -961,43 +1006,11 @@ Has no effect when there's no `org-roam-node-at-point'."
                                                                  (list query-spec))
                                                         it2
                                                         (funcall print-section it2))))
-                           (-as-> (y-or-n-p "Would you like children for this?")
-                                  it2
-                                  (when it2 (pkm--convert-into-get-spec-covert-children))
-                                  (when it2 `(:convert-or convert-to-children ,it2))
-                                  (-concat it (when it2 (list it2) )))
                            (-concat queries (list it))))
         (funcall print-section queries)
         (setq create-query (y-or-n-p "Would you like to add another query to this section?"))))
     (kill-buffer buffer-name)
-    (let* ((completing-read-choices (--> (-filter (lambda (query) (not (member query initial-queries) )) queries)
-                                         (-map (lambda (query) (cons (format "%S" query) query)) it) ))
-           (choices (when completing-read-choices (completing-read-multiple "Would you like to name any of the following queries?" completing-read-choices) ))
-           (choice-or-not-choice-group (-group-by (lambda (possible-choice)
-                                                    (when (member (car possible-choice ) choices) t))
-                                                  completing-read-choices) )
-           (choices-to-not-name (--> (assoc-default nil choice-or-not-choice-group)
-                                     (-map (lambda (not-choice)
-                                             (assoc-default not-choice completing-read-choices)) it)) )
-           (choices-to-name (--> (assoc-default t choice-or-not-choice-group)
-                                 (-map (lambda (choice)
-                                         (assoc-default (car choice ) completing-read-choices)) it) ))
-           (choices-with-names (-map (lambda (choice) (cons (read-string (format "Name for: %S" choice)) (format "%S" choice ))) choices-to-name)))
-      (setq pkm2-browse-saved-named-queries (-concat pkm2-browse-saved-named-queries choices-with-names))
-      (persist-save pkm2-browse-saved-named-queries)
-      (-each choices-to-not-name
-        (lambda (query)
-          (setq pkm2-browse-saved-queries (-concat pkm2-browse-saved-queries (list (format "%S" query))))
-          (persist-save pkm2-browse-saved-queries)
-          )))
     (setq output `(:queries ,queries ))
-    (--> (y-or-n-p (format "Would you like to name this section spec: %S?" output))
-         (when it (read-string (format "What would you name this section spec: %S" output)))
-         (if it
-             (setq pkm2-browse-saved-named-section-specs (-concat pkm2-browse-saved-named-section-specs (list (cons it (format "%S" output)))))
-           (setq pkm2-browse-saved-section-specs (-concat (list (format "%S" output)) pkm2-browse-saved-section-specs))))
-    (persist-save pkm2-browse-saved-section-specs)
-    (persist-save pkm2-browse-saved-named-section-specs)
     output))
 
 (defun pkm2--create-section-query ()
@@ -1008,26 +1021,55 @@ Has no effect when there's no `org-roam-node-at-point'."
          (output (with-output-to-temp-buffer buffer-name
                    (unless (equal (buffer-name) buffer-name)
                      (switch-to-buffer-other-window buffer-name))
-                   (-->
-                    (pkm2--create-query print-query)
-                    (if (y-or-n-p "Would you like children for this?")
-                        (-concat it (list `(:convert-or convert-to-children ,(pkm--convert-into-get-spec-covert-children)) ))
-                      it)))))
+                   (pkm2--create-query print-query))))
 
     (kill-buffer buffer-name)
     (setq pkm2-browse-saved-queries (-concat (list output) pkm2-browse-saved-queries))
     (persist-save pkm2-browse-saved-queries)
     output))
 
+
+
+(defun pkm-browse-section-refresh (section-id)
+  (error "Not implemented"))
+
+(defun pkm-browse-section-add-query (section)
+  (let* ((section-spec (pkm2-browse-section-spec section))
+         (queries (plist-get section-spec :queries))
+         (new-query (pkm2--create-section-query))
+         (new-section-spec (plist-put section-spec :queries (-concat queries (list new-query)))))
+    (setf (pkm2-browse-section-spec section) new-section-spec)))
+
+(defun  pkm-browse-section-edit-spec ()
+  (interactive)
+  (let* ((buffer-name (buffer-name))
+         (section-id (get-text-property (point) :pkm2-browse-section-id))
+         (section (assoc-default section-id pkm2-browse--browse-sections-alist))
+         (section-spec (pkm2-browse-section-spec section))
+         (callback (lambda (browse-spec)
+                     (setf  (pkm2-browse-section-spec section) (car (plist-get browse-spec :sections)))
+                     (pkm2--refresh-current-buffer buffer-name))))
+    (pkm-compile-create-browse-spec callback nil section-spec)))
+
+(defun pkm-browse-section-save-spec ()
+  (interactive)
+  (let* ((buffer-name (buffer-name))
+         (section-id (get-text-property (point) :pkm2-browse-section-id))
+         (section (assoc-default section-id pkm2-browse--browse-sections-alist))
+         (section-spec (pkm2-browse-section-spec section))
+         (section-spec-string (format "%S" section-spec))
+         (name (read-string (format "Name for: %s\n" section-spec-string))))
+    (setq pkm2-browse-saved-named-section-specs (-concat (list (cons name section-spec-string)) pkm2-browse-saved-named-section-specs ) )))
+
 ;;; search
 (defun pkm2-get-nodes-with-text (text )
   (let* ((query (pkm2--db-compile-query-get-node-with-text text))
          (nodes-ids (-flatten (sqlite-select pkm2-database-connection query) ))
          (nodes-texts-and-id (sqlite-select pkm2-database-connection (format "SELECT content, id  FROM node WHERE id IN (%s)"
-                                                               (--> (-map (lambda (node-id)
-                                                                            (pkm2--db-format-value-correctly node-id 'INTEGER))
-                                                                          nodes-ids)
-                                                                    (string-join it ", ")))) ))
+                                                                             (--> (-map (lambda (node-id)
+                                                                                          (pkm2--db-format-value-correctly node-id 'INTEGER))
+                                                                                        nodes-ids)
+                                                                                  (string-join it ", ")))) ))
     (-map #'car nodes-texts-and-id )))
 (defun pkm2-search ()
   (interactive)
