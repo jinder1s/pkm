@@ -33,7 +33,7 @@
 (defun pkm2--db-format-value-correctly (value &optional type)
   (cond ((or (not type) (eq 'TEXT type)) (pkm2--db-sanatize-text value ) )
         ((or (eq 'INTEGER type) (eq 'DATETIME type) ) (format "%d" value) )
-        ((eq 'REAL type) (format "%d" value) )))
+        ((eq 'REAL type) (format "%f" value) )))
 
 
 (defun pkm2-get-current-timestamp ()
@@ -41,7 +41,8 @@
 
 (defun pkm2--db-convert-object-to-string (object)
   (cond ((stringp object) (pkm2--db-sanatize-text object))
-        ((numberp object) (format "%d" object))
+        ((and (numberp object) (equal object (truncate object)) ) (format "%d" object))
+        ((and (numberp object) (not (equal object (truncate object)) ) ) (format "%f" object))
         ((symbolp object) (pkm2--db-sanatize-text (symbol-name object)))))
 
 (defun pkm2--convert-object-to-string (object &optional type)
@@ -1143,13 +1144,13 @@ TODO TEST!"
                                                       ((and it (not (listp it))) it)
                                                       ((progn (message "Choces: %S" choices)  choices)
                                                        (cond ((eq type 'TEXT) (completing-read prompt choices))
-                                                             ((or  (eq type 'INTEGER) (eq type 'DATETIME) ) (string-to-number (completing-read prompt choices)))
+                                                             ((or  (eq type 'INTEGER) (eq type 'DATETIME) ) (truncate (string-to-number (completing-read prompt choices)) ))
                                                              ((eq type 'REAL) (string-to-number (completing-read prompt choices)))
                                                              ((eq type 'BLOB) (progn (display-warning 'pkm-object "BLOB type kvd inputs are not yet implemented")
                                                                                      (error "Tried to insert blob kvd, Not yet implemented.")))
                                                              (t (message "Choices type not defined"))))
                                                       (t (cond ((eq type 'TEXT) (read-string prompt))
-                                                               ((eq type 'INTEGER) (read-number prompt))
+                                                               ((eq type 'INTEGER) (truncate (read-number prompt) ))
                                                                ((eq type 'REAL) (read-number prompt))
                                                                ((eq type 'DATETIME) (pkm2-get-user-selected-timestamp prompt))
                                                                ((eq type 'BLOB) (progn (display-warning 'pkm-object "BLOB type kvd inputs are not yet implemented")
