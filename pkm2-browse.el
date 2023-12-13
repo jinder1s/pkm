@@ -47,12 +47,6 @@
 (defvar pkm2-browse-buffer "*pkm2-browse*"
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
 
-
-
-(when (and  (boundp 'pkm2-browse-saved-queries ) pkm2-browse-saved-queries ) (persist-save 'pkm2-browse-saved-queries) )
-(when (and  (boundp 'pkm2-browse-saved-named-queries ) pkm2-browse-saved-named-queries ) (persist-save 'pkm2-browse-saved-named-queries) )
-(when (and  (boundp 'pkm2-browse-saved-section-specs ) pkm2-browse-saved-section-specs ) (persist-save 'pkm2-browse-saved-section-specs) )
-(when (and  (boundp 'pkm2-browse-saved-named-section-specs ) pkm2-browse-saved-named-section-specs ) (persist-save 'pkm2-browse-saved-named-section-specs) )
 (persist-defvar pkm2-browse-saved-queries () "Individual queries to get pkm nodes")
 (persist-defvar pkm2-browse-saved-named-queries () "Individual queries to get pkm nodes")
 (persist-defvar pkm2-browse-saved-section-specs () "Created Section specs")
@@ -942,7 +936,7 @@ Has no effect when there's no `org-roam-node-at-point'."
          (completing-read-choices (-concat '("NEW") pkm2-browse-saved-named-queries (-map (lambda (query) (cons (format "%S" query) query)) pkm2-browse-saved-queries)))
          (chosen-queries (if (or pkm2-browse-saved-named-queries pkm2-browse-saved-queries)
                              (completing-read-multiple "Which queries would you like to add to this section: "
-                                                             completing-read-choices)
+                                                       completing-read-choices)
                            (list "NEW")))
 
          (initial-queries (--> (-filter (lambda (spec) (not (equal "NEW" spec))) chosen-queries)
@@ -990,15 +984,20 @@ Has no effect when there's no `org-roam-node-at-point'."
                                          (assoc-default (car choice ) completing-read-choices)) it) ))
            (choices-with-names (-map (lambda (choice) (cons (read-string (format "Name for: %S" choice)) (format "%S" choice ))) choices-to-name)))
       (setq pkm2-browse-saved-named-queries (-concat pkm2-browse-saved-named-queries choices-with-names))
+      (persist-save pkm2-browse-saved-named-queries)
       (-each choices-to-not-name
         (lambda (query)
-          (setq pkm2-browse-saved-queries (-concat pkm2-browse-saved-queries (list (format "%S" query)))))))
+          (setq pkm2-browse-saved-queries (-concat pkm2-browse-saved-queries (list (format "%S" query))))
+          (persist-save pkm2-browse-saved-queries)
+          )))
     (setq output `(:queries ,queries ))
     (--> (y-or-n-p (format "Would you like to name this section spec: %S?" output))
          (when it (read-string (format "What would you name this section spec: %S" output)))
          (if it
              (setq pkm2-browse-saved-named-section-specs (-concat pkm2-browse-saved-named-section-specs (list (cons it (format "%S" output)))))
            (setq pkm2-browse-saved-section-specs (-concat (list (format "%S" output)) pkm2-browse-saved-section-specs))))
+    (persist-save pkm2-browse-saved-section-specs)
+    (persist-save pkm2-browse-saved-named-section-specs)
     output))
 
 (defun pkm2--create-section-query ()
@@ -1017,6 +1016,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 
     (kill-buffer buffer-name)
     (setq pkm2-browse-saved-queries (-concat (list output) pkm2-browse-saved-queries))
+    (persist-save pkm2-browse-saved-queries)
     output))
 
 ;;; search
