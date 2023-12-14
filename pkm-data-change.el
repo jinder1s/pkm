@@ -35,12 +35,21 @@
   (change-link-from-a-to-b-verbose "tag" "clock" "node-type" "clock" 'TEXT)
   (change-link-from-a-to-b-verbose "tag" "DEPENDENT" "node-type" "DEPENDENT" 'TEXT)
   (change-link-from-a-to-b-verbose "tag" "note" "node-type" "note" 'TEXT)
-  (change-link-from-a-to-b-verbose "tag" "work" "node-type" "work" 'TEXT)
+  (change-link-from-a-to-b-verbose "tag" "work" "node-type" "work" 'TEXT))
 
-  )
+(defun delete-habit-instance-nodes (db)
+  (let* ((node-ids-to-delete
+          (--> `((:or structure-type (:structure-name habit-instance)))
+               (pkm2--compile-full-db-query it)
+               (sqlite-select pkm2-database-connection it)
+               (-flatten it)) )
+         (query (format
+                 "DELETE FROM node WHERE id IN %s;"
+                 (format "( %s ) " (--> (-map #'pkm2--db-convert-object-to-string node-ids-to-delete)
+                                        (string-join it ", "))))))
+    (sqlite-execute db query)))
 
 (defun swap-link-noda-a-and-node-b ()
-
   (sqlite-execute pkm2-database-connection "UPDATE nodes_link SET node_a = node_b, node_b = node_a; ")
   )
 
