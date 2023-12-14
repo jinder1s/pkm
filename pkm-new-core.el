@@ -671,8 +671,9 @@ Returns output in two formats:
                   (setq output
                         (plist-put output
                                    (nth 0 datum) ; key
-                                   (-concat (plist-get output (nth 0 datum) #'equal)
-                                            (list (nth 1 datum))) ;value type
+                                   (progn (when (plist-get output (nth 0 datum) #'equal)
+                                            (error "Same key should not have multiple dattypes"))
+                                          (intern (nth 1 datum) )) ;value type
                                    #'equal
                                    ))))
     (cl--plist-to-alist output)))
@@ -1748,10 +1749,10 @@ Commit everything.
         (--> (read-string (format "Name for: %S" query-spec))
              (-concat pkm2-browse-saved-named-queries (list (cons it (format "%S" query-spec )) ))
              (setq pkm2-browse-saved-named-queries it))
-      (--> (-concat pkm2-browse-saved-queries (format "%S" query-spec))
+      (--> (-concat pkm2-browse-saved-queries (list (format "%S" query-spec) ))
            (setq pkm2-browse-saved-queries it)))
-    (persist-save pkm2-browse-saved-queries)
-    (persist-save pkm2-browse-saved-named-queries)
+    (persist-save 'pkm2-browse-saved-queries)
+    (persist-save 'pkm2-browse-saved-named-queries)
     query-spec))
 
 
