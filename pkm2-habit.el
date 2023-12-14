@@ -1,6 +1,7 @@
 ;;; pkm/pkm2-habit.el -*- lexical-binding: t; -*-
 
 (require 'ts)
+(require 'pkm-new-core)
 
 (defvar pkm2-habit-freq-to-seconds `(("daily" . ,(* 60 60 24))
                                      ("hourly" . ,(* 60 60))
@@ -79,15 +80,15 @@
          (habit-schedule-hour (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-schedule-hour")
                                    (when it
                                      (if (length> it 1)
-                                         (error "habit node has more than one interval")
+                                         (error "habit node has more than one habit-schedule-hour")
                                        (pkm2-db-kvd-value (car it))))))
          (habit-deadline-hour (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-deadline-hour")
                                    (when it
                                      (if (length> it 1)
-                                         (error "habit node has more than one interval")
+                                         (error "habit node has more than one habit-deadline-hour")
                                        (pkm2-db-kvd-value (car it))))))
          (habit-requireds (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-required")
-                              (-map #'pkm2-db-kvd-value it)))
+                               (-map #'pkm2-db-kvd-value it)))
 
 
          (habit-period (* habit-interval habit-period) )
@@ -127,8 +128,18 @@
                                  ((not most-recent-done-time) t)
                                  (most-recent-done-time
                                   (message "freq: %S, period: %S" habit-frequency habit-period)
-
-                                  (> (- (pkm2-get-current-timestamp) habit-period) most-recent-done-time))) ))
+                                  (> (- (pkm2-get-current-timestamp) habit-period) most-recent-done-time)))
+                           (if habit-schedule-hour
+                               (when (or (equal habit-frequency "daily") (equal habit-frequency "hourly"))
+                                 (let* ((now (ts-now))
+                                        (current-hour (ts-hour now))
+                                        (current-minute (ts-minute now))
+                                        (schedule-hour (truncate habit-schedule-hour))
+                                        (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60 ) )))
+                                   (when (or (and (<= current-hour schedule-hour) (< current-minute schedule-minute)) (when habit-deadline-hour
+                                                                                                                        (<= current-hour habit-deadline-hour)))
+                                     t)))
+                             t)))
          (schedule-timestamp (when (and create-instance habit-schedule-hour)
                                (let* ((now (ts-now))
                                       (current-hour (ts-hour now))
@@ -143,6 +154,8 @@
                                (--> (ts-apply :hour (truncate habit-deadline-hour) :minute (truncate (* (mod habit-deadline-hour 1) 60) ) (ts-now))
                                     (ts-unix it)
                                     (truncate it))))
+         (deadline-alert-minutes (cond ((equal habit-frequency "hourly") 10)
+                                       ((equal habit-frequency "daily") 60)))
 
          (link-label "instance")
          (link-definition (list :pkm-link-label link-label
@@ -156,7 +169,10 @@
                                            (when schedule-timestamp
                                              `(:pkm-type kvd :name "schedule" :key "schedule" :value ,schedule-timestamp :link-to ("child-node") :data-type INTEGER))
                                            (when deadline-timestamp
-                                             `(:pkm-type kvd :name "deadline" :key "deadline" :value ,deadline-timestamp :link-to ("child-node") :data-type INTEGER))) )
+                                             `(:pkm-type kvd :name "deadline" :key "deadline" :value ,deadline-timestamp :link-to ("child-node") :data-type INTEGER))
+                                           (when deadline-alert-minutes
+                                             `(:pkm-type kvd :name "deadline-alert-minutes" :key "deadline-alert-minutes" :value ,deadline-alert-minutes
+                                               :link-to ("child-node") :data-type INTEGER))))
                                  :links (list link-definition))))
     (message "t-h-i: %S" todo-habit-instance)
     (message "create instance: %S" create-instance)
@@ -177,8 +193,56 @@
        (-flatten it)
        (-map #'pkm2--db-query-get-node-with-id it)
        (-each it #'pkm2-habit-create-instances)))
+
+(defun pkm-habit-alert ()
+  (let* ((active-habit-instances-with-deadlines
+          (--> `((:or structure-type (:structure-name habit-instance))
+                 (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "TODO" "HOLD")))
+                 (:and kvd (:key "deadline" :data-type INTEGER)))
+               (pkm2--compile-full-db-query it)
+               (sqlite-select pkm2-database-connection it)
+               (-flatten it)
+               (-map #'pkm2--db-query-get-node-with-id it)))
+         (deadlines (-map  (lambda (h-i-d)
+                             (--> (pkm2-node-get-kvds-with-key h-i-d "deadline")
+                                  (when it
+                                    (if (length> it 1)
+                                        (error "habit instance has more than one deadline")
+                                      (pkm2-db-kvd-value (car it))))) )
+                           active-habit-instances-with-deadlines))
+         (alert-seconds (-map  (lambda (h-i-d)
+                                 (--> (pkm2-node-get-kvds-with-key h-i-d "deadline-alert-minutes")
+                                      (when it
+                                        (if (length> it 1)
+                                            (error "habit instance has more than one deadline-alert-minutes")
+                                          (pkm2-db-kvd-value (car it))))
+                                      (when it (* it 60))) )
+                               active-habit-instances-with-deadlines)))
+    (-each-indexed active-habit-instances-with-deadlines
+      (lambda (index h-i-d)
+        (message "alert at:%S, now: %S, do: %S" (pkm2--convert-object-to-string (- (nth index deadlines)  (or (nth index alert-seconds) (* 5 60))) 'DATETIME )
+                 (pkm2--convert-object-to-string (pkm2-get-current-timestamp) 'DATETIME )
+                 (< (- (nth index deadlines)  (or (nth index alert-seconds) (* 5 60))) (pkm2-get-current-timestamp)))
+        (when  (< (- (nth index deadlines)  (or (nth index alert-seconds) (* 5 60))) (pkm2-get-current-timestamp))
+          (message "Time to alert")
+          (--> (pkm2-node-db-node h-i-d)
+               (pkm2-db-node-content it)
+               (format "Deadline soon: %s" it)
+               (hs-alert it))))
+      )))
+
+
 (defun pkm-habit-manage-habits ()
   (pkm-habit-setup-habits))
 
 
+
+(defun hs-alert (message)
+  "shows Hammerspoon's hs.alert popup with a MESSAGE"
+  (message "alerting: %S" message)
+  (when (and message (eq system-type 'darwin))
+    (call-process (executable-find "hs")
+                  nil 0 nil
+                  "-c"
+                  (concat "hs.alert.show(\"" message "\", 3)"))))
 (provide 'pkm2-habit)

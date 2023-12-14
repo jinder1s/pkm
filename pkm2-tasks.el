@@ -35,6 +35,8 @@
 
 (pkm2-register-behavior `(:name deadline :assets ((:pkm-type kvd :name "deadline" :key "deadline" :value ,#'pkm2-get-user-selected-timestamp
                                                    :link-to ("base-node") :data-type DATETIME )
+                                                  (:pkm-type kvd :name "deadline-alert-minutes" :key "deadline-alert-minutes"
+                                                   :link-to ("base-node") :data-type INTEGER :optional t )
                                                   )))
 
 (pkm-register-structure 'schedule-node
