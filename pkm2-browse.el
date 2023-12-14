@@ -259,8 +259,10 @@
 
 (defun pkm2-browse--default-kvd-display-string (kvd)
   (let* ((key (pkm2-db-kvd-key kvd))
-         (value (pkm2-db-kvd-value kvd)))
-    (propertize (format "%s: %s" (pkm2--db-convert-object-to-string key) (pkm2--db-convert-object-to-string value)) :db-kvd kvd)))
+         (value (pkm2-db-kvd-value kvd))
+         (types (doom-plist-keys pkm-data-type-to-kvd-key-plist))
+         (type (or (-find (lambda (type) (member key (plist-get pkm-data-type-to-kvd-key-plist type))) types) (pkm2-db-kvd-type kvd) )))
+    (propertize (format "%s: %s" (pkm2--db-convert-object-to-string key) (pkm2--convert-object-to-string value type)) :db-kvd kvd)))
 
 (defun pkm2-browse--default-hidden-info-string (browse-node)
   (let* ((browse-id (pkm2-browse-node-browse-id browse-node))
