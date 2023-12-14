@@ -135,28 +135,38 @@
                                        (-flatten it)
                                        (-map #'pkm2-db-kvd-value it)
                                        (when it (-max it) ))))
-         (create-instance (unless todo-habit-instance
-                            (and
-                             (-all?
-                              (lambda (required)
-                                (cond ((equal required "emacs-active")
-                                       (current-idle-time))
-                                      (t (error  (format "habit required not recongnized %S" required)))))
-                              habit-requireds)
-                             (cond ((not most-recent-done-time) t)
-                                   ((and most-recent-deadline (> (pkm2-get-current-timestamp)  most-recent-deadline) t)
-                                    t))
-                             (if habit-schedule-hour
-                                 (when (or (equal habit-frequency "daily") (equal habit-frequency "hourly"))
-                                   (let* ((now (ts-now))
-                                          (current-hour (ts-hour now))
-                                          (current-minute (ts-minute now))
-                                          (schedule-hour (truncate habit-schedule-hour))
-                                          (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60))))
-                                     (when (or (and (<= current-hour schedule-hour) (< current-minute schedule-minute)) (when habit-deadline-hour
-                                                                                                                          (<= current-hour habit-deadline-hour)))
-                                       t)))
-                               t)) ))
+         (create-instance (and
+                           (not todo-habit-instance)
+                           (-all?
+                            (lambda (required)
+                              (cond ((equal required "emacs-active")
+                                     (current-idle-time))
+                                    (t (error  (format "habit required not recongnized %S" required)))))
+                            habit-requireds)
+                           (cond ((not most-recent-done-time) t)
+                                 ((and most-recent-deadline (> (pkm2-get-current-timestamp)  most-recent-deadline) t)
+                                  t))
+                           (or
+                            (if habit-schedule-hour
+                                (when (or (equal habit-frequency "daily") (equal habit-frequency "hourly"))
+                                  (let* ((now (ts-now))
+                                         (current-hour (ts-hour now))
+                                         (current-minute (ts-minute now))
+                                         (schedule-hour (truncate habit-schedule-hour))
+                                         (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60))))
+                                    (when (and (<= current-hour schedule-hour) (< current-minute schedule-minute))
+                                      t)))
+                              t)
+                            (if habit-deadline-hour
+                                (when (or (equal habit-frequency "daily") (equal habit-frequency "hourly"))
+                                  (let* ((now (ts-now))
+                                         (current-hour (ts-hour now))
+                                         (current-minute (ts-minute now))
+                                         (deadline-hour (truncate habit-deadline-hour))
+                                         (deadline-minute (truncate (* (mod habit-deadline-hour 1) 60))))
+                                    (when  (and (<= current-hour deadline-hour) (< current-minute deadline-minute))
+                                      t)))
+                              t))))
          (schedule-timestamp (if (equal habit-frequency "hourly")
                                  (--> (ts-now)
                                       (ts-unix it)
@@ -181,7 +191,10 @@
                                 (habit-deadline-hour
                                  (--> (ts-apply :hour (truncate habit-deadline-hour) :minute (truncate (* (mod habit-deadline-hour 1) 60) ) (ts-now))
                                       (ts-unix it)
-                                      (truncate it))))))
+                                      (truncate it)))
+                                (t (-->
+                                    (+ (ts-unix (ts-now)) habit-period)
+                                    (truncate it))))))
          (deadline-alert-minutes (cond ((equal habit-frequency "hourly") 10)
                                        ((equal habit-frequency "daily") 60)))
 
