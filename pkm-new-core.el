@@ -1,4 +1,3 @@
-
 ;;; pkm-new-core.el -*- lexical-binding: t; -*-
 (require 'cl-lib)
 (require 'cl-generic)
@@ -338,7 +337,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
       (push context-node-id values))
     (when is-archive
       (push "is_archive" value-names)
-      (push 1 values))
+      (push is-archive values))
     (--> (pkm2--db-compile-insert-statement table-name value-names values)
          (sqlite-execute pkm2-database-connection it)
          (car it)
@@ -350,9 +349,9 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
        (format "DELETE FROM %s WHERE id = %d" it id)
        (sqlite-execute pkm2-database-connection it) ))
 
-(defun pkm2-db-archive-link-between-node-and-kvd (id type)
+(defun pkm2-db-archive-link-between-node-and-kvd (id type &optional timestamp)
   (--> (pkm2--db-get-kvd-link-table-for-type type)
-       (pkm2--db-compile-update-statement it (list "is_archive") (list 1) (format "id = %d" id) )
+       (pkm2--db-compile-update-statement it (list "is_archive") (list (or timestamp 1)) (format "id = %d" id) )
        (sqlite-execute pkm2-database-connection it)))
 
 (defun pkm2--db-delete-node (id)
@@ -1934,7 +1933,7 @@ Commit everything.
          (db-id (or db-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it))))
          (new-db-node (pkm2--db-update-node db-id  new-content timestamp)))
     (when (and log-node history-kvd)
-      (pkm2--db-insert-link-between-node-and-kvd db-id (pkm2-db-kvd-id history-kvd) timestamp content-type nil t))
+      (pkm2--db-insert-link-between-node-and-kvd db-id (pkm2-db-kvd-id history-kvd) timestamp content-type nil timestamp))
     new-db-node))
 
 (defun pkm2--update-node-kvd (pkm-node old-kvd new-kvd-id kvd-type context-id old-link-id timestamp)
@@ -1957,7 +1956,7 @@ Commit everything.
          (new-link  (when new-kvd-id
                       (pkm2--db-insert-link-between-node-and-kvd node-id new-kvd-id timestamp kvd-type context-id))))
     (if log-changes
-        (pkm2-db-archive-link-between-node-and-kvd old-link-id kvd-type)
+        (pkm2-db-archive-link-between-node-and-kvd old-link-id kvd-type timestamp)
       (pkm2--db-delete-link-between-node-and-kvd old-link-id kvd-type))
     new-link))
 
