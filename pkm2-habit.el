@@ -59,7 +59,12 @@
                               :asset-modifications (list '(:name "task-status" :plist-key :log-ask-timestamp :plist-value t))
                               :assets (list
                                        '(:pkm-type kvd :name "is-habit-instance" :key "node-type" :value "habit-instance" :link-to ("base-node") :data-type TEXT)
-                                       '(:pkm-type node :name "base-node" :primary-node t :no-input t))))
+                                       '(:pkm-type node :name "base-node" :primary-node t :no-input t)
+                                       '(:pkm-type kvd :name "schedule" :key "schedule"  :link-to ("base-node") :data-type DATETIME :optional t)
+                                       `(:pkm-type kvd :name "deadline" :key "deadline"  :link-to ("base-node") :data-type DATETIME :optional t)
+
+
+                                       )))
 
 
 (defun pkm2-habit-create-instances (habit-pkm-node)
@@ -178,9 +183,9 @@
                                            `(:pkm-type node :name "parent-node" :parent-node t :db-id ,node-id)
                                            `(:pkm-type habit-instance :name "child-node" :child-node t)
                                            (when schedule-timestamp
-                                             `(:pkm-type kvd :name "schedule" :key "schedule" :value ,schedule-timestamp :link-to ("child-node") :data-type INTEGER))
+                                             `(:pkm-type kvd :name "schedule" :key "schedule" :value ,schedule-timestamp :link-to ("child-node") :data-type DATETIME))
                                            (when deadline-timestamp
-                                             `(:pkm-type kvd :name "deadline" :key "deadline" :value ,deadline-timestamp :link-to ("child-node") :data-type INTEGER))
+                                             `(:pkm-type kvd :name "deadline" :key "deadline" :value ,deadline-timestamp :link-to ("child-node") :data-type DATETIME))
                                            (when deadline-alert-minutes
                                              `(:pkm-type kvd :name "deadline-alert-minutes" :key "deadline-alert-minutes" :value ,deadline-alert-minutes
                                                :link-to ("child-node") :data-type INTEGER))))
