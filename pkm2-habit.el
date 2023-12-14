@@ -87,6 +87,11 @@
                                      (if (length> it 1)
                                          (error "habit node has more than one habit-deadline-hour")
                                        (pkm2-db-kvd-value (car it))))))
+         (habit-deadline-minute (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-deadline-minute")
+                                   (when it
+                                     (if (length> it 1)
+                                         (error "habit node has more than one habit-deadline-minute")
+                                       (pkm2-db-kvd-value (car it))))))
          (habit-requireds (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-required")
                                (-map #'pkm2-db-kvd-value it)))
 
@@ -127,7 +132,6 @@
                            (cond (todo-habit-instance nil)
                                  ((not most-recent-done-time) t)
                                  (most-recent-done-time
-                                  (message "freq: %S, period: %S" habit-frequency habit-period)
                                   (> (- (pkm2-get-current-timestamp) habit-period) most-recent-done-time)))
                            (if habit-schedule-hour
                                (when (or (equal habit-frequency "daily") (equal habit-frequency "hourly"))
@@ -135,7 +139,7 @@
                                         (current-hour (ts-hour now))
                                         (current-minute (ts-minute now))
                                         (schedule-hour (truncate habit-schedule-hour))
-                                        (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60 ) )))
+                                        (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60))))
                                    (when (or (and (<= current-hour schedule-hour) (< current-minute schedule-minute)) (when habit-deadline-hour
                                                                                                                         (<= current-hour habit-deadline-hour)))
                                      t)))
@@ -150,10 +154,17 @@
                                    (--> (ts-apply :hour schedule-hour :minute schedule-minute now)
                                         (ts-unix it)
                                         (truncate it))))))
-         (deadline-timestamp (when (and create-instance habit-deadline-hour)
-                               (--> (ts-apply :hour (truncate habit-deadline-hour) :minute (truncate (* (mod habit-deadline-hour 1) 60) ) (ts-now))
-                                    (ts-unix it)
-                                    (truncate it))))
+         (deadline-timestamp (when (and create-instance )
+                               (cond
+                                ((equal habit-frequency "hourly")
+                                 (--> (ts-now)
+                                      (ts-apply :hour (+ (ts-hour it) 1) it)
+                                      (ts-unix it)
+                                      (truncate it)))
+                                (habit-deadline-hour
+                                 (--> (ts-apply :hour (truncate habit-deadline-hour) :minute (truncate (* (mod habit-deadline-hour 1) 60) ) (ts-now))
+                                      (ts-unix it)
+                                      (truncate it))))))
          (deadline-alert-minutes (cond ((equal habit-frequency "hourly") 10)
                                        ((equal habit-frequency "daily") 60)))
 
