@@ -814,13 +814,9 @@ Returns output in two formats:
        (-filter (lambda (structure-name)
                   (pkm-objectp (plist-get pkm-structure-defined-schemas-plist structure-name) pkm-node)) it)))
 
-
-
-
 (defvar pkm-structure-fully-specified-kvds-plist ())
 (defvar pkm-structure-required-kvds-plist ())
 (defvar pkm-structure-unique-required-plist ())
-(defvar pkm-kvd-schemas-plist ())
 (defvar pkm-kvd-key-to-structure-plist ())
 (defvar pkm-data-type-to-kvd-key-plist ())
 
@@ -963,6 +959,14 @@ Returns output in two formats:
       (lambda (structure-name)
         (setq pkm-structure-defined-schemas-plist
               (plist-put pkm-structure-defined-schemas-plist structure-name (pkm--object-define structure-name)))))
+    (-each structure-names
+      (lambda (structure-name)
+        (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
+             (plist-get it :assets)
+             (-each it (lambda (asset)
+                         (when (equal (plist-get asset :pkm-type) 'kvd)
+                           (pkm-object-register-kvd-key-with-data-type asset)
+                           (pkm-object-register-structure-with-kvd  asset structure-name)))))))
     (-each  structure-names
       (lambda (structure-name)
         (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
@@ -1859,11 +1863,7 @@ Commit everything.
   (let* ((what-to-get (or what-to-get (completing-read "How would you like to filter by kvd?" '("key" "key and value" "key and choices" "key and number range")) ))
          (key (or key (completing-read "What key?" (or keys
                                                        (pkm2--db-query-get-all-keys-to-types-alist)) nil 'confirm) ))
-         (type (--> (assoc-default key (pkm2--db-query-get-all-keys-to-types-alist ))
-                    (if (length> it 1)
-                        (completing-read "What type:" it)
-                      (car it))
-                    (intern it)) )
+         (type (assoc-default key (pkm2--db-query-get-all-keys-to-types-alist )))
          (value (when (equal what-to-get "key and value")
                   (completing-read "What value?" (pkm2--db-query-get-all-values-with-key key type) )))
          (choices (when (equal what-to-get "key and choices")
