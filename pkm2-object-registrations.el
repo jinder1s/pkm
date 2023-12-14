@@ -56,10 +56,16 @@
             :assets (list
                      `(:pkm-type kvd :name "is-observation" :key "node-type" :value "observation" :link-to (primary) :data-type TEXT))))
 
-(pkm-register-structure 'idea-note-n
-      (list :parent 'note-n
+(pkm-register-structure 'documentation-log-n
+                        ; TODO this should be both a note and a log
+      (list :parent 'log-n
             :assets (list
-                     `(:pkm-type kvd :name "is-idea" :key "node-type" :value "idea" :link-to ("base-node") :data-type TEXT))))
+                     `(:pkm-type kvd :name "is-documentation" :key "node-type" :value "documentation" :link-to (primary) :data-type TEXT))))
+
+(pkm-register-structure 'idea-note-n
+                        (list :parent 'note-n
+                              :assets (list
+                                       `(:pkm-type kvd :name "is-idea" :key "node-type" :value "idea" :link-to ("base-node") :data-type TEXT))))
 
 
 (pkm-register-structure 'entity-s
