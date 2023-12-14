@@ -93,10 +93,10 @@
                                          (error "habit node has more than one habit-deadline-hour")
                                        (pkm2-db-kvd-value (car it))))))
          (habit-deadline-minute (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-deadline-minute")
-                                   (when it
-                                     (if (length> it 1)
-                                         (error "habit node has more than one habit-deadline-minute")
-                                       (pkm2-db-kvd-value (car it))))))
+                                     (when it
+                                       (if (length> it 1)
+                                           (error "habit node has more than one habit-deadline-minute")
+                                         (pkm2-db-kvd-value (car it))))))
          (habit-requireds (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-required")
                                (-map #'pkm2-db-kvd-value it)))
 
@@ -128,37 +128,49 @@
                                              it)
                                        (-map #'pkm2-db-kvd-link-created_at it)
                                        (when it (-max it) ))))
-         (create-instance (and
-                           (-all? (lambda (required)
-                                    (cond ((equal required "emacs-active")
-                                           (current-idle-time))
-                                          (t (error  (format "habit required not recongnized %S" required)))))
-                                  habit-requireds)
-                           (cond (todo-habit-instance nil)
-                                 ((not most-recent-done-time) t)
-                                 (most-recent-done-time
-                                  (> (- (pkm2-get-current-timestamp) habit-period) most-recent-done-time)))
-                           (if habit-schedule-hour
-                               (when (or (equal habit-frequency "daily") (equal habit-frequency "hourly"))
+         (most-recent-deadline (unless todo-habit-instance
+                                  (--> (-map (lambda (h-s-n)
+                                               (pkm2-node-get-kvds-with-key h-s-n "deadline" ))
+                                             habit-instances)
+                                       (-flatten it)
+                                       (-map #'pkm2-db-kvd-value it)
+                                       (when it (-max it) ))))
+         (create-instance (unless todo-habit-instance
+                            (and
+                             (-all?
+                              (lambda (required)
+                                (cond ((equal required "emacs-active")
+                                       (current-idle-time))
+                                      (t (error  (format "habit required not recongnized %S" required)))))
+                              habit-requireds)
+                             (cond ((not most-recent-done-time) t)
+                                   ((and most-recent-deadline (> (pkm2-get-current-timestamp)  most-recent-deadline) t)
+                                    t))
+                             (if habit-schedule-hour
+                                 (when (or (equal habit-frequency "daily") (equal habit-frequency "hourly"))
+                                   (let* ((now (ts-now))
+                                          (current-hour (ts-hour now))
+                                          (current-minute (ts-minute now))
+                                          (schedule-hour (truncate habit-schedule-hour))
+                                          (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60))))
+                                     (when (or (and (<= current-hour schedule-hour) (< current-minute schedule-minute)) (when habit-deadline-hour
+                                                                                                                          (<= current-hour habit-deadline-hour)))
+                                       t)))
+                               t)) ))
+         (schedule-timestamp (if (equal habit-frequency "hourly")
+                                 (--> (ts-now)
+                                      (ts-unix it)
+                                      (truncate it))
+                               (when (and create-instance habit-schedule-hour)
                                  (let* ((now (ts-now))
                                         (current-hour (ts-hour now))
                                         (current-minute (ts-minute now))
                                         (schedule-hour (truncate habit-schedule-hour))
-                                        (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60))))
-                                   (when (or (and (<= current-hour schedule-hour) (< current-minute schedule-minute)) (when habit-deadline-hour
-                                                                                                                        (<= current-hour habit-deadline-hour)))
-                                     t)))
-                             t)))
-         (schedule-timestamp (when (and create-instance habit-schedule-hour)
-                               (let* ((now (ts-now))
-                                      (current-hour (ts-hour now))
-                                      (current-minute (ts-minute now))
-                                      (schedule-hour (truncate habit-schedule-hour))
-                                      (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60 ) )))
-                                 (when (and (<= current-hour schedule-hour) (< current-minute schedule-minute))
-                                   (--> (ts-apply :hour schedule-hour :minute schedule-minute now)
-                                        (ts-unix it)
-                                        (truncate it))))))
+                                        (schedule-minute (truncate (* (mod habit-schedule-hour 1) 60 ) )))
+                                   (when (and (<= current-hour schedule-hour) (< current-minute schedule-minute))
+                                     (--> (ts-apply :hour schedule-hour :minute schedule-minute now)
+                                          (ts-unix it)
+                                          (truncate it))))) ))
          (deadline-timestamp (when (and create-instance )
                                (cond
                                 ((equal habit-frequency "hourly")
@@ -181,14 +193,7 @@
                                  :assets (-non-nil
                                           (list
                                            `(:pkm-type node :name "parent-node" :parent-node t :db-id ,node-id)
-                                           `(:pkm-type habit-instance :name "child-node" :child-node t)
-                                           (when schedule-timestamp
-                                             `(:pkm-type kvd :name "schedule" :key "schedule" :value ,schedule-timestamp :link-to ("child-node") :data-type DATETIME))
-                                           (when deadline-timestamp
-                                             `(:pkm-type kvd :name "deadline" :key "deadline" :value ,deadline-timestamp :link-to ("child-node") :data-type DATETIME))
-                                           (when deadline-alert-minutes
-                                             `(:pkm-type kvd :name "deadline-alert-minutes" :key "deadline-alert-minutes" :value ,deadline-alert-minutes
-                                               :link-to ("child-node") :data-type INTEGER))))
+                                           `(:pkm-type habit-instance :name "child-node" :child-node t)))
                                  :links (list link-definition))))
     (message "t-h-i: %S" todo-habit-instance)
     (message "create instance: %S" create-instance)
@@ -200,7 +205,10 @@
                              t
                              `(("child-node" . (("base-node" . ,content)
                                                 ("task-status" . "TODO")
-                                                ("task-priority" . 1)))))))))
+                                                ("task-priority" . 1)
+                                                ,(when schedule-timestamp `("schedule" . ,schedule-timestamp))
+                                                ,(when deadline-timestamp `("deadline" . ,deadline-timestamp))
+                                                ,(when deadline-alert-minutes `("deadline-alert-minutes" . ,deadline-alert-minutes))))))))))
 
 (defun pkm-habit-setup-habits ()
   (--> `((:or structure-type (:structure-name habit-node)))
