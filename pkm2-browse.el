@@ -46,6 +46,7 @@
 ;;;; Persistent buffer
 (defvar pkm2-browse-buffer "*pkm2-browse*"
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
+(defvar pkm2-browse-buffer-states-equal-plist ())
 
 (persist-defvar pkm2-browse-saved-section-specs () "Created Section specs")
 (persist-defvar pkm2-browse-saved-named-section-specs () "Created Section specs")
@@ -60,17 +61,19 @@
 
 (defun pkm2-browse (&optional numeric-prefix-argument)
   (interactive "p")
-  (let* ((completing-read-choices (-concat '("NEW") pkm2-browse-saved-named-section-specs (-map (lambda (section-spec) (cons  section-spec section-spec)) pkm2-browse-saved-section-specs)))
+  (let* ((completing-read-choices (-concat '("NEW" "LAST") pkm2-browse-saved-named-section-specs (-map (lambda (section-spec) (cons  section-spec section-spec)) pkm2-browse-saved-section-specs)))
          (chosen-sections (if (length> completing-read-choices 1)
                               (completing-read-multiple "Which sections would you like to add to this section: "
                                                              completing-read-choices)
                            (list "NEW")))
-         (sections-specs (--> (-filter (lambda (spec) (not (equal "NEW" spec))) chosen-sections)
-                              (-map (lambda (choice) (assoc-default choice completing-read-choices)) it)
-                              (-map #'read it)))
+         (sections-specs (-non-nil (-map (lambda (chosen-section)
+                                 (cond ((equal "NEW" chosen-section) (pkm2--create-section-spec))
+                                       ((equal "LAST" chosen-section) nil)
+                                       (t (read (assoc-default chosen-section completing-read-choices)))))
+                               chosen-sections) ))
 
-         (sections-specs (if (member "NEW" chosen-sections)
-                             (--> (pkm2--create-section-spec) (-concat (list it) sections-specs))
+         (sections-specs (if (member "LAST" chosen-sections)
+                             (--> (plist-get pkm2-browse-buffer-states-equal-plist pkm2-browse-buffer #'equal) (pkm2-browse-buffer-state-sections it) (-map #'pkm2-browse-section-spec it) (-concat sections-specs it))
                            sections-specs))
          (sections (-map (lambda (sections-spec)
                            (make-pkm2-browse-section :spec  sections-spec))
@@ -102,7 +105,6 @@
     (pkm2--browse browse-state nil)))
 
 
-(defvar pkm2-browse-buffer-states-equal-plist ())
 
 (defun pkm2--browse (buffer-state &optional buffer-name )
   (setq buffer-name (or buffer-name pkm2-browse-buffer))
