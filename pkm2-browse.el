@@ -581,8 +581,9 @@ Has no effect when there's no `org-roam-node-at-point'."
          (kvd (get-text-property current-point :db-kvd))
          (type (pkm2-db-kvd-type kvd))
          (link-id (pkm2-db-kvd-link-id kvd))
-         (kvds (pkm2-node-kvds pkm-node)))
-    (pkm2--update-node-kvd pkm-node kvd nil type nil link-id)
+         (kvds (pkm2-node-kvds pkm-node))
+         (timestamp (pkm2-get-current-timestamp)))
+    (pkm2--update-node-kvd pkm-node kvd nil type nil link-id timestamp)
     (setf (pkm2-node-kvds pkm-node) (-filter (lambda (temp-kvd)
                                                (if (equal (pkm2-db-kvd-id temp-kvd) (pkm2-db-kvd-id kvd))
                                                    nil ; delete this kvd from node
