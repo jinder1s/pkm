@@ -36,11 +36,19 @@
        (-flatten it)
        (-map #'pkm2--db-query-get-node-with-id it)))
 
+(defun pkm2-clock--get-recent-clock-pkm-nodes (&optional time-spec)
+  (--> `((:or kvd (:key "clock-end" :data-type INTEGER :after ,(or time-spec `(day -2) )))
+         (:or kvd (:key "clock-start" :data-type INTEGER :after ,(or time-spec `(day -2) ))))
+         (pkm2--compile-full-db-query it)
+         (sqlite-select pkm2-database-connection it)
+         (-flatten it)
+         (-map #'pkm2--db-query-get-node-with-id it)) )
+
 (defun pkm2-clock--get-current-clock-parent-pkm-nodes ()
-  ; TODO implment and test this
+                                        ; TODO implment and test this
   (--> `((:or structure-type (:structure-name clock-node))
-          (:not kvd (:key "clock-end" :data-type INTEGER))
-          (:convert-and convert-to-parents (:levels 1 :link-type "clock")) )
+         (:not kvd (:key "clock-end" :data-type INTEGER))
+         (:convert-and convert-to-parents (:levels 1 :link-type "clock")) )
        (pkm2--compile-full-db-query it)
        (sqlite-select pkm2-database-connection it)
        (-flatten it)
