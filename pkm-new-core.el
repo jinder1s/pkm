@@ -1624,13 +1624,23 @@ Commit everything.
           (plist-get type-values :choices)
           (plist-get type-values :data-type)
           nodes-subquery))
-        ((and (or (plist-get type-values :after) (plist-get type-values :before) ) (plist-get type-values :key) (plist-get type-values :data-type) ) ; TODO Test
-         (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range
-          (plist-get type-values :key)
-          (plist-get type-values :after)
-          (plist-get type-values :before)
-          (plist-get type-values :data-type)
-          nodes-subquery))
+        ((and (or (plist-get type-values :after) (plist-get type-values :before)) (plist-get type-values :key) (plist-get type-values :data-type) ) ; TODO Test
+         (message "Doing the right thing: %S, %S" (plist-get type-values :after) (plist-get type-values :before))
+         (let* ((after (plist-get type-values :after))
+                (after (if (and (plistp after) (length> after 1) )
+                           (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
+                         after))
+                (before (plist-get type-values :before))
+                (before  (if (and (plistp before) (length> before 1) )
+                             (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now)))) ) )
+                           before)))
+           (message "after: %S, before: %S" after before)
+           (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range
+            (plist-get type-values :key)
+            after
+            before
+            (plist-get type-values :data-type)
+            nodes-subquery)))
         ((and (plist-get type-values :key) (plist-get type-values :data-type)) ; TODO Test
          (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key
           (plist-get type-values :key)
@@ -1745,8 +1755,7 @@ Commit everything.
                               it2
                               (pkm2--create-query-2 action (nth 0 it2) (nth 1 it2))
                               (list it2)
-                              (-concat query-spec it2)
-                              ))
+                              (-concat query-spec it2)))
       (when print-output (funcall print-output query-spec) )
       (setq action (--> (completing-read "What would you like to do next?" prompts)
                         (assoc-default it prompts))))
@@ -1861,7 +1870,7 @@ Commit everything.
 
 
 (defun pkm--convert-into-get-spec-kvd (&optional what-to-get key keys)
-  (let* ((what-to-get (or what-to-get (completing-read "How would you like to filter by kvd?" '("key" "key and value" "key and choices" "key and number range")) ))
+  (let* ((what-to-get (or what-to-get (completing-read "How would you like to filter by kvd?" '("key" "key and value" "key and choices" "key and number range" "key and time range"))))
          (key (or key (completing-read "What key?" (or keys
                                                        (pkm2--db-query-get-all-keys-to-types-alist)) nil 'confirm) ))
          (type (assoc-default key (pkm2--db-query-get-all-keys-to-types-alist )))
@@ -1872,15 +1881,48 @@ Commit everything.
          (what-to-get-for-range
           (when (equal what-to-get "key and number range")
             (completing-read "What would you like to set?" '("after" "before" "both"))))
+         (what-to-get-for-time-range
+          (when (equal what-to-get "key and time range")
+            (completing-read "What would you like to set?" '("after" "before" "both" "after-relative" "both-relative" "before-relative"))))
          (after (when (and what-to-get-for-range (or (equal "after" what-to-get-for-range) (equal "both" what-to-get-for-range)) )
                   (read-number "number greater than:\n" )))
          (before (when (and what-to-get-for-range (or (equal "before" what-to-get-for-range) (equal "both" what-to-get-for-range)) )
                    (read-number "number less than\n" )))
+         (after (if (member what-to-get-for-time-range (list "after" "both" "after-relative" "both-relative"))
+                    (if (member what-to-get-for-time-range (list "after-relative" "both-relative"))
+                        (let* ((relative-by (completing-read-multiple "How would you like to specify after?"
+                                                                      '("hour" "day" "minute" "second" "week" "month")))
+                               (units-amounts (-map (lambda (time-unit)
+                                                      (cons (intern time-unit ) (read-number (format "Relative by %s?" time-unit)) )) relative-by))
+                               output)
+                          (-each units-amounts (lambda (unit-amount) (setq output (-concat output (list (car unit-amount) (cdr unit-amount))))))
+                          output)
+                      (--> (read-string "Time after:\n" (format-time-string "%FT%T%z" (current-time) ))
+                           (date-to-time it)
+                           (time-convert it 'integer)) )
+                  after
+                  ))
+         (before (if (member what-to-get-for-time-range (list "before" "both" "before-relative" "both-relative"))
+                     (if (member what-to-get-for-time-range (list "before-relative" "both-relative"))
+                         (let* ((relative-by (completing-read-multiple "How would you like to specify before?"
+                                                                       '("hour" "day" "minute" "second" "week" "month")))
+                                (units-amounts (-map (lambda (time-unit)
+                                                       (cons (intern time-unit ) (read-number (format "Relative by %s?" time-unit)) )) relative-by))
+                                output)
+
+                           (-each units-amounts (lambda (unit-amount) (setq output (-concat output (list (car unit-amount) (cdr unit-amount))))))
+                           output)
+                       (--> (read-string "Time before:\n" (format-time-string "%FT%T%z" (current-time) ))
+                            (date-to-time it)
+                            (time-convert it 'integer)))
+                   before))
          (output (-concat (list :key key :data-type type)
-                         (when value (list :value value))
-                         (when choices (list :choices choices))
-                         (when after (list :after after))
-                         (when before (list :before before)))))
+                          (when value (list :value value))
+                          (when choices (list :choices choices))
+                          (when after (list :after after))
+                          (when before (list :before before)))))
+    (when (and (or after before) (not (or (equal type 'INTEGER) (equal type 'REAL))))
+      (error "kvd type is not a number"))
     output))
 
 (defun pkm--convert-into-get-spec-text ()
