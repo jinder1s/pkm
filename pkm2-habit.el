@@ -2,6 +2,8 @@
 
 (require 'ts)
 (require 'pkm-new-core)
+(require 'pkm2-clock)
+
 (defvar pkm2-habit-hourly-paused nil)
 
 (defvar pkm2-habit-freq-to-seconds `(("daily" . ,(* 60 60 24))
@@ -263,8 +265,6 @@
 
 
 (defun pkm2-habit-should-create-habit-instance (habit-pkm-node)
-  ;; TODO Implement
-  (error "Not implemented")
   (let* ((node-id (--> (pkm2-node-db-node habit-pkm-node) (pkm2-db-node-id it)))
          (habit-frequency (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-freq")
                                (when it
@@ -333,6 +333,11 @@
                                       (when it (-max it) ))))
          (create-instance (and
                            (not todo-habit-instance)
+                           (if  (equal habit-frequency "hourly")
+                               (if (pkm2-clock--get-recent-clock-pkm-nodes `(minute -20))
+                                   t
+                                 nil)
+                             t)
                            (-all?
                             (lambda (required)
                               (cond ((equal required "emacs-active")
@@ -365,11 +370,54 @@
                               t)))))
     (when create-instance t)))
 
-(defun pkm2-habit-should-delete-habit-instance (habit-pkm-node)
-  ;; TODO Implement
-  (error "Not implemented")
-  )
-(defun pkm2-habit-should-kill-habit-instance (habit-pkm-node))
+(defun pkm2-habit-should-delete-habit-instance (habit-instance-pkm-node)
+  "If no active clock, and habit instance is hourly and no recent clocks, delete the hourly instance."
+  (unless (pkm2-clock--get-current-clock-pkm-nodes)
+    (let* ((node-id (--> (pkm2-node-db-node habit-instance-pkm-node) (pkm2-db-node-id it)))
+           (habit-nodes (--> `((:or db-nodes (:db-node-ids (,node-id)))
+                               (:convert-and convert-to-parents (:levels 1))
+                               (:and structure-type (:structure-name habit-node)))
+                             (pkm2--compile-full-db-query it)
+                             (sqlite-select pkm2-database-connection it)
+                             (-flatten it)
+                             (-map #'pkm2--db-query-get-node-with-id it)))
+           (habit-freqs (-map (lambda (habit-pkm-node)
+                                (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-freq")
+                                     (when it
+                                       (if (length> it 1)
+                                           (error "habit node has more than one habit-auto-kill value")
+                                         (pkm2-db-kvd-value (car it))))))
+                              habit-nodes))
+           (is-hourly (-find (lambda (freq) (equal freq "hourly")) habit-freqs))
+           (recent-clocks (when is-hourly (pkm2-clock--get-recent-clock-pkm-nodes `(minute -20)))))
+      (when (and is-hourly (not recent-clocks))
+        t))))
+
+(defun pkm2-habit-should-kill-habit-instance (habit-instance-pkm-node)
+  (let* ((node-id (--> (pkm2-node-db-node habit-instance-pkm-node) (pkm2-db-node-id it)))
+         (habit-instance-deadline (--> (pkm2-node-get-kvds-with-key habit-instance-pkm-node "deadline")
+                              (when it
+                                (if (length> it 1)
+                                    (error "habit node has more than one deadline")
+                                  (pkm2-db-kvd-value (car it))))))
+         (habit-nodes (--> `((:or db-nodes (:db-node-ids (,node-id)))
+                             (:convert-and convert-to-parents (:levels 1))
+                             (:and structure-type (:structure-name habit-node)))
+                           (pkm2--compile-full-db-query it)
+                           (sqlite-select pkm2-database-connection it)
+                           (-flatten it)
+                           (-map #'pkm2--db-query-get-node-with-id it)))
+         (auto-kill-if-deadline (-find  (lambda (habit-pkm-node)
+                                          (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-auto-kill")
+                                               (when it
+                                                 (if (length> it 1)
+                                                     (error "habit node has more than one habit-auto-kill value")
+                                                   (pkm2-db-kvd-value (car it))))
+                                               (when (and it (> it 0))
+                                                 t)))
+                                        habit-nodes)))
+    (when (and auto-kill-if-deadline (> (--> (ts-now) (ts-unix it)) habit-instance-deadline))
+      t)))
 
 (defun pkm2-habit-log-habit-done (habit-pkm-node))
 
@@ -476,13 +524,6 @@
                           ,(when deadline-timestamp `("deadline" . ,deadline-timestamp))
                           ,(when deadline-alert-minutes `("deadline-alert-minutes" . ,deadline-alert-minutes)))))))))
 
-(defun pkm-habit-setup-habits ()
-  (--> `((:or structure-type (:structure-name habit-node)))
-       (pkm2--compile-full-db-query it)
-       (sqlite-select pkm2-database-connection it)
-       (-flatten it)
-       (-map #'pkm2--db-query-get-node-with-id it)
-       (-each it #'pkm2-habit-create-instances)))
 
 (defun pkm-log-habit ()
   "Log habit"
@@ -547,8 +588,49 @@
   )
 
 (defun pkm-habit-manage-habits ()
-  (pkm-habit-setup-habits))
+  (let* ((active-habit-instances
+          (--> `((:or structure-type (:structure-name habit-instance))
+                 (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "TODO" "HOLD"))))
+               (pkm2--compile-full-db-query it)
+               (sqlite-select pkm2-database-connection it)
+               (-flatten it)
+               (-map #'pkm2--db-query-get-node-with-id it)))
+         (a-h-i-delete (-filter #'pkm2-habit-should-delete-habit-instance active-habit-instances))
+         (a-h-i-d-db-ids (-map (lambda (h-i-pkm-node)
+                                 (--> (pkm2-node-db-node h-i-pkm-node)
+                                      (pkm2-db-node-id it)))
+                               a-h-i-delete))
+         (a-h-i-kill (-filter #'pkm2-habit-should-kill-habit-instance active-habit-instances))
+         (a-h-i-kill-task-status-kvd (-map (lambda (a-h-i-pkm-node)
+                                             (--> (pkm2-node-get-kvds-with-key a-h-i-pkm-node "task-status")
+                                                  (when it
+                                                    (if (length> it 1)
+                                                        (error "habit instance has more than one task-status")
+                                                      (car it)))))
+                                           a-h-i-kill))
+         (kill-kvd-id (--> (pkm2--db-get-or-insert-kvd "task-status" "KILL" 'TEXT)
+                           (pkm2-db-kvd-id it))))
 
+    (-each a-h-i-d-db-ids #'pkm2--db-delete-node )
+    (-each-indexed
+        a-h-i-kill-task-status-kvd
+      (lambda (index old-kvd)
+        (pkm2--update-node-kvd (nth index a-h-i-kill)
+                               old-kvd
+                               kill-kvd-id
+                               'TEXT
+                               (pkm2-db-kvd-context-id old-kvd)
+                               (pkm2-db-kvd-link-id old-kvd)
+                               (pkm2-get-current-timestamp)))))
+  (let* ((habit-nodes (-->
+                       `((:or structure-type (:structure-name habit-node)))
+                       (pkm2--compile-full-db-query it)
+                       (sqlite-select pkm2-database-connection it)
+                       (-flatten it)
+                       (-map #'pkm2--db-query-get-node-with-id it)))
+         (habits-to-create (-filter #'pkm2-habit-should-create-habit-instance habit-nodes))
+         (new-instances (-map #'pkm2-habit-create-instances habits-to-create))
+         )))
 
 
 (defun hs-alert (message)
