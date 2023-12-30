@@ -1587,24 +1587,24 @@ Commit everything.
     query))
 
 
+(defun pkm2--db-compile-get-nodes-created-at-2 (after before &optional node-table)
+  (let* ((query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " node-table)
+                        "WHERE ("
+                        (when after (format "node.created_at > %d "  after))
+                        (when before (format "OR node.created_at < %d"  before))
+                        ") ")))
+    query))
 
-
-(defun pkm2--db-compile-get-nodes-with-children-with (children-subquery &optional node-subquery)
-  (let* ((parent "node_b")
-         (child "node_a")
-         (query (concat (format "SELECT %s FROM nodes_link " parent)
-                        (format "WHERE %s IN (%s) " child children-subquery)
-                        (when node-subquery (format "WHERE %s IN (%s) " parent node-subquery)))))
+(defun pkm2--db-compile-get-nodes-modified-at-2 (after before &optional node-table)
+  (let* ((query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " node-table)
+                        "WHERE ("
+                        (when after (format " node.modified_at > %d " after))
+                        (when before (format "OR  node.modified_at < %d " before))
+                        ") ")))
     query))
 
 
-(defun pkm2--db-compile-get-nodes-with-parents-with (parent-subquery &optional node-subquery)
-  (let* ((parent "node_b")
-         (child "node_a")
-         (query (concat (format "SELECT %s FROM nodes_link " child)
-                        (format "WHERE %s IN (%s) " parent parent-subquery)
-                        (when node-subquery (format "WHERE %s IN (%s) " child node-subquery)))))
-    query))
+
 
 
 
@@ -1613,11 +1613,27 @@ Commit everything.
           (format "WHERE search_node MATCH '%s' " text)
           (when node-subquery (format "AND node in (%s)" node-subquery))))
 
+(defun pkm2--db-compile-query-get-node-with-text-2 (text &optional node-table)
+  (concat
+   (format "SELECT %1$s.id from %1$s JOIN search_node on search_node.node = %1$s.id " node-table)
+   (format "WHERE search_node MATCH '%s' " text)))
+
+(defun test-compare-search-with-text ()
+  (equal (length (-distinct (-flatten (sqlite-select
+                                       pkm2-database-connection
+                                       (pkm2--db-compile-query-get-node-with-text-2
+                                         "personal" "node")) ) ) )
+
+         (length (-distinct (-flatten (sqlite-select
+                                       pkm2-database-connection
+                                       (pkm2--db-compile-query-get-node-with-text
+                                        "personal" "node")) ) ) ) ) )
+
 (defun pkm2--db-query-get-sub-nodes (levels link-labels node-subquery &optional get-parent-id)
-  ; TODO TEST
+                                        ; TODO TEST
   (let* ((link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
          (link-labels-string (--> (-map #'pkm2--db-convert-object-to-string link-labels)
-                                              (string-join it ", ")))
+                                  (string-join it ", ")))
          (query (concat
                  (format "WITH RECURSIVE subs_table(node_id, parent_id, level) AS (%s) "
                          (concat (format "SELECT node_b, node_a, 1 FROM nodes_link WHERE type in (%s) AND node_a IN (%s) "
@@ -1848,11 +1864,7 @@ Commit everything.
 
 
 
-(defun pkm2--compile-db-query-with-children (type-values nodes-subquery)
-  (--> (plist-get type-values :children-gets)(pkm2--compile-get-nodes it)(pkm2--db-compile-get-nodes-with-children-with it nodes-subquery)))
 
-(defun pkm2--compile-db-query-with-parent (type-values nodes-subquery)
-  (--> (plist-get type-values :parent-gets)(pkm2--compile-get-nodes it)(pkm2--db-compile-get-nodes-with-parents-with it nodes-subquery)))
 
 (defun pkm2--compile-db-query-text (type-values nodes-subquery)
   (pkm2--db-compile-query-get-node-with-text (plist-get type-values :text) nodes-subquery))
