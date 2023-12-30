@@ -21,6 +21,45 @@
 
 ;;; compile query
 
+(defun pkm2--compile-db-query-kvd-2 (type-values nodes-table)
+  (cond ((plist-get type-values :kvd) ; TODO Test
+         (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (plist-get type-values :kvd) nodes-table))
+        ((and (plist-get type-values :value) (plist-get type-values :key) (plist-get type-values :data-type)) ;TODO Test
+         (message "I is here")
+         (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2
+          (plist-get type-values :key)
+          (list (plist-get type-values :value))
+          (plist-get type-values :data-type)
+          nodes-table))
+        ((and (plist-get type-values :choices) (plist-get type-values :key) (plist-get type-values :data-type) ) ;TODO Test
+         (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2
+          (plist-get type-values :key)
+          (plist-get type-values :choices)
+          (plist-get type-values :data-type)
+          nodes-table))
+        ((and (or (plist-get type-values :after) (plist-get type-values :before)) (plist-get type-values :key) (plist-get type-values :data-type) ) ; TODO Test
+         (message "Doing the right thing: %S, %S" (plist-get type-values :after) (plist-get type-values :before))
+         (let* ((after (plist-get type-values :after))
+                (after (if (and (plistp after) (length> after 1) )
+                           (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
+                         after))
+                (before (plist-get type-values :before))
+                (before  (if (and (plistp before) (length> before 1) )
+                             (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now)))) ) )
+                           before)))
+           (message "after: %S, before: %S" after before)
+           (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range-2
+            (plist-get type-values :key)
+            after
+            before
+            (plist-get type-values :data-type)
+            nodes-table)))
+        ((and (plist-get type-values :key) (plist-get type-values :data-type)) ; TODO Test
+         (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2
+          (plist-get type-values :key)
+          (plist-get type-values :data-type)
+          nodes-table))
+        (t (error "Unable to get nodes for nodes-get:\n%S" type-values))))
 
 
 (defun pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 (key type &optional node-table)
@@ -113,9 +152,9 @@
 
 
 
-
-(defun pkm2--db-compile-query-get-nodes-of-structure-type-2 (structure-name &optional node-table)
-  (let* ((unique-required (plist-get pkm-structure-unique-required-plist structure-name))
+(defun pkm2--db-compile-query-get-nodes-of-structure-type-2 (type-values &optional nodes-table)
+  (let* ((structure-name (plist-get type-values :structure-name))
+         (unique-required (plist-get pkm-structure-unique-required-plist structure-name))
          (u-r-keys (--> (car unique-required) (-filter (lambda (kvd) (member (plist-get kvd :key) it))
                                                        (cadr unique-required))))
          (first-key-kvd-spec (car u-r-keys))
@@ -127,7 +166,7 @@
                                 (--> (plist-get kvd :value) (or (stringp it) (numberp it)))) fully-specified-kvds) )
                       ((-find (lambda (kvd)
                                 (plist-get kvd :choices)) fully-specified-kvds))))))
-    (cond (u-r-keys (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type node-table))
+    (cond (u-r-keys (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type nodes-table))
           (easiest-queriable-kvds (pkm2--compile-full-db-query-common (-map-indexed (lambda (index kvd)
                                                                                       (if (equal index 0)
                                                                                           `(:or kvd (:kvd ,kvd))
@@ -137,11 +176,19 @@
 
 
 
-(defun pkm2--db-compile-get-nodes-between-2 (after before &optional node-table)
+(defun pkm2--db-compile-get-nodes-between-2 (type-values &optional node-table)
                                         ; created_at and modified_at between after and before
                                         ; Node linked to any kvd with datetime type between after and before
                                         ; If any of the nodes above are dependent types, get its parent node
-  (let* ((keys (pkm--object-get-time-related-kvd-keys))
+  (let* ((after (plist-get type-values :after))
+         (after (if (and (plistp after) (length> after 1) )
+                    (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
+                  after))
+         (before (plist-get type-values :before))
+         (before  (if (and (plistp before) (length> before 1) )
+                      (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now)))) ) )
+                    before))
+         (keys (pkm--object-get-time-related-kvd-keys))
          (pkm-kvd-queries (-map (lambda (key) `(:or kvd (:key ,key))) keys))
          (node-pkm-queries `((:or created-at (:after ,after :before ,before))
                              (:or modified-at (:after ,after :before ,before))))
@@ -173,10 +220,10 @@
 
 
 
-(defun pkm2--db-compile-query-get-node-with-text-2 (text &optional node-table)
+(defun pkm2--db-compile-query-get-node-with-text-2 (type-values &optional nodes-table)
   (concat
-   (format "SELECT %1$s.id from %1$s JOIN search_node on search_node.node = %1$s.id " node-table)
-   (format "WHERE search_node MATCH '%s' " text)))
+   (format "SELECT %1$s.id from %1$s JOIN search_node on search_node.node = %1$s.id " nodes-table)
+   (format "WHERE search_node MATCH '%s' " (plist-get type-values :text))))
 
 (defun test-compare-search-with-text ()
   (equal (length (-distinct (-flatten (sqlite-select
@@ -190,16 +237,17 @@
                                         "personal" "node")) ) ) ) ) )
 
 
-
-(defun pkm2--db-query-get-sub-nodes-2 (levels link-labels node-table &optional get-parent-id)
+(defun pkm2--db-query-get-sub-nodes-2 (type-values nodes-table &optional get-parent-id)
   ; TODO TEST
-  (let* ((link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
+  (let* ((levels (plist-get type-values :levels))
+         (link-labels (plist-get type-values :link-labels))
+         (link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
          (link-labels-string (--> (-map #'pkm2--db-convert-object-to-string link-labels)
-                                              (string-join it ", ")))
+                                  (string-join it ", ")))
          (query (concat
                  (format "WITH RECURSIVE subs_table(node_id, parent_id, level) AS (%s) "
                          (concat (format "SELECT nodes_link.node_b, nodes_link.node_a, 1 FROM %s JOIN nodes_link ON %1$s.id = nodes_link.node_a WHERE nodes_link.type in (%s) "
-                                         node-table
+                                         nodes-table
                                          link-labels-string)
                                  "UNION "
                                  "SELECT node_b, node_id, subs_table.level + 1 FROM nodes_link JOIN subs_table ON node_id = node_a "
@@ -213,15 +261,19 @@
 
 
 
-(defun pkm2--db-query-get-parent-nodes-2 (levels link-labels node-table &optional get-child-id)
+(defun pkm2--db-query-get-parent-nodes-2 (type-values nodes-table &optional get-child-id)
+  (when (not nodes-table)
+    (error "convert-to-parents needs to supply a sub-query"))
                                         ; TODO modify to only return query
-  (let* ((link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
+  (let* ((levels (plist-get type-values :levels))
+         (link-labels (plist-get type-values :link-labels))
+         (link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
          (link-labels-string (--> (-map #'pkm2--db-convert-object-to-string link-labels)
                                   (string-join it ", ")))
          (query (concat
                  (format "WITH RECURSIVE subs_table(node_id, child_id, level) AS (%s) "
                          (concat (format "SELECT nodes_link.node_a, nodes_link.node_b, 1 FROM %1$s JOIN nodes_link ON %1$s.id = nodes_link.node_b WHERE nodes_link.type in (%s) "
-                                         node-table
+                                         nodes-table
                                          link-labels-string)
                                  "UNION "
                                  "SELECT node_a, node_id, subs_table.level + 1 FROM nodes_link JOIN subs_table ON node_id = node_b "
@@ -299,86 +351,6 @@
     (error (format "Spec wrong: %S" single-query-spec))))
 
 
-
-(defun pkm2--compile-db-query-kvd-2 (type-values nodes-table)
-  (cond ((plist-get type-values :kvd) ; TODO Test
-         (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (plist-get type-values :kvd) nodes-table))
-        ((and (plist-get type-values :value) (plist-get type-values :key) (plist-get type-values :data-type)) ;TODO Test
-         (message "I is here")
-         (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2
-          (plist-get type-values :key)
-          (list (plist-get type-values :value))
-          (plist-get type-values :data-type)
-          nodes-table))
-        ((and (plist-get type-values :choices) (plist-get type-values :key) (plist-get type-values :data-type) ) ;TODO Test
-         (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2
-          (plist-get type-values :key)
-          (plist-get type-values :choices)
-          (plist-get type-values :data-type)
-          nodes-table))
-        ((and (or (plist-get type-values :after) (plist-get type-values :before)) (plist-get type-values :key) (plist-get type-values :data-type) ) ; TODO Test
-         (message "Doing the right thing: %S, %S" (plist-get type-values :after) (plist-get type-values :before))
-         (let* ((after (plist-get type-values :after))
-                (after (if (and (plistp after) (length> after 1) )
-                           (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
-                         after))
-                (before (plist-get type-values :before))
-                (before  (if (and (plistp before) (length> before 1) )
-                             (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now)))) ) )
-                           before)))
-           (message "after: %S, before: %S" after before)
-           (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range-2
-            (plist-get type-values :key)
-            after
-            before
-            (plist-get type-values :data-type)
-            nodes-table)))
-        ((and (plist-get type-values :key) (plist-get type-values :data-type)) ; TODO Test
-         (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2
-          (plist-get type-values :key)
-          (plist-get type-values :data-type)
-          nodes-table))
-        (t (error "Unable to get nodes for nodes-get:\n%S" type-values))))
-
-
-
-(defun pkm2--compile-db-query-structure-type-2 (type-values nodes-table)
-  (pkm2--db-compile-query-get-nodes-of-structure-type (plist-get type-values :structure-name) nodes-table))
-
-
-
-(defun pkm2--compile-db-query-between-2 (type-values nodes-table)
-  (let* ((after (plist-get type-values :after))
-         (after (if (and (plistp after) (length> after 1) )
-                    (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
-                  after))
-         (before (plist-get type-values :before))
-         (before  (if (and (plistp before) (length> before 1) )
-                      (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now)))) ) )
-                    before)))
-    (pkm2--db-compile-get-nodes-between-2
-     after
-     before
-     nodes-table)))
-
-
-
-
-(defun pkm2--compile-db-query-text-2 (type-values nodes-table)
-  (pkm2--db-compile-query-get-node-with-text-2 (plist-get type-values :text) nodes-table))
-
-
-
-(defun pkm2--compile-db-query-convert-to-parent-2 (type-values nodes-table)
-  (when (not nodes-table)
-    (error "convert-to-parents needs to supply a sub-query"))
-  (pkm2--db-query-get-parent-nodes-2
-   (plist-get type-values :levels)
-   (plist-get type-values :link-labels)
-   nodes-table) )
-
-
-
 (defun pkm2--compile-db-query-convert-to-children-2 (type-values nodes-table)
   (when (not nodes-table)
     (error "convert-to-parents needs to supply a sub-query"))
@@ -396,5 +368,16 @@
   (format "SELECT id from node where id IN (%s)"  (--> (plist-get type-values :db-node-ids)
                                                        (-map #'number-to-string it)
                                                        (string-join it ", "))))
+(pkm2--register-query-spec-option 'structure-type '(:structure-name)  #'pkm--convert-into-get-spec-structure-type #'pkm2--compile-db-query-structure-type #'pkm2--db-compile-query-get-nodes-of-structure-type-2)
+(pkm2--register-query-spec-option 'time-between '(:after :before)  #'pkm--convert-into-get-spec-between #'pkm2--compile-db-query-between #'pkm2--compile-db-query-between-2)
+(pkm2--register-query-spec-option 'created-at '(:after :before)  #'pkm--convert-into-get-spec-between #'pkm2--compile-db-query-between #'pkm2--db-compile-get-nodes-created-at-2)
+(pkm2--register-query-spec-option 'modified-at '(:after :before)  #'pkm--convert-into-get-spec-between #'pkm2--compile-db-query-between #'pkm2--db-compile-get-nodes-modified-at-2)
+(pkm2--register-query-spec-option 'kvd '(:key :value :choices :after :before :kvd) #'pkm--convert-into-get-spec-kvd #'pkm2--compile-db-query-kvd #'pkm2--compile-db-query-kvd-2)
+(pkm2--register-query-spec-option 'convert-to-parents '(:levels) #'pkm--convert-into-get-spec-covert-parent #'pkm2--compile-db-query-convert-to-parent-2 #'pkm2--db-query-get-parent-nodes-2)
+(pkm2--register-query-spec-option 'convert-to-children '(:levels) #'pkm--convert-into-get-spec-covert-children #'pkm2--compile-db-query-convert-to-children #'pkm2--db-query-get-sub-nodes-2)
+(pkm2--register-query-spec-option 'text '(:text) #'pkm--convert-into-get-spec-text #'pkm2--compile-db-query-text #'pkm2--db-compile-query-get-node-with-text-2)
+(pkm2--register-query-spec-option 'all nil #'pkm--convert-into-get-spec-empty  #'pkm2--compile-db-query-all #'pkm2--compile-db-query-all-2)
+(pkm2--register-query-spec-option 'db-node '(:db-id) #'pkm--convert-into-get-spec-db-id #'pkm2--compile-db-query-db-id #'pkm2--compile-db-query-db-id-2)
+(pkm2--register-query-spec-option 'db-nodes '(:db-node-ids) #'pkm--convert-into-get-spec-db-node-ids #'pkm2--compile-db-query-db-node-ids #'pkm2--compile-db-query-db-node-ids-2)
 (provide 'pkm-compile-db-query)
 ;;; pkm-compile-db-query.el ends here
