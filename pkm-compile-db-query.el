@@ -425,10 +425,11 @@
 (defun pkm2--compile-db-query-db-id (type-values nodes-subquery)
   (format "SELECT id from node where id = %d" (plist-get type-values :db-id)))
 
-(defun pkm2--compile-db-query-db-node-ids-2 (type-values nodes-subquery)
+(defun pkm2--compile-db-query-db-node-ids (type-values nodes-subquery)
   (format "SELECT id from node where id IN (%s)"  (--> (plist-get type-values :db-node-ids)
                                                        (-map #'number-to-string it)
                                                        (string-join it ", "))))
+
 (pkm2--register-query-spec-option 'structure-type '(:structure-name)  #'pkm--convert-into-get-spec-structure-type #'pkm2--db-compile-query-get-nodes-of-structure-type)
 (pkm2--register-query-spec-option 'time-between '(:after :before)  #'pkm--convert-into-get-spec-between  #'pkm2--db-compile-get-nodes-between)
 (pkm2--register-query-spec-option 'created-at '(:after :before)  #'pkm--convert-into-get-spec-between  #'pkm2--db-compile-get-nodes-created-at)
@@ -437,7 +438,6 @@
 (pkm2--register-query-spec-option 'convert-to-parents '(:levels) #'pkm--convert-into-get-spec-covert-parent  #'pkm2--db-query-get-parent-nodes)
 (pkm2--register-query-spec-option 'convert-to-children '(:levels) #'pkm--convert-into-get-spec-covert-children #'pkm2--db-query-get-sub-nodes)
 (pkm2--register-query-spec-option 'text '(:text) #'pkm--convert-into-get-spec-text  #'pkm2--db-compile-query-get-node-with-text)
-(pkm2--register-query-spec-option 'all nil #'pkm--convert-into-get-spec-empty   #'pkm2--compile-db-query-all)
 (pkm2--register-query-spec-option 'db-node '(:db-id) #'pkm--convert-into-get-spec-db-id #'pkm2--compile-db-query-db-id)
 (pkm2--register-query-spec-option 'db-nodes '(:db-node-ids) #'pkm--convert-into-get-spec-db-node-ids  #'pkm2--compile-db-query-db-node-ids)
 (provide 'pkm-compile-db-query)
