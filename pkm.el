@@ -34,6 +34,8 @@
 
 ; Happy coding! ;)
 
+(require 'pkm-compile-db-query-old)
+(require 'pkm-compile-db-query)
 (require 'pkm-new-core )
 (require 'pkm2-browse)
 (require 'pkm2-tasks)
