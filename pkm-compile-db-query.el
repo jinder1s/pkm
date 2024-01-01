@@ -22,6 +22,7 @@
 ;;; compile query
 
 (defun pkm2--compile-db-query-kvd-2 (type-values nodes-table)
+  (message "nodes-table: %S" nodes-table)
   (cond ((plist-get type-values :kvd) ; TODO Test
          (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (plist-get type-values :kvd) nodes-table))
         ((and (plist-get type-values :value) (plist-get type-values :key) (plist-get type-values :data-type)) ;TODO Test
@@ -31,21 +32,21 @@
           (list (plist-get type-values :value))
           (plist-get type-values :data-type)
           nodes-table))
-        ((and (plist-get type-values :choices) (plist-get type-values :key) (plist-get type-values :data-type) ) ;TODO Test
+        ((and (plist-get type-values :choices) (plist-get type-values :key) (plist-get type-values :data-type)) ;TODO Test
          (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2
           (plist-get type-values :key)
           (plist-get type-values :choices)
           (plist-get type-values :data-type)
           nodes-table))
-        ((and (or (plist-get type-values :after) (plist-get type-values :before)) (plist-get type-values :key) (plist-get type-values :data-type) ) ; TODO Test
+        ((and (or (plist-get type-values :after) (plist-get type-values :before)) (plist-get type-values :key) (plist-get type-values :data-type)) ; TODO Test
          (message "Doing the right thing: %S, %S" (plist-get type-values :after) (plist-get type-values :before))
          (let* ((after (plist-get type-values :after))
-                (after (if (and (plistp after) (length> after 1) )
+                (after (if (and (plistp after) (length> after 1))
                            (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
                          after))
                 (before (plist-get type-values :before))
-                (before  (if (and (plistp before) (length> before 1) )
-                             (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now)))) ) )
+                (before  (if (and (plistp before) (length> before 1))
+                             (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
                            before)))
            (message "after: %S, before: %S" after before)
            (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range-2
@@ -75,12 +76,12 @@
   (equal (length (-distinct (-flatten (sqlite-select
                                        pkm2-database-connection
                                        (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2
-                                        "task-status" 'TEXT "node")) ) ) )
+                                        "task-status" 'TEXT "node")))))
 
          (length (-distinct (-flatten (sqlite-select
                                        pkm2-database-connection
                                        (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key
-                                        "task-status" 'TEXT "node")) ) ) ) ) )
+                                        "task-status" 'TEXT "node")))))))
 
 
 
@@ -139,8 +140,8 @@
 
 (defun pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (kvd &optional node-table)
   (let* ((key (plist-get kvd :key))
-         (values (cond ((list (plist-get kvd :value)) )
-                       ((plist-get kvd :choices) )))
+         (values (cond ((list (plist-get kvd :value)))
+                       ((plist-get kvd :choices))))
          (type (plist-get kvd :data-type)))
     (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2 key values type node-table)))
 
@@ -153,7 +154,8 @@
 
 
 (defun pkm2--db-compile-query-get-nodes-of-structure-type-2 (type-values &optional nodes-table)
-  (let* ((structure-name (plist-get type-values :structure-name))
+  (let* ((nodes-table (or nodes-table "node"))
+         (structure-name (plist-get type-values :structure-name))
          (unique-required (plist-get pkm-structure-unique-required-plist structure-name))
          (u-r-keys (--> (car unique-required) (-filter (lambda (kvd) (member (plist-get kvd :key) it))
                                                        (cadr unique-required))))
@@ -163,15 +165,17 @@
          (fully-specified-kvds (pkm--object-get-required-fully-specified-kvds2 (cadr unique-required)))
          (easiest-queriable-kvds
           (list (cond ((-find (lambda (kvd)
-                                (--> (plist-get kvd :value) (or (stringp it) (numberp it)))) fully-specified-kvds) )
+                                (--> (plist-get kvd :value) (or (stringp it) (numberp it)))) fully-specified-kvds))
                       ((-find (lambda (kvd)
                                 (plist-get kvd :choices)) fully-specified-kvds))))))
+    (message "%S, %S, %S" unique-required u-r-keys easiest-queriable-kvds)
     (cond (u-r-keys (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type nodes-table))
           (easiest-queriable-kvds (pkm2--compile-full-db-query-common (-map-indexed (lambda (index kvd)
                                                                                       (if (equal index 0)
                                                                                           `(:or kvd (:kvd ,kvd))
                                                                                         `(:and kvd (:kvd ,kvd))))
-                                                                                    easiest-queriable-kvds) ))
+                                                                                    easiest-queriable-kvds)
+                                                                      nodes-table))
           (t (error "Unable to get nodes for structure-type %S" structure-name)))))
 
 
@@ -181,15 +185,15 @@
                                         ; Node linked to any kvd with datetime type between after and before
                                         ; If any of the nodes above are dependent types, get its parent node
   (let* ((after (plist-get type-values :after))
-         (after (if (and (plistp after) (length> after 1) )
+         (after (if (and (plistp after) (length> after 1))
                     (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
                   after))
          (before (plist-get type-values :before))
-         (before  (if (and (plistp before) (length> before 1) )
-                      (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now)))) ) )
+         (before  (if (and (plistp before) (length> before 1))
+                      (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
                     before))
-         (keys (pkm--object-get-time-related-kvd-keys))
-         (pkm-kvd-queries (-map (lambda (key) `(:or kvd (:key ,key))) keys))
+         (keys (progn (pkm--object-get-time-related-kvd-keys) nil ))
+         (pkm-kvd-queries (-map (lambda (key) `(:or kvd (:key ,key :data-type DATETIME))) keys))
          (node-pkm-queries `((:or created-at (:after ,after :before ,before))
                              (:or modified-at (:after ,after :before ,before))))
          (pkm-queries (-concat node-pkm-queries pkm-kvd-queries))
@@ -197,28 +201,37 @@
     query))
 
 
-(defun pkm2--db-compile-get-nodes-created-at-2 (after before &optional node-table)
-  (let* ((query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " node-table)
+(defun pkm2--db-compile-get-nodes-created-at-2 (type-values &optional node-table)
+  (let* ((after (plist-get type-values :after))
+         (after (if (and (plistp after) (length> after 1))
+                    (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
+                  after))
+         (before (plist-get type-values :before))
+         (before  (if (and (plistp before) (length> before 1))
+                      (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
+                    before))
+         (query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " node-table)
                         "WHERE ("
                         (when after (format "node.created_at > %d "  after))
                         (when before (format "OR node.created_at < %d"  before))
                         ") ")))
     query))
 
-(defun pkm2--db-compile-get-nodes-modified-at-2 (after before &optional node-table)
-  (let* ((query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " node-table)
+(defun pkm2--db-compile-get-nodes-modified-at-2 (type-values &optional node-table)
+  (let* ((after (plist-get type-values :after))
+         (after (if (and (plistp after) (length> after 1))
+                    (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
+                  after))
+         (before (plist-get type-values :before))
+         (before  (if (and (plistp before) (length> before 1))
+                      (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
+                    before))
+         (query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " node-table)
                         "WHERE ("
                         (when after (format " node.modified_at > %d " after))
                         (when before (format "OR  node.modified_at < %d " before))
                         ") ")))
     query))
-
-
-
-
-
-
-
 
 (defun pkm2--db-compile-query-get-node-with-text-2 (type-values &optional nodes-table)
   (concat
@@ -229,19 +242,19 @@
   (equal (length (-distinct (-flatten (sqlite-select
                                        pkm2-database-connection
                                        (pkm2--db-compile-query-get-node-with-text-2
-                                         "personal" "node")) ) ) )
+                                         "personal" "node")))))
 
          (length (-distinct (-flatten (sqlite-select
                                        pkm2-database-connection
                                        (pkm2--db-compile-query-get-node-with-text
-                                        "personal" "node")) ) ) ) ) )
+                                        "personal" "node")))))))
 
 
 (defun pkm2--db-query-get-sub-nodes-2 (type-values nodes-table &optional get-parent-id)
   ; TODO TEST
   (let* ((levels (plist-get type-values :levels))
          (link-labels (plist-get type-values :link-labels))
-         (link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
+         (link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL)))
          (link-labels-string (--> (-map #'pkm2--db-convert-object-to-string link-labels)
                                   (string-join it ", ")))
          (query (concat
@@ -267,7 +280,7 @@
                                         ; TODO modify to only return query
   (let* ((levels (plist-get type-values :levels))
          (link-labels (plist-get type-values :link-labels))
-         (link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL) ))
+         (link-labels (or link-labels (plist-get pkm-links-type-to-label-eq-plist 'HIERARCHICAL)))
          (link-labels-string (--> (-map #'pkm2--db-convert-object-to-string link-labels)
                                   (string-join it ", ")))
          (query (concat
@@ -284,71 +297,114 @@
                      "SELECT node_id, child_id FROM subs_table"
                    "SELECT node_id FROM subs_table"))))
     query))
-
-
-
-
-(defun pkm2--compile-full-db-query-common (query-plist &optional node-table)
-  (let* ((query query-plist)
-         (output
-          (-reduce-from
-           (lambda (current-output single-query-spec)
-             (cond ((equal (car single-query-spec) :or)
-                    (if current-output
-                        (cons (+ (car current-output) 1) (format "%s, v%d(id) as (SELECT id from v%d UNION %s) "
-                                                                 (cdr current-output)
-                                                                 (+ (car current-output) 1)
-                                                                 (car current-output)
-                                                                 (pkm2--compile-db-query (cdr single-query-spec))) )
-                      (cons 1 (format "WITH v1(id) as (%s) " (pkm2--compile-db-query (cdr single-query-spec))))))
-                   ((equal (car single-query-spec) :and)
-                    (cons  (+ (car current-output) 1)
-                           (format "%s, v%d(id) as (%s) "
-                                   (cdr current-output)
-                                   (+ (car current-output) 1)
-                                   (pkm2--compile-db-query (cdr single-query-spec) (format "v%d" (car current-output)))) ))
-                   ((equal (car single-query-spec) :not)
-                    (cons (+ (car current-output) 1)
-                          (format "%s, v%d(id) as (SELECT id from v%d WHERE id not in (%s))"
-                                  (cdr current-output)
-                                  (+ (car current-output) 1)
-                                  (car current-output)
-                                  (pkm2--compile-db-query (cdr single-query-spec) (format "v%d" (car current-output)))) ))
-                   ((equal (car single-query-spec) :convert-and)
-                    (cons (+ (car current-output) 1)
-                          (format "%s, v%d(id) as (%s)"
-                                  (cdr current-output)
-                                  (+ (car current-output) 1)
-                                  (pkm2--compile-db-query (cdr single-query-spec) (format "v%d" (car current-output))) ) ))
-                   ((equal (car single-query-spec) :convert-or)
-                    (cons (+ (car current-output) 1) (format "%s, v%d(id) as (SELECT id from v%d UNION %s) "
-                                                             (cdr current-output)
-                                                             (+ (car current-output) 1)
-                                                             (car current-output)
-                                                             (pkm2--compile-db-query
-                                                              (cdr single-query-spec)
-                                                              (format "v%d" (car current-output))))))
-                   ((equal (car single-query-spec) :compound-or)
-                    (cons (+ (car current-output) 1) (format "%s, v%d(id) as (SELECT id from v%d UNION (%s)) "
-                                                             (cdr current-output)
-                                                             (+ (car current-output) 1)
-                                                             (car current-output)
-                                                             (pkm2--compile-full-db-query-common (cdr single-query-spec)))))
-                   ((equal (car single-query-spec) :compound-and)
-                    (cons (+ (car current-output) 1) (format "%s, v%d(id) as (%s) "
-                                                             (cdr current-output)
-                                                             (+ (car current-output) 1)
-                                                             (pkm2--compile-full-db-query-common (cdr single-query-spec) (format "v%d" (car current-output))))))
-                   (t (error "Got weird single-query-spec: %S" (car single-query-spec)))))
-           nil
-           query)))
-    output))
-(defun pkm2--compile-db-query-2 (single-query-spec &optional nodes-table-name)
+(defun pkm2--compile-db-query-2 (single-query-spec &optional nodes-table)
+  (message "q-1: %S" nodes-table)
   (if-let* ((type-strategies (plist-get pkm2--query-spec-options-plist (car single-query-spec)))
             (db-query-func (plist-get type-strategies :get-db-query-2))
-            (db-query (funcall db-query-func (cadr single-query-spec) nodes-table-name)))
+            (db-query (funcall db-query-func (cadr single-query-spec) nodes-table)))
       db-query
     (error (format "Spec wrong: %S" single-query-spec))))
+
+
+
+(defun pkm2--compile-full-db-query-common (query-plist &optional nodes-table)
+  (message "nodes table: %S" nodes-table)
+  (let* ((query query-plist)
+         (reduced-output
+          (-reduce-from
+           (lambda (current-output single-query-spec)
+             (if current-output
+                 (let* ((current-db-query (cdr current-output))
+                        (last-index (car current-output))
+                        (next-index (+ last-index 1))
+                        (current-query-spec (cdr single-query-spec))
+                        (current-expression-name (format "%sv%d" (or nodes-table "") next-index))
+                        (last-expression-name (format "%sv%d" (or nodes-table "") last-index))
+                        (base-expression-name (format "%sv" (or nodes-table "") ) ))
+                   (cond ((equal (car single-query-spec) :or)
+                          (cons (+ next-index 1)
+                                (format "%1$s, %2$s(id) as ( %s), %s(id) as (SELECT id from %2$s UNION SELECT id from %5$s) "
+                                        current-db-query
+                                        current-expression-name
+                                        (pkm2--compile-db-query-2 current-query-spec "node")
+                                        (format "%s%d" base-expression-name (+ next-index 1))
+                                        last-expression-name)))
+                         ((equal (car single-query-spec) :and)
+                          (cons  next-index
+                                 (format "%s, %s(id) as (%s) "
+                                         current-db-query
+                                         current-expression-name
+                                         (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
+                         ((equal (car single-query-spec) :not)
+                          (cons next-index
+                                (format "%s, %s(id) as (SELECT id from %s WHERE id not in (%s))"
+                                        current-db-query
+                                        current-expression-name
+                                        last-expression-name
+                                        (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
+                         ((equal (car single-query-spec) :convert-and)
+                          (cons next-index
+                                (format "%s, %s(id) as (%s)"
+                                        current-db-query
+                                        current-expression-name
+                                        (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
+                         ((equal (car single-query-spec) :convert-or)
+                          (cons next-index (format "%s, %s(id) as (SELECT id from %s UNION (%s)) "
+                                                   current-db-query
+                                                   current-expression-name
+                                                   last-expression-name
+                                                   (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
+                         ((equal (car single-query-spec) :compound-or)
+                          (cons next-index (format "%s, %s(id) as (SELECT id from %s UNION (%s)) "
+                                                   current-db-query
+                                                   current-expression-name
+                                                   last-expression-name
+                                                   (pkm2--compile-full-db-query-common current-query-spec))))
+                         ((equal (car single-query-spec) :compound-and)
+                          (cons next-index (format "%s, %s(id) as (%s) "
+                                                   current-db-query
+                                                   current-expression-name
+                                                   (pkm2--compile-full-db-query-common current-query-spec last-expression-name))))
+                         (t (error "Got weird single-query-spec: %S" (car single-query-spec)))))
+               (cons 1 (format "WITH %sv1(id) as (%s) " (or nodes-table "") (pkm2--compile-db-query-2 (cdr single-query-spec) nodes-table)))))
+           nil
+           query))
+         (output (format "%s SELECT * FROM %sv%d"
+                         (cdr reduced-output)
+                         (or nodes-table "")
+                         (car reduced-output))))
+    output))
+
+(defun test-compile-full-db-query-common-1 ()
+  (let* ((pkm-query '((:or structure-type (:structure-name log-n))
+                      (:and time-between (:after (day -20) :before nil))))
+         (query1 (pkm2--compile-full-db-query-common pkm-query))
+         (query2 (pkm2--compile-full-db-query pkm-query))
+         (query1-output (sqlite-select pkm2-database-connection query1))
+         (query2-output (sqlite-select pkm2-database-connection query2)))
+    (equal (length (-distinct query1-output ))
+           (length (-distinct query2-output)))
+
+    ;; query
+    ))
+
+(defun test-compile-full-db-query-common-2 ()
+  (let* ((pkm-query '((:or structure-type (:structure-name log-n))
+                      (:or structure-type (:structure-name project-s))
+                      (:convert-or convert-to-children (:levels 1))
+                      ))
+         (query1 (pkm2--compile-full-db-query-common pkm-query))
+         (query2 (pkm2--compile-full-db-query pkm-query))
+         (query1-output (sqlite-select pkm2-database-connection query1))
+         (query2-output (sqlite-select pkm2-database-connection query2))
+         )
+    (equal (length (-distinct query1-output ))
+           (length (-distinct query2-output)))
+
+    ;; query1
+    ))
+
+
 
 
 (defun pkm2--compile-db-query-convert-to-children-2 (type-values nodes-table)
@@ -359,8 +415,6 @@
    (plist-get type-values :link-labels)
    nodes-table))
 
-
-
 (defun pkm2--compile-db-query-db-id-2 (type-values nodes-subquery)
   (format "SELECT id from node where id = %d" (plist-get type-values :db-id)))
 
@@ -369,7 +423,7 @@
                                                        (-map #'number-to-string it)
                                                        (string-join it ", "))))
 (pkm2--register-query-spec-option 'structure-type '(:structure-name)  #'pkm--convert-into-get-spec-structure-type #'pkm2--compile-db-query-structure-type #'pkm2--db-compile-query-get-nodes-of-structure-type-2)
-(pkm2--register-query-spec-option 'time-between '(:after :before)  #'pkm--convert-into-get-spec-between #'pkm2--compile-db-query-between #'pkm2--compile-db-query-between-2)
+(pkm2--register-query-spec-option 'time-between '(:after :before)  #'pkm--convert-into-get-spec-between #'pkm2--compile-db-query-between #'pkm2--db-compile-get-nodes-between-2)
 (pkm2--register-query-spec-option 'created-at '(:after :before)  #'pkm--convert-into-get-spec-between #'pkm2--compile-db-query-between #'pkm2--db-compile-get-nodes-created-at-2)
 (pkm2--register-query-spec-option 'modified-at '(:after :before)  #'pkm--convert-into-get-spec-between #'pkm2--compile-db-query-between #'pkm2--db-compile-get-nodes-modified-at-2)
 (pkm2--register-query-spec-option 'kvd '(:key :value :choices :after :before :kvd) #'pkm--convert-into-get-spec-kvd #'pkm2--compile-db-query-kvd #'pkm2--compile-db-query-kvd-2)
