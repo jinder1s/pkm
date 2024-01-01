@@ -382,7 +382,7 @@
                                                    current-expression-name
                                                    (pkm2--compile-full-db-query current-query-spec last-expression-name))))
                          (t (error "Got weird single-query-spec: %S" (car single-query-spec)))))
-               (cons 1 (format "WITH %sv1(id) as (%s) " (or nodes-table "") (pkm2--compile-db-query (cdr single-query-spec) nodes-table)))))
+               (cons 1 (format "WITH %sv1(id) as (%s) " (or nodes-table "") (pkm2--compile-db-query (cdr single-query-spec) (or nodes-table "node"))))))
            nil
            query))
          (output (format "%s SELECT * FROM %sv%d"

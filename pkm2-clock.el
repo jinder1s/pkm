@@ -30,7 +30,8 @@
 
 (defun pkm2-clock--get-current-clock-pkm-nodes ()
   ; TODO implment and test this
-  (--> `((:or structure-type (:structure-name clock-node)) (:not kvd (:key "clock-end" :data-type INTEGER)) )
+  (--> `((:or structure-type (:structure-name clock-node))
+         (:not kvd (:key "clock-end" :data-type INTEGER)))
        (pkm2--compile-full-db-query it)
        (sqlite-select pkm2-database-connection it)
        (-flatten it)
