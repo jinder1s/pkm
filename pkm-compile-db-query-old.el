@@ -21,10 +21,7 @@
 
 
 
-(defun pkm2--compile-get-all-nodes (&optional limit node-subquery)
-  (concat "SELECT id from node "
-          (when node-subquery (format "WHERE id IN (%s) "  node-subquery))
-          (when limit (format " LIMIT %s" limit)) ))
+
 
 
 (defun pkm2--create-query (&optional  print-output initial-queries initial-action)
@@ -118,11 +115,11 @@
     query-spec))
 
 (defvar pkm2--query-spec-options-plist ())
-(defun pkm2--register-query-spec-option (spec-option-name inputs read-info-function convert-to-db-func &optional convert-to-db-func-2)
+
+(defun pkm2--register-query-spec-option (spec-option-name inputs read-info-function convert-to-db-func  )
   (setq pkm2--query-spec-options-plist (plist-put pkm2--query-spec-options-plist spec-option-name (list :inputs inputs
                                                                                                         :read-info read-info-function
-                                                                                                        :get-db-query convert-to-db-func
-                                                                                                        :get-db-query-2 convert-to-db-func-2 ))))
+                                                                                                        :get-db-query convert-to-db-func ))))
 
 (defun pkm2--create-query-2 (action query-type query-type-inputs)
   `(,action ,query-type ,query-type-inputs))
@@ -131,10 +128,6 @@
   (--> (plist-get pkm2--query-spec-options-plist key)
        (plist-get it :read-info)
        (funcall it)))
-
-
-
-
 
 
 (defun pkm--convert-into-get-spec-empty ())
@@ -246,8 +239,6 @@
   (list :levels (intern (completing-read "How many levels of parents would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
 (defun pkm--convert-into-get-spec-covert-children ()
   (list :levels (read (completing-read "How many levels of children would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
-
-
 
 (provide 'pkm-compile-db-query-old)
 ;;; pkm-compile-db-query-old.el ends here
