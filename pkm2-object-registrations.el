@@ -1,6 +1,8 @@
 ;;; pkm-object-todo.el -*- lexical-binding: t; -*-
 
 
+(require 'pkm-new-core)
+
 (pkm2-register-behavior `(:name log :assets ((:pkm-type kvd :name "is-log" :key "node-type" :value "log"  :data-type TEXT)
                                              (:pkm-type kvd :name "timestamp" :key "timestamp" :value ,#'pkm2-get-current-timestamp  :data-type DATETIME))))
 

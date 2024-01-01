@@ -1,4 +1,4 @@
-;;; pkm-compile-db-query-old.el --- Description -*- lexical-binding: t; -*-
+;;; pkm-create-pkm-query.el --- Description -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2023 Jinder
 ;;
@@ -240,5 +240,5 @@
 (defun pkm--convert-into-get-spec-covert-children ()
   (list :levels (read (completing-read "How many levels of children would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
 
-(provide 'pkm-compile-db-query-old)
-;;; pkm-compile-db-query-old.el ends here
+(provide 'pkm-create-pkm-query)
+;;; pkm-create-pkm-query.el ends here

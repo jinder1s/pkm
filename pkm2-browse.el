@@ -6,7 +6,9 @@
 (require 'cl-lib)
 (require 'cl-macs)
 (require 'pkm-new-core)
-(require 'pkm-query-compile)
+(require 'pkm-create-pkm-query)
+(require 'pkm-create-pkm-query-ewoc)
+(require 'pkm-compile-db-query)
 
 (cl-defstruct pkm2-browse-node-state
   (show-hidden nil)
@@ -101,7 +103,6 @@
                            (make-pkm2-browse-section :spec  section-spec))
                          (plist-get browse-spec :sections)))
          (browse-state (make-pkm2-browse-buffer-state :sections sections)))
-    (message "b-s3: %S" browse-state)
     (pkm2--browse browse-state nil)))
 
 

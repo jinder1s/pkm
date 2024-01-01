@@ -1,4 +1,4 @@
-;;; pkm-query-compile.el --- Description -*- lexical-binding: t; -*-
+;;; pkm-create-pkm-query-ewoc.el --- Description -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (C) 2023 Jinder
 ;;
@@ -8,7 +8,7 @@
 ;; Modified: December 09, 2023
 ;; Version: 0.0.1
 ;; Keywords: abbrev bib c calendar comm convenience data docs emulations extensions faces files frames games hardware help hypermedia i18n internal languages lisp local maint mail matching mouse multimedia news outlines processes terminals tex tools unix vc wp
-;; Homepage: https://github.com/msingh15/pkm-query-compile
+;; Homepage: https://github.com/msingh15/pkm-create-pkm-query-ewoc
 ;; Package-Requires: ((emacs "29.1"))
 ;;
 ;; This file is not part of GNU Emacs.
@@ -21,9 +21,8 @@
 
 (require 'dash)
 (require 'ewoc)
-(require 'pkm-new-core)
-
-(defun pkm-query-compile-pretty-print-filter (subquery)
+(require 'pkm-create-pkm-query)
+(defun pkm-create-pkm-query-ewoc-pretty-print-filter (subquery)
   (let* ((start-section  (nth 0 subquery))
          (start-query  (nth 1 subquery))
          (start-subquery (nth 2 subquery))
@@ -37,14 +36,14 @@
     (unless (and start-subquery)
       (insert  "\n       "))
     (insert (format "%S" filter))))
-(defvar-local pkm-query-compile-ewoc nil)
-(defvar-local pkm-query-compile-finish-func nil)
-(defvar-local pkm-query-compile-cancel-finish-func nil)
+(defvar-local pkm-create-pkm-query-ewoc-ewoc nil)
+(defvar-local pkm-create-pkm-query-ewoc-finish-func nil)
+(defvar-local pkm-create-pkm-query-ewoc-cancel-finish-func nil)
 
-(defvar-keymap pkm-query-compile-mode-map
+(defvar-keymap pkm-create-pkm-query-ewoc-mode-map
   :doc ""
-  "C-c C-c" (lambda () (interactive) (funcall pkm-query-compile-finish-func))
-  "C-c C-k" (lambda () (interactive) (funcall pkm-query-compile-cancel-finish-func))
+  "C-c C-c" (lambda () (interactive) (funcall pkm-create-pkm-query-ewoc-finish-func))
+  "C-c C-k" (lambda () (interactive) (funcall pkm-create-pkm-query-ewoc-cancel-finish-func))
   "a b q" #'pkm-compile-add-query-before
   "a b s" #'pkm-compile-add-section-before
   "a b f" #'pkm-compile-add-filter-before
@@ -55,11 +54,11 @@
   "d q" #'pkm-compile-remove-current-query
   "d s" #'pkm-compile-remove-current-section)
 
-(setq pkm-query-compile-mode-map
+(setq pkm-create-pkm-query-ewoc-mode-map
       (define-keymap
         ;; :doc ""
-        "C-c C-c" (lambda () (interactive) (funcall pkm-query-compile-finish-func))
-        "C-c C-k" (lambda () (interactive) (funcall pkm-query-compile-cancel-finish-func))
+        "C-c C-c" (lambda () (interactive) (funcall pkm-create-pkm-query-ewoc-finish-func))
+        "C-c C-k" (lambda () (interactive) (funcall pkm-create-pkm-query-ewoc-cancel-finish-func))
         "C-c a b q" #'pkm-compile-add-query-before
         "C-c a b s" #'pkm-compile-add-section-before
         "C-c a b f" #'pkm-compile-add-filter-before
@@ -76,12 +75,12 @@
       )
 (define-minor-mode pkm2-query-compile-mode
   "Minor mode for simple finish/cancel keybindings."
-  :keymap pkm-query-compile-mode-map)
+  :keymap pkm-create-pkm-query-ewoc-mode-map)
 
 (defun pkm-compile-create-browse-spec (post-create-function &optional query section)
   (let* ((buffer-name "* p b com *")
          (buffer (get-buffer-create buffer-name))
-         (browse-ewoc (with-current-buffer buffer (ewoc-create #'pkm-query-compile-pretty-print-filter nil nil t) ))
+         (browse-ewoc (with-current-buffer buffer (ewoc-create #'pkm-create-pkm-query-ewoc-pretty-print-filter nil nil t) ))
          (seed-query (when (not section) (or query (pkm2--create-query-filter :or) ) ))
          (data (if section
                    `(:sections (,section))
@@ -103,15 +102,15 @@
     (switch-to-buffer-other-window buffer)
     (with-current-buffer buffer
       (delete-region (point-min) (point-max))
-      (setq pkm-query-compile-ewoc nil)
-      (setq pkm-query-compile-ewoc browse-ewoc)
-      (setq pkm-query-compile-finish-func
+      (setq pkm-create-pkm-query-ewoc-ewoc nil)
+      (setq pkm-create-pkm-query-ewoc-ewoc browse-ewoc)
+      (setq pkm-create-pkm-query-ewoc-finish-func
             (lambda ()
               (with-current-buffer buffer
                 (let* ((browse-spec (pkm-compile-collect-queries)))
                   (kill-buffer buffer)
                   (funcall post-create-function browse-spec)))))
-      (setq pkm-query-compile-cancel-finish-func
+      (setq pkm-create-pkm-query-ewoc-cancel-finish-func
             (lambda ()
               (kill-buffer buffer-name)))
       (pkm2-query-compile-mode))
@@ -119,7 +118,7 @@
 
 (defun pkm-compile-add-filter-before (&optional filter)
   (interactive)
-  (let* ((current-ewoc-node (ewoc-locate pkm-query-compile-ewoc (point)))
+  (let* ((current-ewoc-node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)))
          (c-e-n-data (ewoc-data current-ewoc-node))
          (current-subquery-start (nth 2 c-e-n-data))
          (new-filter (or filter (pkm2--create-query-filter (when current-subquery-start :or)) ))
@@ -127,63 +126,63 @@
     (when current-subquery-start
       (let* ((new-c-e-n-data (-replace-at 2 nil c-e-n-data)))
         (ewoc-set-data current-ewoc-node new-c-e-n-data)
-        (ewoc-invalidate pkm-query-compile-ewoc current-ewoc-node)))
-    (ewoc-enter-before pkm-query-compile-ewoc current-ewoc-node new-e-n-data)))
+        (ewoc-invalidate pkm-create-pkm-query-ewoc-ewoc current-ewoc-node)))
+    (ewoc-enter-before pkm-create-pkm-query-ewoc-ewoc current-ewoc-node new-e-n-data)))
 
 (defun pkm-compile-add-filter-after (&optional filter)
   (interactive)
-  (let* ((current-ewoc-node (ewoc-locate pkm-query-compile-ewoc (point)))
+  (let* ((current-ewoc-node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)))
          (c-e-n-data (ewoc-data current-ewoc-node))
          (new-filter (or filter (pkm2--create-query-filter)))
          (new-e-n-data (-replace-at 3 new-filter c-e-n-data))
          (new-e-n-data (-replace-at 2 nil new-e-n-data)))
-    (ewoc-enter-after pkm-query-compile-ewoc current-ewoc-node new-e-n-data)))
+    (ewoc-enter-after pkm-create-pkm-query-ewoc-ewoc current-ewoc-node new-e-n-data)))
 
 (defun pkm-compile-add-query-before (&optional node)
   (interactive)
-(let* ((current-ewoc-node (or node (ewoc-locate pkm-query-compile-ewoc (point)) ))
+(let* ((current-ewoc-node (or node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)) ))
        (c-e-n-data (ewoc-data current-ewoc-node))
        (current-subquery-start (nth 2 c-e-n-data))
        (current-query-start (nth 2 c-e-n-data)))
     (if current-subquery-start
         (let* ((new-filter (pkm2--create-query-filter :or) )
                (new-e-n-data (-replace-at 3 new-filter c-e-n-data)))
-          (ewoc-enter-before pkm-query-compile-ewoc current-ewoc-node new-e-n-data)
+          (ewoc-enter-before pkm-create-pkm-query-ewoc-ewoc current-ewoc-node new-e-n-data)
           (when current-query-start
             (let* ((new-c-e-n-data (-replace-at 1 nil c-e-n-data)))
               (ewoc-set-data current-ewoc-node new-c-e-n-data)
-              (ewoc-invalidate pkm-query-compile-ewoc current-ewoc-node))))
-      (pkm-compile-add-query-before (ewoc-prev pkm-query-compile-ewoc current-ewoc-node)))))
+              (ewoc-invalidate pkm-create-pkm-query-ewoc-ewoc current-ewoc-node))))
+      (pkm-compile-add-query-before (ewoc-prev pkm-create-pkm-query-ewoc-ewoc current-ewoc-node)))))
 
 (defun pkm-compile-add-query-after (&optional node)
   (interactive)
-  (let* ((current-ewoc-node (or node (ewoc-locate pkm-query-compile-ewoc (point)) ))
+  (let* ((current-ewoc-node (or node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)) ))
          (c-e-n-data (ewoc-data current-ewoc-node))
-         (next-ewoc-node (ewoc-next pkm-query-compile-ewoc current-ewoc-node))
+         (next-ewoc-node (ewoc-next pkm-create-pkm-query-ewoc-ewoc current-ewoc-node))
          (n-e-n-data (when next-ewoc-node (ewoc-data next-ewoc-node) ))
          (next-subquery-start (nth 2 n-e-n-data)))
     (if (or (not next-ewoc-node) next-subquery-start)
         (let* ((new-filter (pkm2--create-query-filter :or))
                (new-e-n-data `(,(nth 0 c-e-n-data) ,(nth 0 c-e-n-data) t ,new-filter)))
-          (ewoc-enter-after pkm-query-compile-ewoc current-ewoc-node new-e-n-data))
+          (ewoc-enter-after pkm-create-pkm-query-ewoc-ewoc current-ewoc-node new-e-n-data))
       (pkm-compile-add-query-after next-ewoc-node))))
 
 (defun pkm-compile-add-section-before (&optional node)
   (interactive)
-  (let* ((current-ewoc-node (or node (ewoc-locate pkm-query-compile-ewoc (point)) ))
+  (let* ((current-ewoc-node (or node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)) ))
          (c-e-n-data (ewoc-data current-ewoc-node))
          (current-subquery-start (nth 2 c-e-n-data))
          (current-query-start (nth 1 c-e-n-data)))
     (if (and current-subquery-start current-query-start)
         (let* ((new-filter (pkm2--create-query-filter :or) )
                (new-e-n-data `(,(nth 0 c-e-n-data) t t ,new-filter)))
-          (ewoc-enter-before pkm-query-compile-ewoc current-ewoc-node new-e-n-data))
-      (pkm-compile-add-section-before (ewoc-prev pkm-query-compile-ewoc current-ewoc-node)))))
+          (ewoc-enter-before pkm-create-pkm-query-ewoc-ewoc current-ewoc-node new-e-n-data))
+      (pkm-compile-add-section-before (ewoc-prev pkm-create-pkm-query-ewoc-ewoc current-ewoc-node)))))
 
 (defun pkm-compile-add-section-after (&optional node)
   (interactive)
-  (let* ((current-ewoc-node (or node (ewoc-locate pkm-query-compile-ewoc (point)) ))
-         (next-ewoc-node (ewoc-next pkm-query-compile-ewoc current-ewoc-node))
+  (let* ((current-ewoc-node (or node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)) ))
+         (next-ewoc-node (ewoc-next pkm-create-pkm-query-ewoc-ewoc current-ewoc-node))
          (n-e-n-data (when next-ewoc-node (ewoc-data next-ewoc-node)))
          (next-subquery-start (nth 2 n-e-n-data))
          (next-query-start (nth 1 n-e-n-data)))
@@ -191,31 +190,31 @@
             (and next-subquery-start next-query-start) )
         (let* ((new-filter (pkm2--create-query-filter :or) )
                (new-e-n-data `(,(nth 0 n-e-n-data) t t ,new-filter)))
-          (ewoc-enter-after pkm-query-compile-ewoc current-ewoc-node new-e-n-data))
+          (ewoc-enter-after pkm-create-pkm-query-ewoc-ewoc current-ewoc-node new-e-n-data))
       (pkm-compile-add-section-after next-ewoc-node))))
 
 (defun pkm-compile-manually-edit-current-filter ()
   (interactive)
-  (let* ((current-ewoc-node (ewoc-locate pkm-query-compile-ewoc (point)))
+  (let* ((current-ewoc-node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)))
          (c-e-n-data (ewoc-data current-ewoc-node))
          (filter-string (format "%S" (nth 3 c-e-n-data) ))
          (edited-filter (read (read-string "Edit: " filter-string) ))
          (new-c-e-n-data (-replace-at 3 edited-filter c-e-n-data)))
     (ewoc-set-data current-ewoc-node new-c-e-n-data)
-    (ewoc-invalidate pkm-query-compile-ewoc current-ewoc-node)))
+    (ewoc-invalidate pkm-create-pkm-query-ewoc-ewoc current-ewoc-node)))
 
 (defun pkm-compile-remove-current-filter ()
   (interactive)
-  (ewoc-delete pkm-query-compile-ewoc (ewoc-locate pkm-query-compile-ewoc (point))))
+  (ewoc-delete pkm-create-pkm-query-ewoc-ewoc (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point))))
 (defun pkm-compile-remove-current-query ()
   (interactive))
 (defun pkm-compile-remove-current-section ()
   (interactive)
   )
 (defun pkm-compile-move-filter-up ()
-  (let* ((current-ewoc-node (ewoc-locate pkm-query-compile-ewoc (point)))
+  (let* ((current-ewoc-node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)))
          (c-e-n-data (ewoc-data current-ewoc-node))
-         (prev-ewoc-node (ewoc-prev pkm-query-compile-ewoc current-ewoc-node))
+         (prev-ewoc-node (ewoc-prev pkm-create-pkm-query-ewoc-ewoc current-ewoc-node))
          (p-e-n-data (when prev-ewoc-node (ewoc-data prev-ewoc-node)))
          (current-subquery-start (nth 2 c-e-n-data))
          (prev-subquery-start (nth 2 p-e-n-data)))
@@ -226,14 +225,14 @@
                  (new-p-e-n-data (-replace-at 2 current-subquery-start p-e-n-data)))
             (ewoc-set-data current-ewoc-node new-p-e-n-data)
             (ewoc-set-data prev-ewoc-node new-c-e-n-data)
-            (ewoc-invalidate pkm-query-compile-ewoc current-ewoc-node prev-ewoc-node))
-        (progn (ewoc-delete pkm-query-compile-ewoc current-ewoc-node)
-               (ewoc-enter-before pkm-query-compile-ewoc prev-ewoc-node c-e-n-data))))))
+            (ewoc-invalidate pkm-create-pkm-query-ewoc-ewoc current-ewoc-node prev-ewoc-node))
+        (progn (ewoc-delete pkm-create-pkm-query-ewoc-ewoc current-ewoc-node)
+               (ewoc-enter-before pkm-create-pkm-query-ewoc-ewoc prev-ewoc-node c-e-n-data))))))
 
 (defun pkm-compile-move-filter-down ()
-  (let* ((current-ewoc-node (ewoc-locate pkm-query-compile-ewoc (point)))
+  (let* ((current-ewoc-node (ewoc-locate pkm-create-pkm-query-ewoc-ewoc (point)))
          (c-e-n-data (ewoc-data current-ewoc-node))
-         (next-ewoc-node (ewoc-next pkm-query-compile-ewoc current-ewoc-node))
+         (next-ewoc-node (ewoc-next pkm-create-pkm-query-ewoc-ewoc current-ewoc-node))
          (n-e-n-data (when next-ewoc-node (ewoc-data next-ewoc-node)))
          (current-subquery-start (nth 2 c-e-n-data))
          (next-subquery-start (nth 2 n-e-n-data)))
@@ -244,12 +243,12 @@
                  (new-n-e-n-data (-replace-at 2 current-subquery-start n-e-n-data)))
             (ewoc-set-data current-ewoc-node new-n-e-n-data)
             (ewoc-set-data next-ewoc-node new-c-e-n-data)
-            (ewoc-invalidate pkm-query-compile-ewoc current-ewoc-node next-ewoc-node))
-        (progn (ewoc-delete pkm-query-compile-ewoc current-ewoc-node)
-               (ewoc-enter-after pkm-query-compile-ewoc next-ewoc-node c-e-n-data))))))
+            (ewoc-invalidate pkm-create-pkm-query-ewoc-ewoc current-ewoc-node next-ewoc-node))
+        (progn (ewoc-delete pkm-create-pkm-query-ewoc-ewoc current-ewoc-node)
+               (ewoc-enter-after pkm-create-pkm-query-ewoc-ewoc next-ewoc-node c-e-n-data))))))
 
 (defun pkm-compile-collect-queries ()
-  (let*  ((ewoc-data-output (ewoc-collect pkm-query-compile-ewoc (lambda (node) t)))
+  (let*  ((ewoc-data-output (ewoc-collect pkm-create-pkm-query-ewoc-ewoc (lambda (node) t)))
           (output (list :output nil :current-section nil :current-query nil))
           (combined-output (-reduce-from (lambda (output subquery)
                                            (message "output: %S\nsq; %S" output subquery )
@@ -305,5 +304,5 @@
                          (plist-get output :output))))
     browse-spec))
 
-(provide 'pkm-query-compile)
-;;; pkm-query-compile.el ends here
+(provide 'pkm-create-pkm-query-ewoc)
+;;; pkm-create-pkm-query-ewoc.el ends here

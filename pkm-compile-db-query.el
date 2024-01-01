@@ -21,6 +21,9 @@
 
 ;;; compile query
 
+(require 'pkm-create-pkm-query)
+(require 'dash)
+
 (defun pkm2--compile-get-all-nodes (&optional limit node-subquery)
   (concat "SELECT id from node "
           (when node-subquery (format "WHERE id IN (%s) "  node-subquery))
@@ -310,8 +313,6 @@
       db-query
     (error (format "Spec wrong: %S" single-query-spec))))
 
-
-
 (defun pkm2--compile-full-db-query (query-plist &optional nodes-table)
   (message "nodes table: %S" nodes-table)
   (let* ((query query-plist)
@@ -415,17 +416,11 @@
          )
     (equal (length (-distinct query1-output ))
            (length (-distinct query2-output)))
-
     ;; query1
     ))
 (defun test-rename ()
   (--> "WITH blah as (SELECT 1), beep as blah SELECT * from beep"
-       (sqlite-select pkm2-database-connection it))
-  )
-
-
-
-
+       (sqlite-select pkm2-database-connection it)))
 
 (defun pkm2--compile-db-query-db-id (type-values nodes-subquery)
   (format "SELECT id from node where id = %d" (plist-get type-values :db-id)))
