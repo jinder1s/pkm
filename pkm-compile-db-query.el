@@ -178,7 +178,7 @@
                                 (plist-get kvd :choices)) fully-specified-kvds))))))
     (message "%S, %S, %S" unique-required u-r-keys easiest-queriable-kvds)
     (cond (u-r-keys (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type nodes-table))
-          (easiest-queriable-kvds (pkm2--compile-full-db-query-common (-map-indexed (lambda (index kvd)
+          (easiest-queriable-kvds (pkm2--compile-full-db-query (-map-indexed (lambda (index kvd)
                                                                                       (if (equal index 0)
                                                                                           `(:or kvd (:kvd ,kvd))
                                                                                         `(:and kvd (:kvd ,kvd))))
@@ -205,7 +205,7 @@
          (node-pkm-queries `((:or created-at (:after ,after :before ,before))
                              (:or modified-at (:after ,after :before ,before))))
          (pkm-queries (-concat node-pkm-queries pkm-kvd-queries))
-         (query (pkm2--compile-full-db-query-common pkm-queries node-table)))
+         (query (pkm2--compile-full-db-query pkm-queries node-table)))
     query))
 
 
@@ -373,14 +373,14 @@
                                   (format "%1$s, %2$s(id) as ( %s), %3$s(id) as (SELECT id from %2$s UNION SELECT id from %5$s) "
                                           current-db-query
                                           current-expression-name
-                                          (pkm2--compile-full-db-query-common current-query-spec)
+                                          (pkm2--compile-full-db-query current-query-spec)
                                           second-expression-name
                                           last-expression-name))))
                          ((equal (car single-query-spec) :compound-and)
                           (cons next-index (format "%s, %s(id) as (%s) "
                                                    current-db-query
                                                    current-expression-name
-                                                   (pkm2--compile-full-db-query-common current-query-spec last-expression-name))))
+                                                   (pkm2--compile-full-db-query current-query-spec last-expression-name))))
                          (t (error "Got weird single-query-spec: %S" (car single-query-spec)))))
                (cons 1 (format "WITH %sv1(id) as (%s) " (or nodes-table "") (pkm2--compile-db-query (cdr single-query-spec) nodes-table)))))
            nil
@@ -394,7 +394,7 @@
 (defun test-compile-full-db-query-common-1 ()
   (let* ((pkm-query '((:or structure-type (:structure-name log-n))
                       (:and time-between (:after (day -20) :before nil))))
-         (query1 (pkm2--compile-full-db-query-common pkm-query))
+         (query1 (pkm2--compile-full-db-query pkm-query))
          (query2 (pkm2--compile-full-db-query pkm-query))
          (query1-output (sqlite-select pkm2-database-connection query1))
          (query2-output (sqlite-select pkm2-database-connection query2)))
@@ -409,7 +409,7 @@
                       (:or structure-type (:structure-name project-s))
                       (:convert-or convert-to-children (:levels 1))
                       ))
-         (query1 (pkm2--compile-full-db-query-common pkm-query))
+         (query1 (pkm2--compile-full-db-query pkm-query))
          (query2 (pkm2--compile-full-db-query pkm-query))
          (query1-output (sqlite-select pkm2-database-connection query1))
          (query2-output (sqlite-select pkm2-database-connection query2))
