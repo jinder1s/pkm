@@ -297,7 +297,7 @@
                      "SELECT node_id, child_id FROM subs_table"
                    "SELECT node_id FROM subs_table"))))
     query))
-(defun pkm2--compile-db-query-2 (single-query-spec &optional nodes-table)
+(defun pkm2--compile-db-query (single-query-spec &optional nodes-table)
   (message "q-1: %S" nodes-table)
   (if-let* ((type-strategies (plist-get pkm2--query-spec-options-plist (car single-query-spec)))
             (db-query-func (plist-get type-strategies :get-db-query-2))
@@ -307,7 +307,7 @@
 
 
 
-(defun pkm2--compile-full-db-query-common (query-plist &optional nodes-table)
+(defun pkm2--compile-full-db-query (query-plist &optional nodes-table)
   (message "nodes table: %S" nodes-table)
   (let* ((query query-plist)
          (reduced-output
@@ -328,7 +328,7 @@
                                   (format "%1$s, %2$s(id) as ( %s), %s(id) as (SELECT id from %2$s UNION SELECT id from %5$s) "
                                           current-db-query
                                           current-expression-name
-                                          (pkm2--compile-db-query-2 current-query-spec "node")
+                                          (pkm2--compile-db-query current-query-spec "node")
                                           second-expression-name
                                           last-expression-name)) ))
                          ((equal (car single-query-spec) :and)
@@ -336,20 +336,20 @@
                                  (format "%s, %s(id) as (%s) "
                                          current-db-query
                                          current-expression-name
-                                         (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
+                                         (pkm2--compile-db-query current-query-spec last-expression-name))))
                          ((equal (car single-query-spec) :not)
                           (cons next-index
                                 (format "%s, %s(id) as (SELECT id from %s WHERE id not in (%s))"
                                         current-db-query
                                         current-expression-name
                                         last-expression-name
-                                        (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
+                                        (pkm2--compile-db-query current-query-spec last-expression-name))))
                          ((equal (car single-query-spec) :convert-and)
                           (cons next-index
                                 (format "%s, %s(id) as (%s)"
                                         current-db-query
                                         current-expression-name
-                                        (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
+                                        (pkm2--compile-db-query current-query-spec last-expression-name))))
                          ((equal (car single-query-spec) :convert-or)
                           (let* ((second-index (+ next-index 1))
                                  (second-expression-name (format "%s%d" base-expression-name second-index)))
@@ -357,7 +357,7 @@
                                   (format "%1$s, %2$s(id) as ( %s), %s(id) as (SELECT id from %2$s UNION SELECT id from %5$s) "
                                           current-db-query
                                           current-expression-name
-                                          (pkm2--compile-db-query-2 current-query-spec last-expression-name)
+                                          (pkm2--compile-db-query current-query-spec last-expression-name)
                                           second-expression-name
                                           last-expression-name))))
                          ((equal (car single-query-spec) :compound-or)
@@ -376,7 +376,7 @@
                                                    current-expression-name
                                                    (pkm2--compile-full-db-query-common current-query-spec last-expression-name))))
                          (t (error "Got weird single-query-spec: %S" (car single-query-spec)))))
-               (cons 1 (format "WITH %sv1(id) as (%s) " (or nodes-table "") (pkm2--compile-db-query-2 (cdr single-query-spec) nodes-table)))))
+               (cons 1 (format "WITH %sv1(id) as (%s) " (or nodes-table "") (pkm2--compile-db-query (cdr single-query-spec) nodes-table)))))
            nil
            query))
          (output (format "%s SELECT * FROM %sv%d"
