@@ -20,9 +20,10 @@
 ;;; Code:
 
 
+(require 'dash)
+(require 'pkm-new-core)
 
-
-
+(defvar pkm2--query-spec-options-plist ())
 
 (defun pkm2--create-query (&optional  print-output initial-queries initial-action)
   (let* ((action-options '(:or :and :not :convert-or :convert-and))
