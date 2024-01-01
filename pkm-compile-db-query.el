@@ -128,8 +128,8 @@
                                     link-table
                                     data-table
                                     key)
-                            (format "AND %s.value >= (%s) " data-table after)
-                            (format "AND %s.value <= (%s) " data-table before))))
+                            (when after (format "AND %s.value >= (%s) " data-table after) )
+                            (when before (format "AND %s.value <= (%s) " data-table before) ))))
         query)))
 
 (defun test-compare-kvds-with-key-and-value-in-range ()
