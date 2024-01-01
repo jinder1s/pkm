@@ -322,13 +322,15 @@
                         (last-expression-name (format "%sv%d" (or nodes-table "") last-index))
                         (base-expression-name (format "%sv" (or nodes-table "") ) ))
                    (cond ((equal (car single-query-spec) :or)
-                          (cons (+ next-index 1)
-                                (format "%1$s, %2$s(id) as ( %s), %s(id) as (SELECT id from %2$s UNION SELECT id from %5$s) "
-                                        current-db-query
-                                        current-expression-name
-                                        (pkm2--compile-db-query-2 current-query-spec "node")
-                                        (format "%s%d" base-expression-name (+ next-index 1))
-                                        last-expression-name)))
+                          (let* ((second-index (+ next-index 1))
+                                 (second-expression-name (format "%s%d" base-expression-name second-index)))
+                            (cons second-index
+                                  (format "%1$s, %2$s(id) as ( %s), %s(id) as (SELECT id from %2$s UNION SELECT id from %5$s) "
+                                          current-db-query
+                                          current-expression-name
+                                          (pkm2--compile-db-query-2 current-query-spec "node")
+                                          second-expression-name
+                                          last-expression-name)) ))
                          ((equal (car single-query-spec) :and)
                           (cons  next-index
                                  (format "%s, %s(id) as (%s) "
@@ -349,17 +351,25 @@
                                         current-expression-name
                                         (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
                          ((equal (car single-query-spec) :convert-or)
-                          (cons next-index (format "%s, %s(id) as (SELECT id from %s UNION (%s)) "
-                                                   current-db-query
-                                                   current-expression-name
-                                                   last-expression-name
-                                                   (pkm2--compile-db-query-2 current-query-spec last-expression-name))))
+                          (let* ((second-index (+ next-index 1))
+                                 (second-expression-name (format "%s%d" base-expression-name second-index)))
+                            (cons second-index
+                                  (format "%1$s, %2$s(id) as ( %s), %s(id) as (SELECT id from %2$s UNION SELECT id from %5$s) "
+                                          current-db-query
+                                          current-expression-name
+                                          (pkm2--compile-db-query-2 current-query-spec last-expression-name)
+                                          second-expression-name
+                                          last-expression-name))))
                          ((equal (car single-query-spec) :compound-or)
-                          (cons next-index (format "%s, %s(id) as (SELECT id from %s UNION (%s)) "
-                                                   current-db-query
-                                                   current-expression-name
-                                                   last-expression-name
-                                                   (pkm2--compile-full-db-query-common current-query-spec))))
+                          (let* ((second-index (+ next-index 1))
+                                 (second-expression-name (format "%s%d" base-expression-name second-index)))
+                            (cons second-index
+                                  (format "%1$s, %2$s(id) as ( %s), %3$s(id) as (SELECT id from %2$s UNION SELECT id from %5$s) "
+                                          current-db-query
+                                          current-expression-name
+                                          (pkm2--compile-full-db-query-common current-query-spec)
+                                          second-expression-name
+                                          last-expression-name))))
                          ((equal (car single-query-spec) :compound-and)
                           (cons next-index (format "%s, %s(id) as (%s) "
                                                    current-db-query
@@ -403,6 +413,10 @@
 
     ;; query1
     ))
+(defun test-rename ()
+  (--> "WITH blah as (SELECT 1), beep as blah SELECT * from beep"
+       (sqlite-select pkm2-database-connection it))
+  )
 
 
 
