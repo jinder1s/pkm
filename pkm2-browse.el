@@ -1076,14 +1076,16 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 ;;; search
 (defun pkm2-get-nodes-with-text (text )
-  (let* ((query (pkm2--db-compile-query-get-node-with-text text))
+  (let* ((single-query-spec `(text (:text ,text)))
+         (query (pkm2--compile-db-query single-query-spec  "node") )
          (nodes-ids (-flatten (sqlite-select pkm2-database-connection query) ))
          (nodes-texts-and-id (sqlite-select pkm2-database-connection (format "SELECT content, id  FROM node WHERE id IN (%s)"
                                                                              (--> (-map (lambda (node-id)
                                                                                           (pkm2--db-format-value-correctly node-id 'INTEGER))
                                                                                         nodes-ids)
                                                                                   (string-join it ", ")))) ))
-    (-map #'car nodes-texts-and-id )))
+    (-map #'car nodes-texts-and-id)))
+
 (defun pkm2-search ()
   (interactive)
   (pkm2-nodes-search)

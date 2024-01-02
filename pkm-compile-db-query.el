@@ -31,6 +31,7 @@
 
 (defun pkm2--compile-db-query-kvd (type-values nodes-table)
   (message "nodes-table: %S" nodes-table)
+  (setq  nodes-table (or nodes-table "node"))
   (cond ((plist-get type-values :kvd) ; TODO Test
          (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (plist-get type-values :kvd) nodes-table))
         ((and (plist-get type-values :value) (plist-get type-values :key) (plist-get type-values :data-type)) ;TODO Test
@@ -71,11 +72,12 @@
         (t (error "Unable to get nodes for nodes-get:\n%S" type-values))))
 
 
-(defun pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 (key type &optional node-table)
+(defun pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 (key type &optional nodes-table)
   (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type))
          (link-table (pkm2--db-get-kvd-link-table-for-type type))
+         (nodes-table (or nodes-table "node"))
          (query (concat (format "SELECT %1$s.id FROM %1$s JOIN %2$s ON %2$s.node = %1$s.id JOIN %3$s ON %2$s.key_value_data = %3$s.id WHERE %2$s.is_archive is NULL AND %3$s.key = '%4$s'"
-                                node-table
+                                nodes-table
                                 link-table
                                 data-table
                                 key))))
@@ -93,11 +95,12 @@
 
 
 
-(defun pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2 (key values type &optional node-table)
+(defun pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2 (key values type &optional nodes-table)
   (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type))
          (link-table (pkm2--db-get-kvd-link-table-for-type type))
+         (nodes-table (or nodes-table "node"))
          (query (concat (format "SELECT %1$s.id FROM %1$s JOIN %2$s ON %2$s.node = %1$s.id JOIN %3$s ON %2$s.key_value_data = %3$s.id WHERE %2$s.is_archive is NULL AND %3$s.key = '%4$s' AND %3$s.value IN (%5$s)"
-                                node-table
+                                nodes-table
                                 link-table
                                 data-table
                                 key
@@ -119,12 +122,13 @@
 
 
 
-(defun pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range-2 (key after before type &optional node-table)
+(defun pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range-2 (key after before type &optional nodes-table)
   (if (or (eq type 'DATETIME) (eq type 'INTEGER) (eq type 'REAL))
       (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type))
              (link-table (pkm2--db-get-kvd-link-table-for-type type))
+             (nodes-table (or nodes-table "node"))
              (query (concat (format "SELECT %1$s.id FROM %1$s JOIN %2$s ON %2$s.node = %1$s.id JOIN %3$s ON %2$s.key_value_data = %3$s.id WHERE %2$s.is_archive is NULL AND %3$s.key = '%4$s' "
-                                    node-table
+                                    nodes-table
                                     link-table
                                     data-table
                                     key)
@@ -146,17 +150,17 @@
 
 
 
-(defun pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (kvd &optional node-table)
+(defun pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (kvd &optional nodes-table)
   (let* ((key (plist-get kvd :key))
          (values (cond ((list (plist-get kvd :value)))
                        ((plist-get kvd :choices))))
          (type (plist-get kvd :data-type)))
-    (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2 key values type node-table)))
+    (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2 key values type nodes-table)))
 
-(defun pkm2--object-db-query-get-nodes-with-links-to-kvds (kvds &optional node-subquery)
+(defun pkm2--object-db-query-get-nodes-with-links-to-kvds (kvds &optional nodes-table)
   (-reduce-from (lambda (init-subquery kvd)
                   (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd kvd init-subquery))
-                node-subquery
+                (or nodes-table "node")
                 kvds))
 
 
@@ -188,7 +192,7 @@
 
 
 
-(defun pkm2--db-compile-get-nodes-between (type-values &optional node-table)
+(defun pkm2--db-compile-get-nodes-between (type-values &optional nodes-table)
                                         ; created_at and modified_at between after and before
                                         ; Node linked to any kvd with datetime type between after and before
                                         ; If any of the nodes above are dependent types, get its parent node
@@ -205,11 +209,12 @@
          (node-pkm-queries `((:or created-at (:after ,after :before ,before))
                              (:or modified-at (:after ,after :before ,before))))
          (pkm-queries (-concat node-pkm-queries pkm-kvd-queries))
-         (query (pkm2--compile-full-db-query pkm-queries node-table)))
+         (nodes-table (or nodes-table "node"))
+         (query (pkm2--compile-full-db-query pkm-queries nodes-table)))
     query))
 
 
-(defun pkm2--db-compile-get-nodes-created-at (type-values &optional node-table)
+(defun pkm2--db-compile-get-nodes-created-at (type-values &optional nodes-table)
   (let* ((after (plist-get type-values :after))
          (after (if (and (plistp after) (length> after 1))
                     (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
@@ -218,14 +223,16 @@
          (before  (if (and (plistp before) (length> before 1))
                       (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
                     before))
-         (query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " node-table)
+
+         (nodes-table (or nodes-table "node"))
+         (query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " nodes-table)
                         "WHERE ("
                         (when after (format "node.created_at > %d "  after))
                         (when before (format "OR node.created_at < %d"  before))
                         ") ")))
     query))
 
-(defun pkm2--db-compile-get-nodes-modified-at (type-values &optional node-table)
+(defun pkm2--db-compile-get-nodes-modified-at (type-values &optional nodes-table)
   (let* ((after (plist-get type-values :after))
          (after (if (and (plistp after) (length> after 1))
                     (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
@@ -234,7 +241,8 @@
          (before  (if (and (plistp before) (length> before 1))
                       (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
                     before))
-         (query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " node-table)
+         (nodes-table (or nodes-table "node"))
+         (query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " nodes-table)
                         "WHERE ("
                         (when after (format " node.modified_at > %d " after))
                         (when before (format "OR  node.modified_at < %d " before))
@@ -243,7 +251,7 @@
 
 (defun pkm2--db-compile-query-get-node-with-text (type-values &optional nodes-table)
   (concat
-   (format "SELECT %1$s.id from %1$s JOIN search_node on search_node.node = %1$s.id " nodes-table)
+   (format "SELECT %1$s.id from %1$s JOIN search_node on search_node.node = %1$s.id " (or nodes-table "node"))
    (format "WHERE search_node MATCH '%s' " (plist-get type-values :text))))
 
 (defun test-compare-search-with-text ()
