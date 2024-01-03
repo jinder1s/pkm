@@ -225,7 +225,9 @@
                     before))
 
          (nodes-table (or nodes-table "node"))
-         (query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " nodes-table)
+         (query (concat (format "SELECT node.id FROM %s " (if (equal nodes-table "node")
+                                                             "node"
+                                                            (format "%1$s  JOIN node ON node.id = %1$s.id  " nodes-table)))
                         "WHERE ("
                         (when after (format "node.created_at > %d "  after))
                         (when before (format "OR node.created_at < %d"  before))
@@ -242,11 +244,13 @@
                       (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
                     before))
          (nodes-table (or nodes-table "node"))
-         (query (concat (format "SELECT node.id FROM %1$s JOIN node ON node.id = %1$s.id  " nodes-table)
-                        "WHERE ("
-                        (when after (format " node.modified_at > %d " after))
-                        (when before (format "OR  node.modified_at < %d " before))
-                        ") ")))
+         (query (concat (format "SELECT node.id FROM %s " (if (equal nodes-table "node")
+                                                             "node"
+                                                            (format "%1$s  JOIN node ON node.id = %1$s.id  " nodes-table)))
+                 "WHERE ("
+                 (when after (format " node.modified_at > %d " after))
+                 (when before (format "OR  node.modified_at < %d " before))
+                 ") ")))
     query))
 
 (defun pkm2--db-compile-query-get-node-with-text (type-values &optional nodes-table)
@@ -323,7 +327,8 @@
 
 (defun pkm2--compile-full-db-query (query-plist &optional nodes-table)
   (message "nodes table: %S" nodes-table)
-  (let* ((query query-plist)
+  (let* ((prefix (pkm-random-id))
+         (query query-plist)
          (reduced-output
           (-reduce-from
            (lambda (current-output single-query-spec)
@@ -332,9 +337,9 @@
                         (last-index (car current-output))
                         (next-index (+ last-index 1))
                         (current-query-spec (cdr single-query-spec))
-                        (current-expression-name (format "%sv%d" (or nodes-table "") next-index))
-                        (last-expression-name (format "%sv%d" (or nodes-table "") last-index))
-                        (base-expression-name (format "%sv" (or nodes-table "") ) ))
+                        (current-expression-name (format "%s%s%d" (or nodes-table "") prefix next-index))
+                        (last-expression-name (format "%s%s%d" (or nodes-table "") prefix last-index))
+                        (base-expression-name (format "%s%s" (or nodes-table "") prefix ) ))
                    (cond ((equal (car single-query-spec) :or)
                           (let* ((second-index (+ next-index 1))
                                  (second-expression-name (format "%s%d" base-expression-name second-index)))
@@ -390,12 +395,13 @@
                                                    current-expression-name
                                                    (pkm2--compile-full-db-query current-query-spec last-expression-name))))
                          (t (error "Got weird single-query-spec: %S" (car single-query-spec)))))
-               (cons 1 (format "WITH %sv1(id) as (%s) " (or nodes-table "") (pkm2--compile-db-query (cdr single-query-spec) (or nodes-table "node"))))))
+               (cons 1 (format "WITH %s%s1(id) as (%s) " (or nodes-table "") prefix (pkm2--compile-db-query (cdr single-query-spec) (or nodes-table "node"))))))
            nil
            query))
-         (output (format "%s SELECT * FROM %sv%d"
+         (output (format "%s SELECT * FROM %s%s%d"
                          (cdr reduced-output)
                          (or nodes-table "")
+                         prefix
                          (car reduced-output))))
     output))
 

@@ -19,6 +19,17 @@
 (unless  pkm2-browse-saved-named-queries (persist-load 'pkm2-browse-saved-named-queries) )
 
 ;;; pkm utils
+(defun pkm-random-id ()
+  "Return string with random (version 4) UUID."
+  (let ((rnd (md5 (format "%s%s%s%s%s%s%s"
+			  (random)
+			  (org-time-convert-to-list nil)
+			  (user-uid)
+			  (emacs-pid)
+			  (user-full-name)
+			  user-mail-address
+			  (recent-keys)))))
+    (substring (format "id%s" rnd ) 0 6)))
 (defun pkm2--db-sanatize-text (input)
   "Single-quote (scalar) input for use in a SQL expression."
   (with-temp-buffer
@@ -133,10 +144,6 @@ The original alist is not modified."
 
 (defvar pkm2-database-connection nil)
 
-(defun pkm2--core-trace-sqlite-execute (DB QUERY &optional VALUES RETURN-TYPE)
-  (message "Running Query: %S" QUERY))
-(advice-add #'sqlite-execute :before #'pkm2--core-trace-sqlite-execute)
-(advice-add #'sqlite-select :before #'pkm2--core-trace-sqlite-execute)
 
 (defun pkm2-setup-database (database_handle)
   "Set up database with initial schema.
