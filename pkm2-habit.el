@@ -533,7 +533,6 @@
 
 
 (defun pkm-habit-alert ()
-  (hs-alert (format "Current idle time: %S" (current-idle-time)))
   (let* ((active-habit-instances-with-deadlines
           (--> `((:or structure-type (:structure-name habit-instance))
                  (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "TODO" "HOLD")))
@@ -635,7 +634,6 @@
 
 (defun hs-alert (message)
   "shows Hammerspoon's hs.alert popup with a MESSAGE"
-  (message "alerting: %S" message)
   (when (and message (eq system-type 'darwin))
     (call-process (executable-find "hs")
                   nil 0 nil
