@@ -45,6 +45,7 @@
   (to nil :type marker))
 
 
+
 ;;;; Persistent buffer
 (defvar pkm2-browse-buffer "*pkm2-browse*"
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
@@ -61,49 +62,49 @@
 (defvar-local pkm2-browse--browse-nodes-alist ())
 (defvar-local pkm2-browse--browse-sections-alist ())
 
+
+
+
 (defun pkm2-browse (&optional numeric-prefix-argument)
   (interactive "p")
-  (let* ((completing-read-choices (-concat '("NEW" "LAST") pkm2-browse-saved-named-section-specs (-map (lambda (section-spec) (cons  section-spec section-spec)) pkm2-browse-saved-section-specs)))
-         (chosen-sections (if (length> completing-read-choices 1)
-                              (completing-read-multiple "Which sections would you like to add to this section: "
+  (message "prefix: %S" numeric-prefix-argument)
+  (pcase numeric-prefix-argument
+    (1 (let* ((completing-read-choices (-concat '("NEW" "LAST") pkm2-browse-saved-named-section-specs (-map (lambda (section-spec) (cons  section-spec section-spec)) pkm2-browse-saved-section-specs)))
+              (chosen-sections (if (length> completing-read-choices 1)
+                                   (completing-read-multiple "Which sections would you like to add to this section: "
                                                              completing-read-choices)
-                           (list "NEW")))
-         (sections-specs (-non-nil (-map (lambda (chosen-section)
-                                 (cond ((equal "NEW" chosen-section) (pkm2--create-section-spec))
-                                       ((equal "LAST" chosen-section) nil)
-                                       (t (read (assoc-default chosen-section completing-read-choices)))))
-                               chosen-sections) ))
+                                 (list "NEW")))
+              (sections-specs (-non-nil (-map (lambda (chosen-section)
+                                                (cond ((equal "NEW" chosen-section) (pkm2--create-section-spec))
+                                                      ((equal "LAST" chosen-section) nil)
+                                                      (t (read (assoc-default chosen-section completing-read-choices)))))
+                                              chosen-sections) ))
 
-         (sections-specs (if (member "LAST" chosen-sections)
-                             (--> (plist-get pkm2-browse-buffer-states-equal-plist pkm2-browse-buffer #'equal) (pkm2-browse-buffer-state-sections it) (-map #'pkm2-browse-section-spec it) (-concat sections-specs it))
-                           sections-specs))
-         (sections (-map (lambda (sections-spec)
-                           (make-pkm2-browse-section :spec  sections-spec))
-                         sections-specs)))
-    (message "sections-spec: %S, chosed-sections: %S" sections-specs chosen-sections)
-    (pkm2--browse (make-pkm2-browse-buffer-state :sections sections) nil)))
-
-(defun pkm2-browse-2 ()
-  (interactive)
-  (let* ((query-create-callback (lambda (browse-spec)
-                                  (let* ((sections (-map (lambda (section-spec)
-                                                           (make-pkm2-browse-section :spec  section-spec))
-                                                         (plist-get browse-spec :sections)))
-                                         (browse-state (make-pkm2-browse-buffer-state :sections sections)))
-                                    (message "b-s2: %S" browse-state)
-                                    (pkm2--browse browse-state nil)))))
-    (pkm-compile-create-browse-spec query-create-callback)))
-
-(defun pkm2-browse-3 ()
-  (interactive)
-  (let* ((browse-spec (--> (completing-read "Which Browse spec?" pkm2-browse-saved-named-browse-specs )
+              (sections-specs (if (member "LAST" chosen-sections)
+                                  (--> (plist-get pkm2-browse-buffer-states-equal-plist pkm2-browse-buffer #'equal) (pkm2-browse-buffer-state-sections it) (-map #'pkm2-browse-section-spec it) (-concat sections-specs it))
+                                sections-specs))
+              (sections (-map (lambda (sections-spec)
+                                (make-pkm2-browse-section :spec  sections-spec))
+                              sections-specs)))
+         (message "sections-spec: %S, chosed-sections: %S" sections-specs chosen-sections)
+         (pkm2--browse (make-pkm2-browse-buffer-state :sections sections) nil)))
+    (0 (let* ((query-create-callback (lambda (browse-spec)
+                                       (let* ((sections (-map (lambda (section-spec)
+                                                                (make-pkm2-browse-section :spec  section-spec))
+                                                              (plist-get browse-spec :sections)))
+                                              (browse-state (make-pkm2-browse-buffer-state :sections sections)))
+                                         (message "b-s2: %S" browse-state)
+                                         (pkm2--browse browse-state nil)))))
+         (pkm-compile-create-browse-spec query-create-callback)))
+    (2 (let* ((browse-spec (--> (completing-read "Which Browse spec?" pkm2-browse-saved-named-browse-specs )
                            (assoc-default it pkm2-browse-saved-named-browse-specs)
                            (read it)))
          (sections (-map (lambda (section-spec)
                            (make-pkm2-browse-section :spec  section-spec))
                          (plist-get browse-spec :sections)))
          (browse-state (make-pkm2-browse-buffer-state :sections sections)))
-    (pkm2--browse browse-state nil)))
+         (pkm2--browse browse-state nil)))))
+
 
 
 
@@ -512,7 +513,10 @@ Has no effect when there's no `org-roam-node-at-point'."
          (section (pkm2-browse-node-state-section state))
          (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (pkm2-db-node-id it)))
          (level-parents (or level-parents (read (completing-read "How many levels of parents would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
-         (query (pkm2--db-query-get-parent-nodes level-parents '("sub") (format "%s" db-id) t))
+         (pkm-query `((:or db-node (:db-id ,db-id))
+                      (:convert-and convert-to-parents (:levels ,level-parents :link-labels ("sub") ))))
+
+         (query (pkm2--compile-full-db-query pkm-query))
          (query-results (sqlite-select pkm2-database-connection query))
          (browse-nodes
           (-map (lambda (result)
