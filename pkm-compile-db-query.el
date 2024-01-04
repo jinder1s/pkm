@@ -451,5 +451,15 @@
 (pkm2--register-query-spec-option 'text '(:text) #'pkm--convert-into-get-spec-text  #'pkm2--db-compile-query-get-node-with-text)
 (pkm2--register-query-spec-option 'db-node '(:db-id) #'pkm--convert-into-get-spec-db-id #'pkm2--compile-db-query-db-id)
 (pkm2--register-query-spec-option 'db-nodes '(:db-node-ids) #'pkm--convert-into-get-spec-db-node-ids  #'pkm2--compile-db-query-db-node-ids)
+
+
+(defun pkm2-get-nodes-with-pkm-query (pkm-query)
+  (--> (pkm2--compile-full-db-query pkm-query)
+       (sqlite-select pkm2-database-connection it)
+       (-flatten it)
+       (-map #'pkm2--db-query-get-node-with-id it)))
+
+
+
 (provide 'pkm-compile-db-query)
 ;;; pkm-compile-db-query.el ends here
