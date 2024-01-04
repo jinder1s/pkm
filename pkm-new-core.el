@@ -1101,6 +1101,14 @@ TODO TEST!"
          (to (cdr from-to)))
     (list :asset-schema asset-spec :asset-capture-info (list :content content :db-id db-id :from from :to to) :asset-name asset-name)))
 
+(defun pkm-read (prompt type)
+  (cond ((eq type 'TEXT) (read-string prompt))
+        ((eq type 'INTEGER) (truncate (read-number prompt) ))
+        ((eq type 'REAL) (read-number prompt))
+        ((eq type 'DATETIME) (pkm2-get-user-selected-timestamp prompt))
+        ((eq type 'BLOB) (progn (display-warning 'pkm-object "BLOB type kvd inputs are not yet implemented")
+                                (error "Tried to insert blob kvd. Not yet implemented.")))))
+
 (defun pkm2--object-capture-kvd (asset-spec values buffer-name)
   (let* ((asset-name (plist-get asset-spec :name))
          (prompt (or (plist-get asset-spec :prompt)
