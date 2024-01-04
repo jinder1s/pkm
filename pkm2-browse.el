@@ -903,7 +903,7 @@ Has no effect when there's no `org-roam-node-at-point'."
                                  (string-join values-strings " ")))
 
                               ((equal 'content (plist-get spec :display))
-                               (-->  (pkm2-node-db-node pkm-node) (propertize (pkm2-db-node-content it)
+                               (-->  (pkm2-node-db-node pkm-node) (propertize (pkm2--convert-object-to-string (pkm2-db-node-content it))
                                                                               :db-node it)))
                               ((equal 'hidden (plist-get spec :display))
                                (if show-hidden
