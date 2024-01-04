@@ -35,7 +35,6 @@
   (cond ((plist-get type-values :kvd) ; TODO Test
          (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (plist-get type-values :kvd) nodes-table))
         ((and (plist-get type-values :value) (plist-get type-values :key) (plist-get type-values :data-type)) ;TODO Test
-         (message "I is here")
          (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2
           (plist-get type-values :key)
           (list (plist-get type-values :value))
@@ -48,7 +47,6 @@
           (plist-get type-values :data-type)
           nodes-table))
         ((and (or (plist-get type-values :after) (plist-get type-values :before)) (plist-get type-values :key) (plist-get type-values :data-type)) ; TODO Test
-         (message "Doing the right thing: %S, %S" (plist-get type-values :after) (plist-get type-values :before))
          (let* ((after (plist-get type-values :after))
                 (after (if (and (plistp after) (length> after 1))
                            (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
@@ -57,7 +55,6 @@
                 (before  (if (and (plistp before) (length> before 1))
                              (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
                            before)))
-           (message "after: %S, before: %S" after before)
            (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-value-in-range-2
             (plist-get type-values :key)
             after

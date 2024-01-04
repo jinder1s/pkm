@@ -270,9 +270,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   (sqlite-execute database_handle "CREATE UNIQUE INDEX IF NOT EXISTS unique_kvd_link_integer ON data_or_properties_link_integer(node, key_value_data, context);")
   (sqlite-execute database_handle "CREATE UNIQUE INDEX IF NOT EXISTS unique_kvd_link_real ON data_or_properties_link_real(node, key_value_data, context);")
   (sqlite-execute database_handle "CREATE UNIQUE INDEX IF NOT EXISTS unique_kvd_link_blob ON data_or_properties_link_blob(node, key_value_data, context);")
-  (sqlite-execute database_handle "CREATE UNIQUE INDEX IF NOT EXISTS unique_nodes_links ON nodes_link(node_a, node_b, type, context);")
-
-  )
+  (sqlite-execute database_handle "CREATE UNIQUE INDEX IF NOT EXISTS unique_nodes_links ON nodes_link(node_a, node_b, type, context);"))
 
 
 (defvar pkm2--key_value_data-type-to-table-plist '(INTEGER (:data-table "key_value_data_integer" :link-table "data_or_properties_link_integer")
@@ -344,6 +342,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 (defun pkm2--db-delete-node (id)
   (--> (format "delete from node where id = %d" id)
        (sqlite-execute pkm2-database-connection it)))
+
 (defun pkm2--db-delete-link-between-nodes (id)
   (--> (format "delete from nodes_link where id = %d" id)
        (sqlite-execute pkm2-database-connection it)))
@@ -377,9 +376,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          (sqlite-execute pkm2-database-connection it)
          (car it)
          (car it)
-         (make-pkm2-db-node :id it :content content :created_at timestamp)
-         (progn (message "Node inserted:%S" it)
-                it))))
+         (make-pkm2-db-node :id it :content content :created_at timestamp))))
 
 (defun pkm2--db-update-node (node-id new-content timestamp)
   (let* ((table-name "node")
@@ -426,7 +423,6 @@ VAlue can be a number, string, or list of numbers or strings."
                   (equal (pkm2-db-kvd-key kvd) key)) it)))
 
 ; QUERY stuff
-
 (defun pkm2--db-do-sql-query-and-get-all-rows (query &optional return-plist)
   "Run sql QUERY on database.
 Returns output in two formats:
@@ -1070,7 +1066,6 @@ TODO TEST!"
 (defvar pkm2-buffer-capture-data-equal-plist ())
 
 (defun pkm2--capture-verify-insert (buffer-name text read-only create-markers)
-  (message "insert: %S, %S, %S, %S" buffer-name text read-only create-markers)
   (with-current-buffer buffer-name
     (let ((inhibit-read-only t)
           (from (when create-markers  (set-marker (make-marker) (point)) )))
@@ -1091,21 +1086,11 @@ TODO TEST!"
          (db-id (plist-get asset-spec :db-id))
          (content (progn
                     (when buffer-name (pkm2--capture-verify-insert buffer-name (format  "%s: " asset-name) t nil))
-                    (cond (db-id
-                           (message "node: db-id")
-                           "" )
-                          ((assoc-default asset-name values)
-                           (message "values: %S" (assoc-default asset-name values))
-                           (assoc-default asset-name values) )
-                          (content
-                           (message "content: %S" content)
-                           content)
-                          (dont-ask-for-input
-                           (message "No input")
-                           "")
-                          (t
-                           (message "Should ask for string")
-                           (read-string prompt)))))
+                    (cond (db-id "")
+                          ((assoc-default asset-name values) (assoc-default asset-name values) )
+                          (content content)
+                          (dont-ask-for-input "")
+                          (t (read-string prompt)))))
          (from-to (when buffer-name (pkm2--capture-verify-insert buffer-name
                                                                  (if db-id
                                                                      (propertize (format "db-id: %d" db-id) :db-id db-id)
@@ -1346,11 +1331,11 @@ Commit everything.
                            :links commited-links)))
         (if within-transaction
             output
-          (sqlite-commit pkm2-database-connection)
-                                        ; (sqlite-rollback pkm2-database-connection)
-          ))
+          (progn (sqlite-commit pkm2-database-connection)
+                 output)))
     (error (message "Received Error %s" (error-message-string err))
-           (sqlite-rollback pkm2-database-connection))))
+           (sqlite-rollback pkm2-database-connection)
+           nil)))
 
 
 (defun pkm--object-get-specified-node-db-ids (node-specifier assets-infos)
