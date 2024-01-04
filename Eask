@@ -16,4 +16,9 @@
 (depends-on "dash" "2.13")
 (depends-on "ts" "0.3")
 (depends-on "persist" "0.5")
+
+
+(development
+  (depends-on "undercover"))
+
 (files "*.el")
