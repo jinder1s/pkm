@@ -992,7 +992,6 @@ Returns output in two formats:
            (timestamp (pkm2-get-current-timestamp))
            (db-node (unless db-id
                       (pkm2--db-insert-node content timestamp))))
-      (message "Newly inserted node: %S, id: %S" db-node (when db-node (pkm2-db-node-id db-node) ))
       (if (or db-node db-id)
           (list
            :asset-schema (plist-get s-node :asset-schema)
@@ -1187,7 +1186,6 @@ This code doesn't directly output a formatted string because it seems to be used
                             (unless skip-verify
                               (pkm2--capture-verify-insert buffer-name (format  "Capturing %s.\n" (symbol-name structure-name)) t nil))
                             (-map (lambda (asset-spec)
-                                    (message "asset-spec: %S" asset-spec)
                                     (let* ((asset-name (plist-get asset-spec :name))
                                            (input-value (assoc-default asset-name values))
                                            (prompt (or (plist-get asset-spec :prompt)
@@ -1351,17 +1349,14 @@ Commit everything.
 
 
 (defun pkm--object-get-specified-node-db-ids (node-specifier assets-infos)
-  (message "ns: %S, %S" node-specifier assets-infos)
   (cond ((plistp node-specifier)
          (list  (plist-get node-specifier :db-id)))
         ((-flatten
-           (--> (-filter (lambda (asset-info)
-                           (pkm--object-does-specifier-match
-                            node-specifier
-                            (plist-get asset-info :asset-schema))) assets-infos)
-                (progn (message "after filter: %S" it)
-                       it)
-                (-map (lambda (asset-info) (plist-get asset-info :db-id)) it))) )))
+          (--> (-filter (lambda (asset-info)
+                          (pkm--object-does-specifier-match
+                           node-specifier
+                           (plist-get asset-info :asset-schema))) assets-infos)
+               (-map (lambda (asset-info) (plist-get asset-info :db-id)) it))) )))
 
 
 ;;; pkm-links

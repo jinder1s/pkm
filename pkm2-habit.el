@@ -510,7 +510,6 @@
                                            `(:pkm-type node :name "parent-node" :parent-node t :db-id ,node-id)
                                            `(:pkm-type habit-instance :name "child-node" :child-node t)))
                                  :links (list link-definition))))
-    (message "t-h-i: %S" todo-habit-instance)
     (if todo-habit-instance
         todo-habit-instance
       (pkm2--object-capture-object-verify
@@ -528,8 +527,7 @@
 (defun pkm-log-habit ()
   "Log habit"
   ;; TODO Implement
-  (error "Not implemented")
-  )
+  (error "Not implemented"))
 
 
 (defun pkm-habit-alert ()
