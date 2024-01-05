@@ -636,5 +636,5 @@
     (call-process (executable-find "hs")
                   nil 0 nil
                   "-c"
-                  (concat "hs.alert.show(\"" message "\", 3)"))))
+                  (concat "hs.alert.show(\"" message "\", 5)"))))
 (provide 'pkm2-habit)

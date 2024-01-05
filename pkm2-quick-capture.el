@@ -17,6 +17,10 @@
   (interactive)
   (pkm2-quick-capture-into-active-clock 'idea-note-n))
 
+(defun pkm2-document-into-active-clock ()
+  (interactive)
+  (pkm2-quick-capture-into-active-clock 'documentation-log-n))
+
 (defun pkm2-quick-capture-into-active-clock (&optional structure-name  link-type)
   (interactive)
   (if-let* ((active-clocked-nodes (pkm2-clock--get-current-clock-parent-pkm-nodes))
