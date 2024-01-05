@@ -1076,12 +1076,28 @@ TODO TEST!"
           (set-marker-insertion-type to t)
           (cons from to))))))
 
+(defun pkm-read (prompt type &optional choices)
+  (if choices
+      (cond ((eq type 'TEXT) (completing-read prompt choices))
+            ((or  (eq type 'INTEGER) (eq type 'DATETIME) ) (truncate (string-to-number (completing-read prompt choices)) ))
+            ((eq type 'REAL) (string-to-number (completing-read prompt choices)))
+            ((eq type 'BLOB) (progn (display-warning 'pkm-object "BLOB type kvd inputs are not yet implemented")
+                                    (error "Tried to insert blob kvd, Not yet implemented.")))
+            (t (message "Choices type not defined")))
+    (cond ((eq type 'TEXT) (read-string prompt))
+          ((eq type 'INTEGER) (truncate (read-number prompt) ))
+          ((eq type 'REAL) (read-number prompt))
+          ((eq type 'DATETIME) (pkm2-get-user-selected-timestamp prompt))
+          ((eq type 'BLOB) (progn (display-warning 'pkm-object "BLOB type kvd inputs are not yet implemented")
+                                  (error "Tried to insert blob kvd. Not yet implemented.")))) ))
+
 (defun pkm2--object-capture-node (asset-spec values buffer-name)
   (let* ((asset-name (plist-get asset-spec :name))
          (prompt (or (plist-get asset-spec :prompt)
                      (when (plist-get asset-spec :name)
                        (format "%s: " (plist-get asset-spec :name)))))
          (content (plist-get asset-spec :content))
+         (type (or (plist-get asset-spec :data-type) 'TEXT))
          (dont-ask-for-input (plist-get asset-spec :no-input))
          (db-id (plist-get asset-spec :db-id))
          (content (progn
@@ -1090,7 +1106,7 @@ TODO TEST!"
                           ((assoc-default asset-name values) (assoc-default asset-name values) )
                           (content content)
                           (dont-ask-for-input "")
-                          (t (read-string prompt)))))
+                          (t (pkm-read prompt type)))))
          (from-to (when buffer-name (pkm2--capture-verify-insert buffer-name
                                                                  (if db-id
                                                                      (propertize (format "db-id: %d" db-id) :db-id db-id)
@@ -1100,14 +1116,6 @@ TODO TEST!"
          (from (car from-to))
          (to (cdr from-to)))
     (list :asset-schema asset-spec :asset-capture-info (list :content content :db-id db-id :from from :to to) :asset-name asset-name)))
-
-(defun pkm-read (prompt type)
-  (cond ((eq type 'TEXT) (read-string prompt))
-        ((eq type 'INTEGER) (truncate (read-number prompt) ))
-        ((eq type 'REAL) (read-number prompt))
-        ((eq type 'DATETIME) (pkm2-get-user-selected-timestamp prompt))
-        ((eq type 'BLOB) (progn (display-warning 'pkm-object "BLOB type kvd inputs are not yet implemented")
-                                (error "Tried to insert blob kvd. Not yet implemented.")))))
 
 (defun pkm2--object-capture-kvd (asset-spec values buffer-name)
   (let* ((asset-name (plist-get asset-spec :name))
@@ -1126,21 +1134,8 @@ TODO TEST!"
                                                       ((assoc-default asset-name values) (assoc-default asset-name values))
                                                       ((functionp it) (funcall it))
                                                       ((and it (not (listp it))) it)
-                                                      ((progn (message "Choces: %S" choices)  choices)
-                                                       (cond ((eq type 'TEXT) (completing-read prompt choices))
-                                                             ((or  (eq type 'INTEGER) (eq type 'DATETIME) ) (truncate (string-to-number (completing-read prompt choices)) ))
-                                                             ((eq type 'REAL) (string-to-number (completing-read prompt choices)))
-                                                             ((eq type 'BLOB) (progn (display-warning 'pkm-object "BLOB type kvd inputs are not yet implemented")
-                                                                                     (error "Tried to insert blob kvd, Not yet implemented.")))
-                                                             (t (message "Choices type not defined"))))
-                                                      (t (cond ((eq type 'TEXT) (read-string prompt))
-                                                               ((eq type 'INTEGER) (truncate (read-number prompt) ))
-                                                               ((eq type 'REAL) (read-number prompt))
-                                                               ((eq type 'DATETIME) (pkm2-get-user-selected-timestamp prompt))
-                                                               ((eq type 'BLOB) (progn (display-warning 'pkm-object "BLOB type kvd inputs are not yet implemented")
-                                                                                       (error "Tried to insert blob kvd. Not yet implemented."))))))) ))
+                                                      (t (pkm-read prompt type choices))))))
          (from-to (when buffer-name
-                    (message "value: %S, type: %S, output: %s" value type (pkm2--convert-object-to-string value type))
                     (pkm2--capture-verify-insert
                      buffer-name
                      (pkm2--convert-object-to-string value type)
@@ -1152,6 +1147,15 @@ TODO TEST!"
 
 
 (defun pkm2--object-capture-object-verify (structure-name-or-schema &optional external-buffer-name skip-verify values sub-asset-name)
+  "This is a fairly large function, but here's the basic breakdown:
+- It creates an interactive process to capture information about a particular object or schema.
+- The function first checks if the provided structure name or schema is valid using `pkm--object-validate-structure-schema`. If it isn't, it raises an error.
+- Then, it loops over each asset specified in the schema and asks for input based on its type (kvd or node). It also handles optional assets and managed assets appropriately.
+- If `skip-verify` is false and there are no errors, it creates a buffer where information about the captured object can be entered. A hook is added to the kill buffer event so that any data in the buffer can be saved when the buffer is killed.
+- Finally, the function returns an output plist containing information about the structure name, its schema and the capture info of each asset. This is optionally stored if `skip-verify` is true and there's no sub asset name. The data is equal-comparable for easier comparison later.
+
+This code doesn't directly output a formatted string because it seems to be used as an interactive process rather than a one-off function. But, its primary purpose is to capture information from the user and return it in structured form, which can then be further processed. The caller of this function should then decide how to format that data for presentation to the user.
+"
   (let* ((structure-schema (if (plistp structure-name-or-schema)
                                structure-name-or-schema
                              (pkm--object-define structure-name-or-schema)))
