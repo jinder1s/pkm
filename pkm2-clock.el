@@ -100,11 +100,11 @@
 
 (defun pkm2-clock-switch ()
   (interactive)
-  (pkm2-clock-out)
+  (pkm2-clock-out t)
   (pkm2-clock-in))
 
 
-(defun pkm2-clock-out ()
+(defun pkm2-clock-out (&optional dont-ask-parent)
   (interactive)
   (if-let* ((active-clocks  (pkm2-clock--get-current-clock-pkm-nodes))
             (active-clocks-parents (-map (lambda (a-c)
@@ -131,7 +131,7 @@
             (node-id (--> (pkm2-node-db-node active-clock) (pkm2-db-node-id it)))
             (kvd-id (pkm2-db-kvd-id kvd))
             (link (pkm2--db-insert-link-between-node-and-kvd node-id kvd-id (pkm2-get-current-timestamp) 'INTEGER)))
-      (when (y-or-n-p "Clock out done, would you like to clock into a parent node?")
+      (when (and (not dont-ask-parent) (y-or-n-p "Clock out done, would you like to clock into a parent node?") )
         (if-let* ((clocked-node-db-id (--> (pkm2-node-db-node active-clock-parent) (pkm2-db-node-id it)))
                   (clockable-parents (when pkm2-clock-auto-clock-into-parent
                                        (pkm2-clock--find-clockable-parents `(,clocked-node-db-id) pkm2-clock-auto-clock-node-types)))
