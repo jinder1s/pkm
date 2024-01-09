@@ -21,6 +21,7 @@
 
 (require 'pkm-new-core)
 (require 'pkm2-browse)
+(require 'pkm-hammerspoon)
 
 (defvar pkm2-task-status-types (list "TODO" "DOING" "DONE" "HOLD" "KILL"))
 (defvar pkm2-tasks-status-face-plist '(TODO org-todo DOING org-todo DONE org-done KILL +org-todo-cancel HOLD +org-todo-onhold ))
@@ -102,6 +103,27 @@
                                           `(:pkm-type kvd :name "deadline" :key "deadline" :value ,#'pkm2-get-user-selected-timestamp :link-to ("target-node") :data-type DATETIME )))))
 
     (pkm2--object-capture-object-verify structure-schema "pkm-schedule" t)))
+
+(defun pkm2-tasks-alert ()
+  (let* ((node-with-deadline
+          (pkm2-get-nodes-with-pkm-query `((:or kvd (:key "deadline" :data-type INTEGER :after (hour -1) :before (hour 1)))
+                                           (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "TODO" "HOLD"))))))
+         (deadlines (-map  (lambda (h-i-d)
+                             (pkm2-node-get-kvd-value-with-key h-i-d "deadline"))
+                           node-with-deadline))
+         (alert-seconds (-map  (lambda (h-i-d)
+                                 (--> (pkm2-node-get-kvd-value-with-key h-i-d "deadline-alert-minutes")
+                                      (when it (* 60 it))))
+                               node-with-deadline)))
+    (-each-indexed node-with-deadline
+      (lambda (index h-i-d)
+        (when (nth index alert-seconds)
+          (when  (< (- (nth index deadlines)
+                       (nth index alert-seconds))
+                    (pkm2-get-current-timestamp))
+            (--> (pkm2-node-db-node h-i-d)
+                 (pkm2-db-node-content it)
+                 (pkm-hammerspoon-alert it))))))))
 
 (provide 'pkm2-tasks)
 ;;; pkm2-tasks.el ends here
