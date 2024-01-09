@@ -422,7 +422,20 @@ VAlue can be a number, string, or list of numbers or strings."
        (-filter (lambda (kvd)
                   (equal (pkm2-db-kvd-key kvd) key)) it)))
 
-; QUERY stuff
+(defun pkm2-node-get-kvd-value-with-key(node key &optional allow-multiple)
+  "Get value or values of kvd in NODE whose key = KEY"
+  (let* ((kvds (pkm2-node-get-kvds-with-key node key))
+         (has-multiple (length> kvds 1))
+         (values (-map #'pkm2-db-kvd-value kvds)))
+    (if allow-multiple
+        values
+      (if has-multiple
+          (error (format "node has more than one %s, if you expect more than 1 value, set allow-multiple to t.
+Use pkm2-node-get-kvds-with-key to explore all the kvds with this key."
+                         key))
+        (car values)))))
+
+                                        ; QUERY stuff
 (defun pkm2--db-do-sql-query-and-get-all-rows (query &optional return-plist)
   "Run sql QUERY on database.
 Returns output in two formats:
