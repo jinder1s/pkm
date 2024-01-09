@@ -95,16 +95,16 @@
 
 (pkm-register-structure 'webpage-n
       (list :parent 'resource-n
-            :browse-insert-format-string (format "%s: %s %s"
+            :browse-insert-format-string (format "%s %s"
                                                  "<insert>(:display content)</insert>"
-                                                 "<insert>(:display kvd-value :key \"description\" )</insert>"
                                                  "<insert>(:display hidden :prefix \"\\n\")</insert>")
 
 
+
+            :asset-modifications (list '(:name "base-node" :plist-key :prompt :plist-value "Description of link"))
             :assets (list
                      `(:pkm-type kvd :name "is-webpage" :key "node-type" :value "webpage" :link-to ("base-node") :data-type TEXT)
                      `(:pkm-type kvd :name "author" :key "author"  :link-to ("base-node") :data-type TEXT :optional t)
-                     `(:pkm-type kvd :name "description" :key "description"  :link-to ("base-node") :data-type TEXT)
                      `(:pkm-type kvd :name "web-link" :key "web-link"  :link-to ("base-node") :data-type TEXT ))))
 
 (pkm-register-structure 'location-s
