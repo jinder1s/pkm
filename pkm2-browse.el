@@ -67,7 +67,6 @@
 
 (defun pkm2-browse (&optional numeric-prefix-argument)
   (interactive "p")
-  (message "prefix: %S" numeric-prefix-argument)
   (pcase numeric-prefix-argument
     (1 (let* ((completing-read-choices (-concat '("NEW" "LAST") pkm2-browse-saved-named-section-specs (-map (lambda (section-spec) (cons  section-spec section-spec)) pkm2-browse-saved-section-specs)))
               (chosen-sections (if (length> completing-read-choices 1)
@@ -77,7 +76,10 @@
               (sections-specs (-non-nil (-map (lambda (chosen-section)
                                                 (cond ((equal "NEW" chosen-section) (pkm2--create-section-spec))
                                                       ((equal "LAST" chosen-section) nil)
-                                                      (t (read (assoc-default chosen-section completing-read-choices)))))
+                                                      (t (--> (assoc-default chosen-section completing-read-choices)
+                                                              (cond
+                                                               ((stringp it) (read it))
+                                                               ((listp it) it))))))
                                               chosen-sections) ))
 
               (sections-specs (if (member "LAST" chosen-sections)
@@ -97,12 +99,13 @@
                                          (pkm2--browse browse-state nil)))))
          (pkm-compile-create-browse-spec query-create-callback)))
     (2 (let* ((browse-spec (--> (completing-read "Which Browse spec?" pkm2-browse-saved-named-browse-specs )
-                           (assoc-default it pkm2-browse-saved-named-browse-specs)
-                           (read it)))
-         (sections (-map (lambda (section-spec)
-                           (make-pkm2-browse-section :spec  section-spec))
-                         (plist-get browse-spec :sections)))
-         (browse-state (make-pkm2-browse-buffer-state :sections sections)))
+                                (assoc-default it pkm2-browse-saved-named-browse-specs)
+                                (cond ((stringp it) (read it))
+                                      ((listp it) it))))
+              (sections (-map (lambda (section-spec)
+                                (make-pkm2-browse-section :spec  section-spec))
+                              (plist-get browse-spec :sections)))
+              (browse-state (make-pkm2-browse-buffer-state :sections sections)))
          (pkm2--browse browse-state nil)))))
 
 
