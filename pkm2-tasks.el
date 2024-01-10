@@ -20,7 +20,6 @@
 ;;; Code:
 
 (require 'pkm-new-core)
-(require 'pkm2-browse)
 (require 'pkm-hammerspoon)
 
 (defvar pkm2-task-status-types (list "TODO" "DOING" "DONE" "HOLD" "KILL"))
