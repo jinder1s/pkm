@@ -101,6 +101,32 @@
       (expect (pkm2-db-kvd-created_at kvd) :to-equal timestamp))))
 
 
+(describe "Object definition tests"
+  (it "Define base node"
+    (let* ((node-asset '(:pkm-type node :name "base-node" :primary-node t))
+           (schema  (list :assets
+                          (list
+                           node-asset)))
+           (object-def (progn
+                         (pkm-register-structure 'base-n schema)
+                         (pkm--object-define 'base-n))))
+      (expect object-def :not :to-be nil)
+      (expect (plist-get object-def :assets) :not :to-be nil)
+      (expect (length (plist-get object-def :assets) ) :to-be 1)
+      (expect (car (plist-get object-def :assets)) :to-be node-asset)))
+  (it "Define sub-object"
+    (let* ((node-asset '(:pkm-type node :name "base-node" :primary-node t))
+           (schema  (list :assets
+                          (list
+                           node-asset)))
+           (object-def (progn
+                         (pkm-register-structure 'base-n schema)
+                         (pkm--object-define 'base-n))))
+      (expect object-def :not :to-be nil)
+      (expect (plist-get object-def :assets) :not :to-be nil)
+      (expect (length (plist-get object-def :assets) ) :to-be 1)
+      (expect (car (plist-get object-def :assets)) :to-be node-asset))))
+
 (describe "Object creation tests"
   :var (database-file)
   (before-each
