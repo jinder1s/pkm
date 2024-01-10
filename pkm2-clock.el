@@ -160,4 +160,48 @@
 
 (pkm2--register-query-spec-option 'active-clock '() #'pkm--convert-into-get-spec-active-clock #'pkm2--convert-into-db-query-active-clock)
 
+;; * Quick Capture
+(defun pkm2-log-into-active-clock ()
+  (interactive)
+  (pkm2-quick-capture-into-active-clock 'log-n))
+
+
+(defun pkm2-note-into-active-clock ()
+  (interactive)
+  (pkm2-quick-capture-into-active-clock 'note-n))
+
+(defun pkm2-idea-note-into-active-clock ()
+  (interactive)
+  (pkm2-quick-capture-into-active-clock 'idea-note-n))
+
+(defun pkm2-document-into-active-clock ()
+  (interactive)
+  (pkm2-quick-capture-into-active-clock 'documentation-log-n))
+
+(defun pkm2-quick-capture-into-active-clock (&optional structure-name  link-type)
+  (interactive)
+  (if-let* ((active-clocked-nodes (pkm2-clock--get-current-clock-parent-pkm-nodes))
+            (clocked-node
+             (when active-clocked-nodes
+               (if (length> active-clocked-nodes 1)
+                   (let* ((completing-read-choices
+                           (-map
+                            (lambda (a-c-p)
+                              (--> (pkm2-node-db-node a-c-p)
+                                   (pkm2-db-node-content it)
+                                   (cons it a-c-p)))
+                            active-clocked-nodes))
+                          (choice (when completing-read-choices
+                                    (--> (completing-read
+                                          (format "Where would you like to add a %s?" (symbol-name structure-name))
+                                          completing-read-choices)
+                                         (assoc-default it completing-read-choices)))))
+                     choice)
+                 (car active-clocked-nodes))))
+
+            (clocked-node-id (--> (pkm2-node-db-node clocked-node) (pkm2-db-node-id it)))
+            (link-type (or link-type "sub")))
+      (pkm--object-capture-sub clocked-node-id structure-name link-type)
+    (message "No active clocked-node")))
+
 (provide 'pkm2-clock)
