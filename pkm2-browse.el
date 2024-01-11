@@ -1,6 +1,4 @@
 ;;; pkm2-browse.el -*- lexical-binding: t; -*-
-
-
 (require 'persist)
 (require 'dash)
 (require 'cl-lib)
@@ -28,7 +26,8 @@
   (children nil)
   (dependents nil)
   (parents nil)
-  (parent nil))
+  (parent nil)
+  (magit-section nil))
 
 (cl-defstruct pkm2-browse-buffer-state
   (sections nil)
@@ -38,6 +37,8 @@
 
 (cl-defstruct pkm2-browse-section
   (section-id nil)
+  (section-nodes nil)
+  (org-section-nodes nil)
   (spec nil)
   (state nil)
   (name nil)
@@ -49,7 +50,7 @@
 
 
 
-;;;; Persistent buffer
+
 (defvar pkm2-browse-buffer "*pkm2-browse*"
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
 (defvar pkm2-browse-buffer-states-equal-plist ())
@@ -58,7 +59,6 @@
 (persist-defvar pkm2-browse-saved-named-section-specs () "Created Section specs")
 (unless  pkm2-browse-saved-section-specs (persist-load 'pkm2-browse-saved-section-specs) )
 (unless  pkm2-browse-saved-named-section-specs (persist-load 'pkm2-browse-saved-named-section-specs) )
-
 
 (persist-defvar pkm2-browse-saved-named-browse-specs () "Created browse specs")
 (unless  pkm2-browse-saved-named-browse-specs (persist-load 'pkm2-browse-saved-named-browse-specs) )
@@ -114,33 +114,29 @@
 
 
 (defun pkm2--browse (buffer-state &optional buffer-name )
-  (setq buffer-name (or buffer-name pkm2-browse-buffer))
-  (pcase (pkm2-browse--buffer--visibility buffer-name)
-    ('visible
-     (progn
-       (message "Already visible")))
-    (_
-     (display-buffer-in-side-window (get-buffer-create buffer-name) '((side . right)))
-     (with-current-buffer buffer-name
-       ; (outline-mode)
-       (+word-wrap-mode )
-       (pkm2-browse-mode)
-       (tooltip-mode))))
-  (with-current-buffer buffer-name
-    (set-window-dedicated-p (get-buffer-window buffer-name) t)
-    (setq buffer-read-only nil)
-    (erase-buffer)
-    (setq pkm2-browse--browse-nodes-alist ())
-    (setq pkm2-browse--browse-sections-alist ())
-    (setq pkm2-browse-buffer-states-equal-plist (plist-put pkm2-browse-buffer-states-equal-plist buffer-name buffer-state #'equal))
-    (magit-insert-section (magit-section buffer-state)
-      (magit-insert-section-body (-each-indexed
-          (pkm2-browse-buffer-state-sections buffer-state)
-        (lambda (index section)
-          (magit-insert-section (magit-section section (pkm2-browse-section-hidden section) )
-            (magit-insert-heading (or (pkm2-browse-section-name section) (format "Section %d" index)))
-            (magit-insert-section-body (pkm2-browse--insert-section section) ) ))) ) )
-    (setq buffer-read-only t) ))
+  (let* ((inhibit-read-only t) )
+    (setq buffer-name (or buffer-name pkm2-browse-buffer))
+    (display-buffer-in-side-window (get-buffer-create buffer-name) '((side . right)))
+    (with-current-buffer buffer-name
+      (kill-all-local-variables)
+      (erase-buffer)
+      (magit-section-mode)
+      (+word-wrap-mode)
+      (tooltip-mode)
+      (pkm2-browse-mode)
+      (set-window-dedicated-p (get-buffer-window buffer-name) t)
+      (setq pkm2-browse--browse-nodes-alist ())
+      (setq pkm2-browse--browse-sections-alist ())
+      (setq pkm2-browse-buffer-states-equal-plist (plist-put pkm2-browse-buffer-states-equal-plist buffer-name buffer-state #'equal))
+      (magit-insert-section (magit-section buffer-state)
+        (magit-insert-section-body
+          (-each-indexed
+              (pkm2-browse-buffer-state-sections buffer-state)
+            (lambda (index section)
+              (magit-insert-section (magit-section section (pkm2-browse-section-hidden section) )
+                (magit-insert-heading (or (pkm2-browse-section-name section) (format "Section %d" index)))
+                (magit-insert-section-body (pkm2-browse--insert-section section)))))))
+      (setq buffer-read-only t) ) ))
 
 
 
@@ -151,9 +147,11 @@
   (if section-spec
       (--> (pkm2--browse-get-section-nodes section-spec)
            (-distinct it)
-                                        ; (progn (message "out nodes: %S" it) it)
            (-map (lambda (id)
-                   (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id id) :state (make-pkm2-browse-node-state))) it))
+                   (make-pkm2-browse-node
+                    :pkm-node (pkm2--db-query-get-node-with-id id)
+                    :state (make-pkm2-browse-node-state)))
+                 it))
     (error "Received nil as section-spec")))
 (defun pkm2--browse-get-browse-id-of-node-with-db-id (db-id)
   (car (-find (lambda (b-n-cons) (equal
@@ -172,9 +170,12 @@
   (let* ((nodes-spec (pkm2-browse-section-spec section))
          (section-state (pkm2-browse-section-state section))
          (show-as-hierarchy (pkm2-browse-section-show-as-hierarchy section))
-         (section-nodes (pkm2-browse--get-nodes nodes-spec))
+         (section-nodes (or  (pkm2-browse-section-section-nodes section)
+                         (pkm2-browse--get-nodes nodes-spec) ))
          (section-nodes-in-hierarchy  (when show-as-hierarchy
-                                        (pkm2-browse--organize-into-hierarchies section-nodes)))
+                                        (or
+                                         (pkm2-browse-section-org-section-nodes section)
+                                         (pkm2-browse--organize-into-hierarchies section-nodes) )))
          (sorter nil)
          (sorted-sorted-nodes (-->  (or section-nodes-in-hierarchy section-nodes)
                                     (if sorter
@@ -188,6 +189,8 @@
                                                          ;;   (insert "\n"))
                                                          (pkm2-browse--insert-browse-node b-n)))
                     (set-marker (make-marker) (point)))))
+    (setf (pkm2-browse-section-section-nodes section) section-nodes)
+    (setf (pkm2-browse-section-org-section-nodes section) section-nodes-in-hierarchy)
     (setf (pkm2-browse-section-from section) from)
     (setf (pkm2-browse-section-to section) to)
     (setf (pkm2-browse-section-state section) nil)
@@ -234,27 +237,28 @@
                                                     (display-warning 'pkm2-browse (format "Node has multiple insert funcs: %S"   (pkm2-node-types (pkm2-browse-node-pkm-node browse-node) ) )))
                                                   (car it))))
          (id (or (pkm2-browse-node-browse-id browse-node)
-                      (setf (pkm2-browse-node-browse-id browse-node) (pkm2--browse-create-new-id pkm2-browse--browse-nodes-alist))))
+                 (setf (pkm2-browse-node-browse-id browse-node) (pkm2--browse-create-new-id pkm2-browse--browse-nodes-alist))))
          (children-browse-nodes (pkm2-browse-node-children browse-node))
-         (parents-browse-nodes (pkm2-browse-node-parents browse-node)))
+         (parents-browse-nodes (pkm2-browse-node-parents browse-node))
+         (j-magit-section (magit-insert-section (magit-section browse-node)
+                            (magit-insert-heading
+                              (insert prefix2)
+                              (if browse-insert-format-string
+                                  (insert (pkm2--browse-format-insert browse-insert-format-string browse-node))
+                                (funcall insert-func browse-node)))
+                            (magit-insert-section-body
+                              (when (and children-browse-nodes (not only-node))
+                                (-each children-browse-nodes (lambda (c-b-n)
+                                                               (pkm2-browse--insert-browse-node c-b-n)) ))
+                              (when (and parents-browse-nodes (not only-node))
+                                (-each parents-browse-nodes (lambda (p-b-n)
+                                        ; The seperator here can be better. Not the cleanest thing in the world
+                                                              (insert "\nParent\n")
+                                                              (pkm2-browse--insert-browse-node p-b-n)))))
+                            (set-marker (make-marker) (point)))))
+    (setf (pkm2-browse-node-magit-section browse-node) j-magit-section)
     (push (cons id browse-node) pkm2-browse--browse-nodes-alist)
 
-    (magit-insert-section (magit-section browse-node)
-      (magit-insert-heading
-        (insert prefix2)
-        (if browse-insert-format-string
-            (insert (pkm2--browse-format-insert browse-insert-format-string browse-node))
-          (funcall insert-func browse-node)))
-      (magit-insert-section-body
-        (when (and children-browse-nodes (not only-node))
-          (-each children-browse-nodes (lambda (c-b-n)
-                                         (pkm2-browse--insert-browse-node c-b-n)) ))
-        (when (and parents-browse-nodes (not only-node))
-          (-each parents-browse-nodes (lambda (p-b-n)
-                                        ; The seperator here can be better. Not the cleanest thing in the world
-                                        (insert "\nParent\n")
-                                        (pkm2-browse--insert-browse-node p-b-n)))))
-      (set-marker (make-marker) (point)))
 
     (setq pkm2-browse--browse-nodes-alist (assoc-delete-all id pkm2-browse--browse-nodes-alist) ) ))
 
@@ -299,16 +303,28 @@
         ((numberp object) (format "%d" object))))
 
 (defun pkm2-browse--refresh-insert-browse-node (browse-node)
-  (let* ((state (pkm2-browse-node-state browse-node))
-         (from (pkm2-browse-node-state-from state))
-         (to (pkm2-browse-node-state-to state)))
+  (let* ((j-magit-section (pkm2-browse-node-magit-section browse-node))
+         (section-children (oref j-magit-section children))
+         (section-parent (oref j-magit-section parent))
+         (section-parent-children (oref section-parent children))
+         (state (pkm2-browse-node-state browse-node))
+         (from (oref j-magit-section start))
+         (to (oref j-magit-section end)))
     (when (and from to)
       (setq buffer-read-only nil)
       (goto-char from)
       (delete-region from to)
-      (set-marker from nil)
-      (set-marker to nil)
-      (pkm2-browse--insert-browse-node browse-node nil t)
+      ;; (set-marker from nil)
+      ;; (set-marker to nil)
+      (let*  ((new-section (pkm2-browse--insert-browse-node browse-node nil t))
+              (new-pchildren (-map (lambda (child)
+                                    (if (eq j-magit-section child) new-section child))
+                                  section-parent-children)))
+        (oset new-section parent section-parent)
+        (oset new-section children section-children)
+        (oset section-parent children new-pchildren)
+        (-each section-children (lambda (child)
+                                  (oset child parent new-section))))
       (setq buffer-read-only nil))))
 
 
@@ -340,8 +356,7 @@ Valid states are 'visible, 'exists and 'none."
 Has no effect when there's no `org-roam-node-at-point'."
   (with-current-buffer (get-buffer-create pkm2-browse-buffer)
     (let ((inhibit-read-only t))
-      (erase-buffer)
-      )))
+      (erase-buffer))))
 
 (defun pkm2--browse-remove-node (browse-id)
   ; Remove node from pkm2-browse--browse-nodes-alist
@@ -392,7 +407,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2--browse-section-previous-node ())
 (defun pkm2--browse-section-parent-node ())
 (defun pkm2--browse-get-browse-node-at-point (&optional current-point)
-  (get-text-property (or current-point (point)) :pkm2-browse-node ))
+  (--> (magit-current-section) (oref it value)))
 
 ;;; interactivity
 ;;;
@@ -623,7 +638,7 @@ Has no effect when there's no `org-roam-node-at-point'."
   (interactive)
   (let* ((buffer-name (or buffer-name (buffer-name) ))
          (buffer-state (plist-get pkm2-browse-buffer-states-equal-plist buffer-name #'equal)))
-    (pkm2--browse buffer-state buffer-name)))
+    (save-excursion (pkm2--browse buffer-state buffer-name))))
 
 (defun pkm2--browse-add-node-as-child-to-node-at-point ()
   (interactive)
