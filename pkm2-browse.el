@@ -397,13 +397,16 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2--browse-section-next-node ())
 (defun pkm2--browse-section-previous-node ())
 (defun pkm2--browse-section-parent-node ())
+(defun pkm2--browse-get-browse-node-at-point (&optional current-point)
+  (get-text-property (or current-point (point)) :pkm2-browse-node ))
 
 ;;; interactivity
+;;;
 
 (defun pkm2--browse-toggle-hidden-info-at-point ()
   (interactive)
   (save-excursion
-    (let* ((browse-node (get-text-property (point) :pkm2-browse-node))
+    (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
            (state (pkm2-browse-node-state browse-node))
            (show-hidden (pkm2-browse-node-state-show-hidden state))
            (new-show-hidden (not show-hidden)))
@@ -413,7 +416,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2--browse-edit-object-at-point ()
   (interactive)
   (let* ((current-point (point))
-         (browse-node (get-text-property current-point :pkm2-browse-node ))
+         (browse-node (pkm2--browse-get-browse-node-at-point))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-node (get-text-property current-point :db-node))
          (kvd (get-text-property current-point :db-kvd)))
@@ -467,7 +470,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 (defun pkm2--browse-see-children-at-point ()
   (interactive)
-  (pkm2--browse-see-children (get-text-property (point) :pkm2-browse-node-id)))
+  (pkm2--browse-see-children (pkm2--browse-get-browse-node-at-point)))
 
 
 (defun pkm2--browse-see-children (browse-id &optional db-id level-children)
@@ -548,13 +551,13 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 (defun pkm2--browse-see-parents-at-point ()
   (interactive)
-  (pkm2--browse-see-parents (get-text-property (point) :pkm2-browse-node-id)))
+  (pkm2--browse-see-parents (pkm2--browse-get-browse-node-at-point)))
 
 
 (defun pkm2--browse-add-kvd-at-point ()
   (interactive)
   (let* ((current-point (point))
-         (browse-node (get-text-property current-point :pkm2-browse-node ))
+         (browse-node (pkm2--browse-get-browse-node-at-point))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-node (pkm2-node-db-node pkm-node))
          (node-id (pkm2-db-node-id db-node))
@@ -586,7 +589,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2--browse-delete-link-to-kvd-at-point ()
   (interactive)
   (let* ((current-point (point))
-         (browse-node (get-text-property current-point :pkm2-browse-node ))
+         (browse-node (pkm2--browse-get-browse-node-at-point))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (kvd (get-text-property current-point :db-kvd))
          (type (pkm2-db-kvd-type kvd))
@@ -602,7 +605,7 @@ Has no effect when there's no `org-roam-node-at-point'."
     (pkm2-browse--refresh-insert-browse-node browse-node)))
 (defun pkm2--browse-delete-link-to-parent-of-node-at-point ()
   (let* ((current-point (point))
-         (browse-node (get-text-property current-point :pkm2-browse-node ))
+         (browse-node (pkm2--browse-get-browse-node-at-point))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it)))
          (parent-browse-node (pkm2-browse-node-parent browse-node))
@@ -631,7 +634,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2--browse-add-node-as-child-to-node-at-point ()
   (interactive)
   (let* ((selected-node-id (pkm2-nodes-search "Select node to add as child: "))
-         (browse-node (get-text-property (point) :pkm2-browse-node ))
+         (browse-node (pkm2--browse-get-browse-node-at-point))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-node (pkm2-node-db-node pkm-node))
          (node-id (pkm2-db-node-id db-node))
@@ -647,7 +650,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2--browse-add-node-as-parent-to-node-at-point ()
   (interactive)
   (let* ((selected-node-id (pkm2-nodes-search "Select node to add as parent "))
-         (browse-node (get-text-property (point) :pkm2-browse-node ))
+         (browse-node (pkm2--browse-get-browse-node-at-point))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-node (pkm2-node-db-node pkm-node))
          (node-id (pkm2-db-node-id db-node))
@@ -662,7 +665,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 (defun pkm2--browse-delete-node-at-point ()
   (interactive)
-  (--> (get-text-property (point) :pkm2-browse-node)
+  (--> (pkm2--browse-get-browse-node-at-point)
        (pkm2-browse-node-pkm-node it)
        (pkm2-node-db-node it)
        (pkm2-db-node-id it)
@@ -672,7 +675,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2--browse-promote-node-at-point ()
   ;  TODO Complete and test
   (let* ((buffer-name (buffer-name))
-         (browse-node (get-text-property (point) :pkm2-browse-node))
+         (browse-node (pkm2--browse-get-browse-node-at-point))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-node (pkm2-node-db-node pkm-node))
          (node-id (pkm2-db-node-id db-node))
@@ -706,7 +709,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 (defun pkm2--browse-filter-children-nodes-at-point (&optional arg)
   (interactive "p")
-  (let* ((browse-node (get-text-property (point) :pkm2-browse-node))
+  (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
          (browse-id (pkm2-browse-node-browse-id browse-node))
          (db-id (--> (pkm2-browse-node-pkm-node browse-node)
                      (pkm2-node-db-node it)
@@ -757,7 +760,7 @@ Has no effect when there's no `org-roam-node-at-point'."
   (--> (get-text-property  (point) :pkm2-node-db-id) (pkm--object-capture-sub it) ))
 (defun pkm--browse-capture-node-as-sibling-of-node-at-point ()
   (interactive)
-  (--> (get-text-property (point) :pkm2-browse-node)
+  (--> (pkm2--browse-get-browse-node-at-point)
        (pkm2-browse-node-parent it)
        (pkm2-browse-node-pkm-node it)
        (pkm2-node-db-node it)
@@ -766,7 +769,7 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 (defun pkm2--narrow-to-node-and-children-at-point ()
   (interactive)
-  (let* ((browse-node (get-text-property (point) :pkm2-browse-node))
+  (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
          (db-id (--> (pkm2-browse-node-pkm-node browse-node)
                      (pkm2-node-db-node it)
                      (pkm2-db-node-id it)))
