@@ -251,11 +251,12 @@
     (setf (pkm2-browse-node-ewoc-node browse-node) ewoc-node)
     (when (and children-browse-nodes (not only-node))
       (-each children-browse-nodes (lambda (c-b-n)
-                                     (pkm2-browse--insert-browse-node c-b-n))))
+                                     (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
+                                     (pkm2-browse--insert-browse-node c-b-n `(after . ,ewoc-node)))))
     (when (and parents-browse-nodes (not only-node))
       (-each parents-browse-nodes (lambda (p-b-n)
                                         ; The seperator here can be better. Not the cleanest thing in the world
-                                    (pkm2-browse--insert-browse-node p-b-n))))))
+                                    (pkm2-browse--insert-browse-node p-b-n `(before . ,ewoc-node)))))))
 
 
 (defun pkm2-browse--default-kvd-display-string (kvd)
@@ -371,21 +372,19 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 ;;; interactivity
 (defun pkm2--browse-get-browse-node-at-point (&optional current-point)
-  (let* ((current-ewoc-node (ewoc-locate pkm2-browse-ewoc (or current-point (point))))
-         (browse-node-id (ewoc-data current-ewoc-node))
-         (browse-node (assoc-default browse-node-id  pkm2-browse--browse-nodes-alist)))
-    browse-node))
+  (if-let* ((browse-node-id (pkm2--browse-get-browse-node-id-at-point current-point) )
+            (browse-node (assoc-default browse-node-id  pkm2-browse--browse-nodes-alist) ))
+      browse-node))
 (defun pkm2-get-pkm-node-at-point ()
-  (--> (pkm2--browse-get-browse-node-at-point) (pkm2-browse-node-pkm-node it)))
+  (--> (pkm2--browse-get-browse-node-at-point) (when it (pkm2-browse-node-pkm-node it) )))
 
 (defun pkm2--browse-get-browse-node-id-at-point (&optional current-point)
-  (let* ((browse-node (pkm2--browse-get-browse-node-at-point current-point))
-         (id (pkm2-browse-node-browse-id browse-node)))
-    id))
+  (if-let* ((current-ewoc-node (when pkm2-browse-ewoc (ewoc-locate pkm2-browse-ewoc (or current-point (point)))))
+            (browse-node-id (ewoc-data current-ewoc-node)))
+      browse-node-id))
 
 (defun pkm2--browse-get-browse-node-db-node-id-at-point (&optional current-point)
-  (--> (ewoc-locate pkm2-browse-ewoc (or current-point (point) ))
-       (ewoc-data it)
+  (--> (pkm2--browse-get-browse-node-at-point)
        (pkm2-browse-node-pkm-node it)
        (pkm2-node-db-node it)
        (pkm2-db-node-id it)))
@@ -456,17 +455,12 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 (defun pkm2--browse-see-children-at-point ()
   (interactive)
-  (pkm2--browse-see-children (pkm2--browse-get-browse-node-at-point)))
+  (pkm2--browse-see-children (pkm2--browse-get-browse-node-id-at-point)))
 
 
-(defun pkm2--browse-see-children (browse-id &optional db-id level-children)
-  (when (and browse-id db-id) (error "Specified both browse-id and db-id, only one should be specified."))
-  (when (not (or browse-id db-id) ) (error "Did not specify either browse-id or db-id, at least one is needed."))
-  (let* ((browse-id (if db-id
-                        (pkm2--browse-get-browse-id-of-node-with-db-id db-id)
-                      browse-id))
-         (browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
-
+(defun pkm2--browse-see-children (browse-id &optional level-children)
+  (let* ((browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
+         (ewoc-node (pkm2-browse-node-ewoc-node browse-node))
          (base-level (pkm2-browse-node-level browse-node))
          (section (pkm2-browse-node-section browse-node))
          (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (pkm2-db-node-id it)))
@@ -476,25 +470,21 @@ Has no effect when there's no `org-roam-node-at-point'."
          (browse-nodes
           (-map (lambda (id)
                   (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id id)  :section section)) nodes-ids) )
-         (nodes-in-hierarchy  (pkm2-browse--organize-into-hierarchies browse-nodes)))
+         (nodes-in-hierarchy  (pkm2-browse--organize-into-hierarchies browse-nodes))
+         (inhibit-read-only t))
     (-each browse-nodes
       (lambda (b-n)
         (setf (pkm2-browse-node-level b-n) (+ (pkm2-browse-node-level b-n) base-level))))
     (pkm2--browse-remove-node browse-id)
-    (setq buffer-read-only nil)
-    (-each nodes-in-hierarchy #'pkm2-browse--insert-browse-node)
-    (setq buffer-read-only t)))
+    (-each nodes-in-hierarchy (lambda (browse-node)
+                                (pkm2-browse--insert-browse-node browse-node `(after . ,ewoc-node))))))
 
 
 (defun pkm2--browse-see-parents (browse-id &optional db-id level-parents)
   "Very hacky and not very well done. Needs to be fixed."
-  (when (and browse-id db-id) (error "Specified both browse-id and db-id, only one should be specified."))
-  (when (not (or browse-id db-id) ) (error "Did not specify either browse-id or db-id, at least one is needed."))
-  (let* (
-         (browse-id (if db-id
-                        (pkm2--browse-get-browse-id-of-node-with-db-id db-id)
-                      browse-id))
-         (browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
+  (error "Function hasn't yet been setup")
+  (let* ((browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
+         (ewoc-node (pkm2-browse-node-ewoc-node browse-node))
          (base-level (pkm2-browse-node-level browse-node))
          (section (pkm2-browse-node-section browse-node))
          (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (pkm2-db-node-id it)))
@@ -504,32 +494,15 @@ Has no effect when there's no `org-roam-node-at-point'."
 
          (query (pkm2--compile-full-db-query pkm-query))
          (query-results (sqlite-select pkm2-database-connection query))
-         (browse-nodes
-          (-map (lambda (result)
-                  (message "result: %S" result)
-                  (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id (car result))
-                                         :level (if (cadr result) (+ 1 base-level) base-level)
-                                         :section section
-                                         :parent (cadr result)))
-                (-concat (list `(,db-id nil)) query-results))))
-    (--> (-map (lambda (b-n) (-as-> b-n b-it (pkm2-browse-node-pkm-node b-it) (pkm2-node-db-node b-it) (pkm2-db-node-id b-it))) browse-nodes)
-         (when (not (equal (length it ) (length (-distinct it) )))
-           (error "At least 2 browse nodes have same db-id. Something unexpected has happend.")))
-    (-each browse-nodes (lambda (b-n) (-as-> (pkm2-browse-node-pkm-node b-n)
-                                             it2
-                                             (pkm2-node-db-node it2)
-                                             (pkm2-db-node-id it2)
-                                             (-filter (lambda (b-n2) (equal it2  (pkm2-browse-node-parent b-n2))) browse-nodes )
-                                             (setf (pkm2-browse-node-parents b-n) it2))))
+
+         (inhibit-read-only t))
     (pkm2--browse-remove-node browse-id)
-    (setq buffer-read-only nil)
-    (pkm2-browse--insert-browse-node (car browse-nodes))
-    (setq buffer-read-only t)))
+    ))
 
 
 (defun pkm2--browse-see-parents-at-point ()
   (interactive)
-  (pkm2--browse-see-parents (pkm2--browse-get-browse-node-at-point)))
+  (pkm2--browse-see-parents (pkm2--browse-get-browse-node-id-at-point)))
 
 
 (defun pkm2--browse-add-kvd-at-point ()
@@ -707,44 +680,72 @@ Has no effect when there's no `org-roam-node-at-point'."
     (pkm2--browse-see-nodes-as-children browse-id db-nodes-ids)))
 
 
-(defun pkm2--browse-see-nodes-as-children (browse-id nodes-ids)
+(defun pkm2--browse-see-nodes-as-children (browse-id nodes-db-ids)
   (let* ((browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
+         (ewoc-node (pkm2-browse-node-ewoc-node browse-node))
          (base-level (pkm2-browse-node-level browse-node))
          (section (pkm2-browse-node-section browse-node))
          (browse-nodes
           (-map (lambda (id)
-                  (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id id) :section section))
-                nodes-ids))
+                  (let* ((pkm-node (pkm2--db-query-get-node-with-id id))
+                         (b-n-id (pkm2--browse-create-new-id pkm2-browse--browse-nodes-alist))
+                         (b-n (make-pkm2-browse-node :pkm-node pkm-node :section section :browse-id b-n-id)))
+                    (push (cons b-n-id b-n) pkm2-browse--browse-nodes-alist)
+                    b-n))
+                nodes-db-ids))
          (nodes-in-hierarchy  (pkm2-browse--organize-into-hierarchies browse-nodes))
          (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (pkm2-db-node-id it)))
-         (browse-node (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id db-id) :section section)))
+         (browse-node (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id db-id) :section section))
+         (inhibit-read-only t))
     (-each browse-nodes
       (lambda (b-n)
         (setf (pkm2-browse-node-level b-n)
               (+ (pkm2-browse-node-level b-n) base-level 1))))
     (setf (pkm2-browse-node-children browse-node) nodes-in-hierarchy)
     (pkm2--browse-remove-node browse-id)
-    (setq buffer-read-only nil)
-    (pkm2-browse--insert-browse-node browse-node)
-    (setq buffer-read-only t)))
+    (pkm2-browse--insert-browse-node browse-node `(after . ,ewoc-node))))
+
+(defun pkm2--browse-see-node-as-child (browse-id child-db-id)
+  (let* ((browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
+         (ewoc-node (pkm2-browse-node-ewoc-node browse-node))
+         (base-level (pkm2-browse-node-level browse-node))
+         (section (pkm2-browse-node-section browse-node))
+         (child-browse-id (pkm2--browse-create-new-id pkm2-browse--browse-nodes-alist))
+         (child-browse-node
+          (let* ((pkm-node (pkm2--db-query-get-node-with-id child-db-id))
+                 (b-n (make-pkm2-browse-node :pkm-node pkm-node :section section
+                                             :browse-id child-browse-id
+                                             :parent browse-id :level (+ base-level 1))))
+            (push (cons child-browse-id b-n) pkm2-browse--browse-nodes-alist)
+            b-n))
+         (browse-node-children (pkm2-browse-node-children browse-node))
+         (b-n-children-new (-concat (list child-browse-id ) browse-node-children))
+         (inhibit-read-only t))
+    (setf (pkm2-browse-node-children browse-node) b-n-children-new)
+    (pkm2-browse--insert-browse-node child-browse-node `(after . ,ewoc-node))))
+
 
 
 (defun pkm--browse-capture-node-as-child-of-node-at-point ()
   (interactive)
-  (--> (pkm2--browse-get-browse-node-at-point)
-       (pkm2-browse-node-pkm-node it)
-       (pkm2-node-db-node it)
-       (pkm2-db-node-id it)
-       (pkm--object-capture-sub it) ))
+  (let* ((browse-node-id (pkm2--browse-get-browse-node-id-at-point))
+         (browse-node (assoc-default browse-node-id pkm2-browse--browse-nodes-alist )))
+    (-->
+     (pkm2-browse-node-pkm-node browse-node)
+     (pkm2-node-db-node it)
+     (pkm2-db-node-id it)
+     (pkm--object-capture-sub it))))
+
 
 (defun pkm--browse-capture-node-as-sibling-of-node-at-point ()
   (interactive)
-  (--> (pkm2--browse-get-browse-node-at-point)
-       (pkm2-browse-node-parent it)
-       (pkm2-browse-node-pkm-node it)
-       (pkm2-node-db-node it)
-       (pkm2-db-node-id it)
-       (pkm--object-capture-sub it)))
+  (let* ((b-n (pkm2--browse-get-browse-node-id-at-point))
+         (p-b-n (pkm2-browse-node-parent b-n)))
+    (-->
+     (pkm2-browse-node-pkm-node p-b-n)
+     (pkm2-node-db-node it)
+     (pkm2-db-node-id it)
+     (pkm--object-capture-sub it))))
 
 (defun pkm2--narrow-to-node-and-children-at-point ()
   (interactive)
@@ -772,8 +773,6 @@ Has no effect when there's no `org-roam-node-at-point'."
 
 
 ;;; hierarchy
-;;
-
 (defun pkm2-browse-hierarchy-organize-as-hierarchy (browse-nodes)
   (let* ((pkm-nodes (-map #'pkm2-browse-node-pkm-node browse-nodes))
          (parent-links (-map #'pkm2-node-parent-links pkm-nodes))
@@ -1071,11 +1070,11 @@ Has no effect when there's no `org-roam-node-at-point'."
 (defun pkm2-get-nodes-with-text (text )
   (let* ((single-query-spec `(text (:text ,text)))
          (query (pkm2--compile-db-query single-query-spec  "node") )
-         (nodes-ids (-flatten (sqlite-select pkm2-database-connection query) ))
+         (nodes-db-ids (-flatten (sqlite-select pkm2-database-connection query) ))
          (nodes-texts-and-id (sqlite-select pkm2-database-connection (format "SELECT content, id  FROM node WHERE id IN (%s)"
                                                                              (--> (-map (lambda (node-id)
                                                                                           (pkm2--db-format-value-correctly node-id 'INTEGER))
-                                                                                        nodes-ids)
+                                                                                        nodes-db-ids)
                                                                                   (string-join it ", ")))) ))
     (-map #'car nodes-texts-and-id)))
 
