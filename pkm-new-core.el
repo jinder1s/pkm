@@ -18,6 +18,8 @@
 (unless  pkm2-browse-saved-queries (persist-load 'pkm2-browse-saved-queries) )
 (unless  pkm2-browse-saved-named-queries (persist-load 'pkm2-browse-saved-named-queries) )
 
+(defun pkm2-get-pkm-node-at-point ())
+
 ;;; pkm utils
 (defun pkm-random-id ()
   "Return string with random (version 4) UUID."

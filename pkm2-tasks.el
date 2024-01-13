@@ -79,7 +79,11 @@
 (defun pkm2-tasks-schedule-node (&optional db-id)
   (interactive)
   (let* ((structure-name 'schedule-node)
-         (parent-node-db-id (or db-id (get-text-property  (point) :pkm2-node-db-id) (pkm2-nodes-search "Search node to schedule into: ")))
+         (parent-node-db-id (or db-id
+                                (--> (pkm2-get-pkm-node-at-point)
+                                     (when it (pkm2-node-db-node it))
+                                     (when it (pkm2-db-node-id it) ))
+                                (pkm2-nodes-search "Search node to schedule into: ")))
          (link-label "instance")
          (link-definition (list :pkm-link-label link-label
                                 :parent 'parent
@@ -94,7 +98,10 @@
 
 (defun pkm2-tasks-set-node-deadline (&optional db-id)
   (interactive)
-  (let* ((target-node (or db-id (get-text-property  (point) :pkm2-node-db-id) (pkm2-nodes-search "Search node to schedule into: ")))
+  (let* ((target-node (or db-id (--> (pkm2-get-pkm-node-at-point)
+                                     (when it (pkm2-node-db-node it))
+                                     (when it (pkm2-db-node-id it) ))
+                          (pkm2-nodes-search "Search node to schedule into: ")))
          (link-label "instance")
          (structure-schema (list :name 'parent-child-node
                                  :assets (list
