@@ -122,7 +122,7 @@
     ;; (display-buffer-in-side-window (get-buffer-create buffer-name) '((side . right)))
     (with-current-buffer buffer-name
       ;; (set-window-dedicated-p (get-buffer-window buffer-name) t)
-      (+word-wrap-mode )
+      (+word-wrap-mode )                ; TODO remove this doom specific function
       (pkm2-browse-mode)
       (tooltip-mode)
       (erase-buffer)
@@ -723,8 +723,6 @@ Has no effect when there's no `org-roam-node-at-point'."
          (inhibit-read-only t))
     (setf (pkm2-browse-node-children browse-node) b-n-children-new)
     (pkm2-browse--insert-browse-node child-browse-node `(after . ,ewoc-node))))
-
-
 
 (defun pkm--browse-capture-node-as-child-of-node-at-point ()
   (interactive)
