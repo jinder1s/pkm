@@ -6,7 +6,7 @@
 ; Maintainer: Manjinder Singh
 ; URL: https://github.com/jinder1s/pkm.git
 ; Version: 0.0.1
-; Package-Requires: ((emacs "29.1")("dash" "2.13") ("ts" "0.3")("persist" "0.5"))
+; Package-Requires: ((emacs "29.1")(dash "2.13") (ts "0.3")(persist "0.5"))
 ; Keywords: notes, tasks, habits, clocks
 
 ; This file is not part of GNU Emacs.
