@@ -136,7 +136,7 @@
           (when (> index 0))
           (pkm2-browse--insert-section section)))
       (setq buffer-read-only t) )
-    (display-buffer-in-side-window (get-buffer-create buffer-name) '((side . right)))))
+    (display-buffer-same-window (get-buffer-create buffer-name) nil)))
 
 
 
