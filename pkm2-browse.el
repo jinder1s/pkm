@@ -203,7 +203,7 @@
   (cond ((numberp ewoc-item)
          (let* ((browse-node (assoc-default ewoc-item pkm2-browse--browse-nodes-alist))
                 (level (pkm2-browse-node-level browse-node))
-                (prefix2 (concat (propertize " " 'display `(space :width (,(*  20 (abs (or level 0) )))))))
+                (prefix2 (concat (propertize " " 'display `(space :width ,(*  2 (abs (or level 0)))))))
                 ;; (prefix2 (format "%s " (make-string (+ 1 level ) ?*) ))
 
                 (pkm-node (pkm2-browse-node-pkm-node browse-node))
@@ -264,22 +264,25 @@
          (value (pkm2-db-kvd-value kvd))
          (types (doom-plist-keys pkm-data-type-to-kvd-key-plist))
          (type (or (-find (lambda (type) (member key (plist-get pkm-data-type-to-kvd-key-plist type))) types) (pkm2-db-kvd-type kvd) )))
-    (propertize (format "%s: %s" (pkm2--db-convert-object-to-string key) (pkm2--convert-object-to-string value type)) :db-kvd kvd)))
+    (propertize (format "%s: %s" (pkm2--convert-object-to-string key) (pkm2--convert-object-to-string value type)) :db-kvd kvd)))
 
 (defun pkm2-browse--default-hidden-info-string (browse-node)
   (let* ((browse-id (pkm2-browse-node-browse-id browse-node))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it)))
          (kvds (pkm2-node-kvds pkm-node))
+         (level (pkm2-browse-node-level browse-node))
+         (prefix2 (concat (propertize " " 'display `(space :width ,(*  2 (abs (or level 0)))))))
          (hidden-string (concat
                          (--> (-map #'pkm2-browse--default-kvd-display-string kvds)
-                              (string-join it "\n")
-                              (format "\n%s" it))
+                              (string-join it (concat "\n" prefix2))
+                              (format "\n%s%s" prefix2 it))
                          "\n"
+                         prefix2
                          (format "id: %d" db-id)
                          "\n"
-                         (format "browse-id: %d" browse-id)
-                         )))
+                         prefix2
+                         (format "browse-id: %d" browse-id))))
     hidden-string))
 
 (defun pkm2--browse-convert-object-to-string (object)
@@ -893,7 +896,8 @@ Has no effect when there's no `org-roam-node-at-point'."
                                                                               :db-node it)))
                               ((equal 'hidden (plist-get spec :display))
                                (if show-hidden
-                                   (concat (plist-get spec :prefix) (pkm2-browse--default-hidden-info-string browse-node) )
+                                   (concat (plist-get spec :prefix)
+                                           (pkm2-browse--default-hidden-info-string browse-node) )
                                  "")))))
     (when (plist-get spec :face)
       (setq output-string (propertize output-string 'face (plist-get spec :face))))
