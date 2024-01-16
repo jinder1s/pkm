@@ -355,8 +355,37 @@
   (--> (pkm2--compile-full-db-query query-spec) (sqlite-select pkm2-database-connection it) (-flatten it)))
 
 
-(defun pkm2--browse-section-next-node ())
-(defun pkm2--browse-section-previous-node ())
+(defun pkm2--browse-section-next-node (&optional reverse)
+  (let* ((current-node (pkm2--browse-get-browse-node-at-point))
+         (level (when current-node (pkm2-browse-node-level current-node) ) )
+         (section (when current-node (pkm2-browse-node-section current-node) ))
+         (current-ewoc (when current-node (pkm2-browse-node-ewoc-node current-node) ))
+         (next-ewoc (when current-ewoc
+                      (if reverse (ewoc-prev pkm2-browse-ewoc current-ewoc)
+                        (ewoc-next pkm2-browse-ewoc current-ewoc))))
+         found-next-ewoc-node
+         found-next-browse-node)
+    (while (and next-ewoc (not found-next-ewoc-node))
+      (let* ((next-b-n-id (ewoc-data next-ewoc))
+             (next-b-n (assoc-default next-b-n-id pkm2-browse--browse-nodes-alist))
+             (n-section (when next-b-n
+                          (pkm2-browse-node-section next-b-n) ))
+             (n-level (when next-b-n
+                        (pkm2-browse-node-level next-b-n) )))
+        (if (and section (eq section n-section) )
+            (if (and level (equal level n-level) )
+                (progn (setq found-next-ewoc-node next-ewoc)
+                       (setq found-next-browse-node next-b-n))
+              (if (< level n-level)
+                  (setq next-ewoc (if reverse (ewoc-prev pkm2-browse-ewoc next-ewoc)
+                                    (ewoc-next pkm2-browse-ewoc next-ewoc) ))
+                (setq next-ewoc nil)))
+          (setq next-ewoc nil))))
+    (when found-next-ewoc-node
+      (ewoc-goto-node pkm2-browse-ewoc found-next-ewoc-node))
+    found-next-browse-node))
+(defun pkm2--browse-section-previous-node ()
+  (pkm2--browse-section-next-node t))
 (defun pkm2--browse-section-parent-node ())
 
 
