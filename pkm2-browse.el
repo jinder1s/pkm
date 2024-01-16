@@ -334,8 +334,8 @@
       (-each parents-ids  #'pkm2--browse-remove-node))
     (when parent-browse-node
       (setf (pkm2-browse-node-children parent-browse-node)
-            (-filter (lambda (child)
-                       (not (equal browse-id (pkm2-browse-node-browse-id child))))
+            (-filter (lambda (child-id)
+                       (not (equal browse-id (pkm2-browse-node-browse-id (assoc-default child-id pkm2-browse--browse-nodes-alist)))))
                      (pkm2-browse-node-children parent-browse-node))))
     (ewoc-delete pkm2-browse-ewoc ewoc-node)
     (setq pkm2-browse--browse-nodes-alist (assq-delete-all browse-id pkm2-browse--browse-nodes-alist))
