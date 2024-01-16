@@ -185,22 +185,22 @@
          (pkm-nodes (--> (pkm2--browse-get-section-nodes-db-ids nodes-spec)
                          (-map #'pkm2--db-query-get-node-with-id it)))
          (sorter (pkm2-browse-section-sorter section))
-         (browse-nodes (cond (show-as-hierarchy
+         (browse-nodes (when pkm-nodes (cond (show-as-hierarchy
                               (--> (pkm2-browse-hierarchy-organize-as-hierarchy2 pkm-nodes)
                                    (-map (lambda (branch)
                                            (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree branch section 0)) it)))
                              (t (-map (lambda (pkm-node)
                                         (make-pkm2-browse-node :pkm-node pkm-node :section section :level 0))
-                                      pkm-nodes))))
-         (sorted-sorted-nodes (if sorter
+                                      pkm-nodes))) ))
+         (sorted-sorted-nodes  (if sorter
                                   (pkm2-browse-sort-browse-nodes browse-nodes sorter)
-                                browse-nodes))
+                                browse-nodes) )
          (section-id (or (pkm2-browse-section-section-id section)
                          (setf (pkm2-browse-section-section-id section) (pkm-random-id))))
-         (section-start-ewoc (or  (pkm2-browse-section-start-ewoc-node section)
-                                  (ewoc-enter-last pkm2-browse-ewoc (or (pkm2-browse-section-name section) "section")) ))
-         (section-end-ewoc (or (pkm2-browse-section-end-ewoc-node section)
-                               (ewoc-enter-after pkm2-browse-ewoc section-start-ewoc "section end"))))
+         (section-start-ewoc (when pkm-nodes (or  (pkm2-browse-section-start-ewoc-node section)
+                                  (ewoc-enter-last pkm2-browse-ewoc (format "---%s---" (or (pkm2-browse-section-name section) "section") )) ) ))
+         (section-end-ewoc (when pkm-nodes (or (pkm2-browse-section-end-ewoc-node section)
+                               (ewoc-enter-after pkm2-browse-ewoc section-start-ewoc "----")) )))
     (-each sorted-sorted-nodes (lambda (b-n)
                                  (pkm2-browse--insert-browse-node b-n `(before . ,section-end-ewoc))))
 
