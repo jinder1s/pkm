@@ -234,6 +234,56 @@
            (set-marker (make-marker) (point))))
         ((stringp ewoc-item) (insert ewoc-item))))
 
+(defun pkm2-browse-insert-node-in-hierarchy (browse-node parent-node parent-link section &optional where)
+  (let* ((b-n-id (pkm2-browse-node-browse-id browse-node))
+         (p-b-n-id (when parent-node (pkm2-browse-node-browse-id parent-node) ))
+         (parent-level (when parent-node (pkm2-browse-node-level parent-node) ))
+         (current-node-level (if parent-level (+ parent-level 1) 0))
+         (parent-children (when parent-node (pkm2-browse-node-children parent-node) ))
+         (insert-direction (if (listp where)
+                               (car where)
+                             where))
+         (sibling-node (if (listp where)
+                           (cdr where)
+                         nil))
+         (sibling-id (when sibling-node
+                       (pkm2-browse-node-browse-id sibling-node) ))
+         anchor-ewoc-node
+         ewoc-insert-direction
+         new-parent-children)
+    (cond
+     ((and (eq insert-direction 'after) sibling-node)
+      (setq anchor-ewoc-node (pkm2-browse-node-ewoc-node sibling-node))
+      (setq ewoc-insert-direction 'after)
+      (setq new-parent-children (when parent-node (--> (-elem-index sibling-id parent-children)
+                                                       (when it (-insert-at (+ it 1) b-n-id parent-children) )) ) ))
+     ((and (eq insert-direction 'before) sibling-id )
+      (setq anchor-ewoc-node (pkm2-browse-node-ewoc-node sibling-node))
+      (setq ewoc-insert-direction 'before)
+      (setq new-parent-children (when parent-node (--> (-elem-index sibling-id parent-children)
+                                                       (when it (-insert-at  it  b-n-id parent-children) )) ) ))
+     ((eq insert-direction 'first)
+      (setq anchor-ewoc-node (if parent-node
+                                 (pkm2-browse-node-ewoc-node parent-node)
+                               (pkm2-browse-section-start-ewoc-node section)))
+      (setq ewoc-insert-direction 'after)
+      (setq new-parent-children (-concat (list b-n-id) parent-children)))
+     ((eq insert-direction 'last)
+      (setq anchor-ewoc-node (if parent-node
+                                 (--> (-last-item parent-children)
+                                      (assoc-default it pkm2-browse--browse-nodes-alist)
+                                      (pkm2-browse-node-ewoc-node it))
+                               (pkm2-browse-section-end-ewoc-node section)))
+      (setq ewoc-insert-direction 'after)
+      (setq new-parent-children (-concat (list b-n-id) parent-children))))
+    (when parent-link (setf (pkm2-browse-node-parent-link browse-node) parent-link) )
+    (when parent-node (setf (pkm2-browse-node-children parent-node) new-parent-children) )
+    (when parent-node (setf (pkm2-browse-node-parent browse-node) p-b-n-id) )
+    (setf (pkm2-browse-node-section browse-node) section)
+    (setf (pkm2-browse-node-level browse-node) current-node-level)
+    (push (cons b-n-id browse-node) pkm2-browse--browse-nodes-alist)
+    (pkm2-browse--insert-browse-node browse-node (cons ewoc-insert-direction anchor-ewoc-node))))
+
 (defun pkm2-browse--insert-browse-node (browse-node  &optional where only-node)
   (let* ((id (pkm2-browse-node-browse-id browse-node))
          ewoc-node
@@ -288,7 +338,7 @@
                          (format "id: %d" db-id)
                          "\n"
                          prefix2
-                         (format "browse-id: %d" browse-id))))
+                         (format "browse-id: %s" browse-id))))
     hidden-string))
 
 (defun pkm2--browse-convert-object-to-string (object)
@@ -390,7 +440,18 @@
 
 
 ;;; interactivity
-;;;
+(defun pkm2-browse-move-browse-node-at-point-up (&optional down)
+  (let* ((current-node (pkm2--browse-get-browse-node-at-point))
+         (parent-link (pkm2-browse-node-parent-link current-node))
+         (parent-node (--> (pkm2-browse-node-parent current-node)
+                           (assoc-default it pkm2-browse--browse-nodes-alist)))
+         (section (pkm2-browse-node-section current-node))
+         (next-node (pkm2--browse-section-next-node (not down)))
+         (direction (if down 'after 'before)))
+    (when next-node
+      (pkm2--browse-remove-node current-node)
+      (pkm2-browse-insert-node-in-hierarchy current-node parent-node parent-link section `(,direction . ,next-node)))))
+
 (defun pkm2-sort-funcs-in-current-section ()
   (let* ((current-section (pkm2--browse-get-section-at-point))
          (sort-fuction (intern (completing-read "What sorting func?" (-map #'symbol-name section-nodes-sorting-functions)))))
@@ -672,38 +733,35 @@
 
 (defun pkm2--browse-promote-node-at-point ()
   ;  TODO Complete and test
-  (let* ((buffer-name (buffer-name))
-         (browse-node (pkm2--browse-get-browse-node-at-point))
+  (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
+         (section (pkm2-browse-node-section browse-node))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-node (pkm2-node-db-node pkm-node))
          (node-id (pkm2-db-node-id db-node))
-         (parent-browse-node (pkm2-browse-node-parent browse-node))
-         (parent-pkm-node (pkm2-browse-node-pkm-node parent-browse-node))
-         (parent-db-node (pkm2-node-db-node parent-pkm-node))
-         (parent-node-id (pkm2-db-node-id parent-db-node))
-         (connecting-link (--> (pkm2-node-parent-links pkm-node)
-                               (-filter (lambda (link)
-                                          (equal parent-node-id (pkm2-db-nodes-link-node_a link)))
-                                        it)
-                               (if (length> it 1)
-                                   (error "Promote function only supports 1 parent link between child and parent.")
-                                 (car it))))
+         (parent-browse-node (--> (pkm2-browse-node-parent browse-node)
+                                  (assoc-default it pkm2-browse--browse-nodes-alist)))
+         (connecting-link (--> (pkm2-browse-node-parent-link browse-node)))
          (connecting-link-id (pkm2-db-nodes-link-id connecting-link))
          (connecting-link-label (pkm2-db-nodes-link-type connecting-link))
          (connecting-context-id (pkm2-db-nodes-link-context connecting-link))
-         (parent-parent-browse-node (pkm2-browse-node-parent parent-browse-node))
+         (parent-parent-browse-node (--> (pkm2-browse-node-parent parent-browse-node)
+                                         (assoc-default it pkm2-browse--browse-nodes-alist)))
          (parent-parent-pkm-node (pkm2-browse-node-pkm-node parent-parent-browse-node))
          (parent-parent-db-node (pkm2-node-db-node parent-parent-pkm-node))
-         (parent-parent-node-id (pkm2-db-node-id parent-parent-db-node)))
-    (pkm2--db-insert-link-between-parent-and-child connecting-link-label
-                                                   parent-parent-node-id
-                                                   node-id
-                                                   (pkm2-get-current-timestamp)
-                                                   connecting-context-id)
+         (parent-parent-node-id (pkm2-db-node-id parent-parent-db-node))
+         (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
+                                                                  parent-parent-node-id
+                                                                  node-id
+                                                                  (pkm2-get-current-timestamp)
+                                                                  connecting-context-id))
+         (inhibit-read-only t))
+
     (pkm2--db-delete-link-between-nodes connecting-link-id)
-    (pkm2--refresh-current-buffer buffer-name)
-    ; TODO move node up in hierarchy in browser
-    ))
+    (pkm2--browse-remove-node browse-node)
+    (pkm2-browse-insert-node-in-hierarchy browse-node
+                                          parent-parent-browse-node
+                                          new-link
+                                          section `(after . ,parent-browse-node))))
 
 (defun pkm2--browse-filter-children-nodes-at-point (&optional arg)
   (interactive "p")
@@ -866,17 +924,24 @@
 (defun pkm2-browse-hierarchy-organize-children (pkm-node pkm-nodes)
   (let* ((children-links (pkm2-node-children-links pkm-node))
          (pkm-node-children-node-db-ids (-map #'pkm2--link-get-link-child-id children-links))
-         (present-children (-map (lambda (p-n) (when (member (--> (pkm2-node-db-node p-n)
-                                                                  (pkm2-db-node-id it))
-                                                             pkm-node-children-node-db-ids)
-                                                 p-n))
-                                 pkm-nodes))
-         (present-children-organized (-map (lambda (present-child) (when present-child (pkm2-browse-hierarchy-organize-children present-child pkm-nodes) ))
+         (present-children (-map (lambda (c-id)
+                                   (-find (lambda (p-n)
+                                            (equal (--> (pkm2-node-db-node p-n)
+                                                        (pkm2-db-node-id it))
+                                                   c-id))
+                                          pkm-nodes))
+                                 pkm-node-children-node-db-ids))
+         (present-children-organized (-map (lambda (present-child)
+                                             (when present-child
+                                               (pkm2-browse-hierarchy-organize-children present-child pkm-nodes) ))
                                            present-children) )
-         (present-children-organized-with-links (-non-nil (-map-indexed (lambda (index child)
-                                                                (when child
-                                                                  (plist-put child :parent-link (nth index children-links))))
-                                                              present-children-organized) )))
+         (present-children-organized-with-links (-non-nil (-map-indexed
+                                                           (lambda (index child)
+                                                             (when child
+                                                               (plist-put child :parent-link (nth index children-links))))
+                                                           present-children-organized))))
+
+
     `(:node ,pkm-node :children ,present-children-organized-with-links)))
 
 (defun pkm2-browse-hierarchy-organize-as-hierarchy2 (pkm-nodes)
@@ -904,8 +969,8 @@
          (parents (plist-get branch :parents))
          (parent-link (plist-get branch :parent-link))
          (children-nodes  (-map (lambda (child-branch)
-                                 (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree child-branch section (+ level 1)))
-                               children) )
+                                  (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree child-branch section (+ level 1)))
+                                children) )
          (parents-nodes (-map (lambda (child-branch)
                                 (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree child-branch section (+ level 1)))
                               parents))
