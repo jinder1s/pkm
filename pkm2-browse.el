@@ -420,7 +420,7 @@
   (--> (pkm2--compile-full-db-query query-spec) (sqlite-select pkm2-database-connection it) (-flatten it)))
 
 
-(defun pkm2--browse-section-next-node (&optional reverse)
+(defun pkm2--browse-section-next-sibling-node (&optional reverse)
   (let* ((current-node (pkm2--browse-get-browse-node-at-point))
          (level (when current-node (pkm2-browse-node-level current-node) ) )
          (section (when current-node (pkm2-browse-node-section current-node) ))
@@ -449,8 +449,11 @@
     (when found-next-ewoc-node
       (ewoc-goto-node pkm2-browse-ewoc found-next-ewoc-node))
     found-next-browse-node))
-(defun pkm2--browse-section-previous-node ()
-  (pkm2--browse-section-next-node t))
+
+(defun pkm2--browse-section-previous-sibling-node ()
+  (pkm2--browse-section-next-sibling-node t))
+
+
 (defun pkm2--browse-section-parent-node ())
 
 
@@ -461,7 +464,7 @@
          (parent-node (--> (pkm2-browse-node-parent current-node)
                            (assoc-default it pkm2-browse--browse-nodes-alist)))
          (section (pkm2-browse-node-section current-node))
-         (next-node (pkm2--browse-section-next-node (not down)))
+         (next-node (pkm2--browse-section-next-sibling-node (not down)))
          (direction (if down 'after 'before)))
     (when next-node
       (pkm2--browse-remove-node current-node)
