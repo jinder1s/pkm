@@ -285,7 +285,7 @@
                                       (assoc-default it pkm2-browse--browse-nodes-alist)
                                       (pkm2-browse-node-ewoc-node it))
                                (pkm2-browse-section-end-ewoc-node section)))
-      (setq ewoc-insert-direction 'after)
+      (setq ewoc-insert-direction 'before)
       (setq new-parent-children (-concat (list b-n-id) parent-children))))
     (when parent-link (setf (pkm2-browse-node-parent-link browse-node) parent-link) )
     (when parent-node (setf (pkm2-browse-node-children parent-node) new-parent-children) )
@@ -750,7 +750,6 @@
 
 
 (defun pkm2--browse-promote-node-at-point ()
-  ;  TODO Complete and test
   (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
          (section (pkm2-browse-node-section browse-node))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
@@ -762,24 +761,55 @@
          (connecting-link-id (pkm2-db-nodes-link-id connecting-link))
          (connecting-link-label (pkm2-db-nodes-link-type connecting-link))
          (connecting-context-id (pkm2-db-nodes-link-context connecting-link))
-         (parent-parent-browse-node (--> (pkm2-browse-node-parent parent-browse-node)
+         (grandparent-browse-node (--> (pkm2-browse-node-parent parent-browse-node)
                                          (assoc-default it pkm2-browse--browse-nodes-alist)))
-         (parent-parent-pkm-node (pkm2-browse-node-pkm-node parent-parent-browse-node))
-         (parent-parent-db-node (pkm2-node-db-node parent-parent-pkm-node))
-         (parent-parent-node-id (pkm2-db-node-id parent-parent-db-node))
+         (grandparent-pkm-node (pkm2-browse-node-pkm-node grandparent-browse-node))
+         (grandparent-db-node (pkm2-node-db-node grandparent-pkm-node))
+         (grandparent-node-id (pkm2-db-node-id grandparent-db-node))
          (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
-                                                                  parent-parent-node-id
+                                                                  grandparent-node-id
                                                                   node-id
                                                                   (pkm2-get-current-timestamp)
                                                                   connecting-context-id))
          (inhibit-read-only t))
-
     (pkm2--db-delete-link-between-nodes connecting-link-id)
     (pkm2--browse-remove-node browse-node)
     (pkm2-browse-insert-node-in-hierarchy browse-node
-                                          parent-parent-browse-node
+                                          grandparent-browse-node
                                           new-link
                                           section `(after . ,parent-browse-node))))
+
+
+
+(defun pkm2-browse-demote-node-at-point ()
+  "Move node lower in hierarchy."
+  ;; TODO TEST
+  (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
+         (section (pkm2-browse-node-section browse-node))
+         (pkm-node (pkm2-browse-node-pkm-node browse-node))
+         (db-node (pkm2-node-db-node pkm-node))
+         (node-id (pkm2-db-node-id db-node))
+         (connecting-link (--> (pkm2-browse-node-parent-link browse-node)))
+         (connecting-link-id (pkm2-db-nodes-link-id connecting-link))
+         (connecting-link-label (pkm2-db-nodes-link-type connecting-link))
+         (connecting-context-id (pkm2-db-nodes-link-context connecting-link))
+         (sibling-above-browse-node (save-excursion
+                                      (pkm2--browse-section-previous-sibling-node)))
+         (sibling-above-pkm-node (pkm2-browse-node-pkm-node sibling-above-browse-node))
+         (sibling-above-db-node (pkm2-node-db-node sibling-above-pkm-node))
+         (sibling-above-node-id (pkm2-db-node-id sibling-above-db-node))
+         (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
+                                                                  node-id
+                                                                  sibling-above-node-id
+                                                                  (pkm2-get-current-timestamp)
+                                                                  connecting-context-id))
+         (inhibit-read-only t))
+    (pkm2--db-delete-link-between-nodes connecting-link-id)
+    (pkm2--browse-remove-node browse-node)
+    (pkm2-browse-insert-node-in-hierarchy browse-node
+                                          sibling-above-browse-node
+                                          new-link
+                                          section `last)))
 
 (defun pkm2--browse-filter-children-nodes-at-point (&optional arg)
   (interactive "p")
