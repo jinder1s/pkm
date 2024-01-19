@@ -32,6 +32,7 @@
 			  user-mail-address
 			  (recent-keys)))))
     (substring (format "id%s" rnd ) 0 6)))
+
 (defun pkm2--db-sanatize-text (input)
   "Single-quote (scalar) input for use in a SQL expression."
   (with-temp-buffer
@@ -291,7 +292,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 (defun pkm2--db-get-kvd-link-table-for-type ( type )
   (--> pkm2--key_value_data-type-to-table-plist (plist-get it (or type 'TEXT ))(plist-get it :link-table )))
 
-
+;; * Mutations
 
 (defun pkm2--db-compile-insert-statement (table-name value-names values)
   (concat
@@ -314,23 +315,6 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
    ";"))
 
 
-
-(defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive)
-  (let* ((table-name (pkm2--db-get-kvd-link-table-for-type type))
-         (value-names '( "node" "key_value_data" "created_at" ))
-         (values `(,node-id ,key_value_data-id ,timestamp)))
-    (when context-node-id
-      (push "context" value-names)
-      (push context-node-id values))
-    (when is-archive
-      (push "is_archive" value-names)
-      (push is-archive values))
-    (--> (pkm2--db-compile-insert-statement table-name value-names values)
-         (sqlite-execute pkm2-database-connection it)
-         (car it)
-         (car it)
-         (make-pkm2-db-kvd-link :id2 it  :type type :node node-id :key_value_data key_value_data-id :context context-node-id :created_at timestamp))))
-
 (defun pkm2--db-delete-link-between-node-and-kvd (id type)
   (--> (pkm2--db-get-kvd-link-table-for-type type)
        (format "DELETE FROM %s WHERE id = %d" it id)
@@ -350,56 +334,111 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
        (sqlite-execute pkm2-database-connection it)))
 
 
+(defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive)
+  ;; schema
+  ;; (:action insert :what kvd-link :data (:node-id node-id :kvd-id kvd-id :timestamp timestamp :type type :context-node-id context-node-id :is-archive is-archive))
+  (let* ((table-name (pkm2--db-get-kvd-link-table-for-type type))
+         (value-names (-concat (list "node" "key_value_data" "created_at")
+                               (when context-node-id
+                                 '("context"))
+                               (when is-archive
+                                 '("is_archive"))))
+
+         (values (-concat `(,node-id ,key_value_data-id ,timestamp)
+                          (when context-node-id
+                            (list context-node-id))
+                          (when is-archive
+                            (list is-archive))))
+         (output
+          (--> (pkm2--db-compile-insert-statement table-name value-names values)
+               (sqlite-execute pkm2-database-connection it)
+               (car it)
+               (car it)
+               (make-pkm2-db-kvd-link :id2 it  :type type :node node-id :key_value_data key_value_data-id :context context-node-id :created_at timestamp :is_archive is-archive))))
+    (when output
+      (pkm2--sync-add-event
+       `(:action insert :what kvd-link :data (:node-id ,node-id :kvd-id ,key_value_data-id :timestamp ,timestamp :type ,type :context-node-id ,context-node-id :is-archive ,is-archive)))
+      output)))
+
 (defun pkm2--db-insert-link-between-nodeA-and-nodeB (type from-node-id to-node-id timestamp &optional  context-node-id)
+  ;; schema
+  ;; (:action insert :what node-link :data (:type type :from-node-id from-node-id :to-node-id to-node-id :timestamp timestamp :context-node-id context-node-id))
   (let* ((table-name "nodes_link")
-         (value-names '("type" "node_a" "node_b" "created_at"))
-         (values `(,type ,from-node-id ,to-node-id ,timestamp)))
-    (when context-node-id
-      (push "context" value-names)
-      (push context-node-id values))
-    (--> (pkm2--db-compile-insert-statement table-name value-names values)
-         (sqlite-execute pkm2-database-connection it)
-         (car it)
-         (car it)
-         (make-pkm2-db-nodes-link :id it :type type :node_a from-node-id :node_b to-node-id :context context-node-id :created_at timestamp))))
+         (value-names (-concat (list "type" "node_a" "node_b" "created_at")
+                               (when context-node-id
+                                 '("context"))))
+         (values (-concat `(,type ,from-node-id ,to-node-id ,timestamp)
+                          (when context-node-id
+                            (list context-node-id))))
+         (output
+          (--> (pkm2--db-compile-insert-statement table-name value-names values)
+               (sqlite-execute pkm2-database-connection it)
+               (car it)
+               (car it)
+               (make-pkm2-db-nodes-link :id it :type type :node_a from-node-id :node_b to-node-id :context context-node-id :created_at timestamp))))
+    (when output
+      (pkm2--sync-add-event
+       `(:action insert :what node-link :data (:type ,type :from-node-id ,from-node-id :to-node-id ,to-node-id :timestamp ,timestamp :context-node-id ,context-node-id)))
+      output)))
 
 (defun pkm2--db-insert-link-between-parent-and-child (type parent-id child-id timestamp &optional  context-node-id)
   (pkm2--db-insert-link-between-nodeA-and-nodeB type parent-id child-id timestamp context-node-id))
 
 
 (defun pkm2--db-insert-node (content timestamp)
+  ;; schema
+  ;; (:action insert :what node :data (:content content :timestamp timestamp))
   (let* ((table-name "node")
-         (value-names '("created_at"))
-         (values `(,timestamp)))
-    (when content
-      (push "content" value-names)
-      (push content values))
-    (--> (pkm2--db-compile-insert-statement table-name value-names values)
-         (sqlite-execute pkm2-database-connection it)
-         (car it)
-         (car it)
-         (make-pkm2-db-node :id it :content content :created_at timestamp))))
+         (value-names (if content
+                          '("content" "created_at")
+                        '("created_at") ))
+         (values (if content
+                     (list content timestamp)
+                   (list timestamp)))
+         (output (--> (pkm2--db-compile-insert-statement table-name value-names values)
+                      (sqlite-execute pkm2-database-connection it)
+                      (car it)
+                      (car it)
+                      (make-pkm2-db-node :id it :content content :created_at timestamp))))
+    (when output
+      (pkm2--sync-add-event
+       `(:action insert :what node :data (:content ,content :timestamp ,timestamp)))
+      output)))
 
 (defun pkm2--db-update-node (node-id new-content timestamp)
+  ;; schema
+  ;; (:action update :what node :data (:node-id node-id :new-content new-content :timestamp timestamp))
   (let* ((table-name "node")
          (value-names '("modified_at" "content"))
          (values `(,timestamp ,new-content))
          (where-clause (format "id = %d" node-id))
-         (returning-column-names '("id" "content" "created_at" "modified_at")))
-    (--> (pkm2--db-compile-update-statement table-name value-names values where-clause returning-column-names)
-         (sqlite-execute pkm2-database-connection it)
-         (car it)
-         (make-pkm2-db-node :id (nth 0 it) :content (nth 1 it) :created_at (nth 2 it) :modified_at (nth 3 it)))))
+         (returning-column-names '("id" "content" "created_at" "modified_at"))
+         (output
+          (--> (pkm2--db-compile-update-statement table-name value-names values where-clause returning-column-names)
+               (sqlite-execute pkm2-database-connection it)
+               (car it)
+               (make-pkm2-db-node :id (nth 0 it) :content (nth 1 it) :created_at (nth 2 it) :modified_at (nth 3 it)))))
+    (when output
+      (pkm2--sync-add-event
+       `(:action update :what node :data (:node-id ,node-id :new-content ,new-content :timestamp ,timestamp))))
+    output))
 
 (defun pkm2--db-insert-kvd (key value timestamp &optional type)
+  ;; schema
+  ;; (:action insert :what kvd :data (:key key :value value :timestamp timestamp :type type))
+
   (let* ((table-name (pkm2--db-get-kvd-data-table-for-type type))
          (value-names '("key" "value" "created_at"))
-         (values `(,key ,value ,timestamp)))
-    (--> (pkm2--db-compile-insert-statement table-name value-names values)
-         (sqlite-execute pkm2-database-connection it)
-         (car it)
-         (car it)
-         (make-pkm2-db-kvd :type type :id it :key key :value value :created_at timestamp))))
+         (values `(,key ,value ,timestamp))
+         (output (--> (pkm2--db-compile-insert-statement table-name value-names values)
+                      (sqlite-execute pkm2-database-connection it)
+                      (car it)
+                      (car it)
+                      (make-pkm2-db-kvd :type type :id it :key key :value value :created_at timestamp))))
+    (when output
+      (pkm2--sync-add-event
+       `(:action insert :what kvd :data (:key ,key :value ,value :timestamp ,timestamp :type ,type)))
+      output)))
 
 (defun pkm2--db-get-or-insert-kvd (key value &optional type)
   (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type) )
@@ -408,6 +447,53 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
         (make-pkm2-db-kvd :type type :id (nth 0 db-info) :key key :value value :created_at (nth 3 db-info))
       (pkm2--db-insert-kvd key value (pkm2-get-current-timestamp) type))))
 
+
+;; ** log change
+(defun pkm2--update-node-with-log (pkm-node db-id new-content timestamp)
+  (message "In update log node")
+  (let* ((node-types (pkm2-node-types pkm-node))
+         (log-node (-any (lambda (type)
+                           (--> (plist-get pkm-structure-defined-schemas-plist type)
+                                (plist-get it :log-primary)))
+                         node-types))
+         (old-content (when log-node (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-content it))))
+         (content-type (when log-node
+                         (if (stringp old-content)
+                             'TEXT
+                           (error "Haven't figure out how to do history for node content that is not text."))))
+         (history-kvd (when (and log-node old-content)
+                        (pkm2--db-get-or-insert-kvd "history"
+                                             old-content
+                                             content-type)))
+         (db-id (or db-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it))))
+         (new-db-node (pkm2--db-update-node db-id  new-content timestamp)))
+    (when (and log-node history-kvd)
+      (pkm2--db-insert-link-between-node-and-kvd db-id (pkm2-db-kvd-id history-kvd) timestamp content-type nil timestamp))
+    new-db-node))
+
+(defun pkm2--update-node-kvd (pkm-node old-kvd new-kvd-id kvd-type context-id old-link-id timestamp)
+  (let* ((node-types (pkm2-node-types pkm-node))
+         (kvd-key (pkm2-db-kvd-key old-kvd))
+         (key-kvd-specs (-non-nil
+                         (-map (lambda (structure-name)
+                                 (pkm-object-kvd-get-kvd-spec-for-key-in-structure kvd-key structure-name))
+                               node-types)))
+         (log-changes (-any (lambda (spec)
+                              (plist-get spec :log-change))
+                            key-kvd-specs))
+         (log-changes-ask-timestamp (-any (lambda (spec)
+                              (plist-get spec :log-ask-timestamp))
+                            key-kvd-specs))
+         (timestamp (if log-changes-ask-timestamp
+                        (pkm2-get-user-selected-timestamp)
+                        timestamp))
+         (node-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it)))
+         (new-link  (when new-kvd-id
+                      (pkm2--db-insert-link-between-node-and-kvd node-id new-kvd-id timestamp kvd-type context-id))))
+    (if log-changes
+        (pkm2-db-archive-link-between-node-and-kvd old-link-id kvd-type timestamp)
+      (pkm2--db-delete-link-between-node-and-kvd old-link-id kvd-type))
+    new-link))
 
 (defun pkm2-node-has-key-value (node key value)
   "Check if NODE has KEY VALUE kvd.
@@ -1420,52 +1506,9 @@ Commit everything.
              (delete-query (format "DELETE FROM %s WHERE id IN (%s)" data-table select-query)))
         (sqlite-execute pkm2-database-connection delete-query)))))
 
-;;; log change
-
-(defun pkm2--update-node-with-log (pkm-node db-id new-content timestamp)
-  (message "In update log node")
-  (let* ((node-types (pkm2-node-types pkm-node))
-         (log-node (-any (lambda (type)
-                           (--> (plist-get pkm-structure-defined-schemas-plist type)
-                                (plist-get it :log-primary)))
-                         node-types))
-         (old-content (when log-node (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-content it))))
-         (content-type (when log-node
-                         (if (stringp old-content)
-                             'TEXT
-                           (error "Haven't figure out how to do history for node content that is not text."))))
-         (history-kvd (when (and log-node old-content)
-                        (pkm2--db-get-or-insert-kvd "history"
-                                             old-content
-                                             content-type)))
-         (db-id (or db-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it))))
-         (new-db-node (pkm2--db-update-node db-id  new-content timestamp)))
-    (when (and log-node history-kvd)
-      (pkm2--db-insert-link-between-node-and-kvd db-id (pkm2-db-kvd-id history-kvd) timestamp content-type nil timestamp))
-    new-db-node))
-
-(defun pkm2--update-node-kvd (pkm-node old-kvd new-kvd-id kvd-type context-id old-link-id timestamp)
-  (let* ((node-types (pkm2-node-types pkm-node))
-         (kvd-key (pkm2-db-kvd-key old-kvd))
-         (key-kvd-specs (-non-nil
-                         (-map (lambda (structure-name)
-                                 (pkm-object-kvd-get-kvd-spec-for-key-in-structure kvd-key structure-name))
-                               node-types)))
-         (log-changes (-any (lambda (spec)
-                              (plist-get spec :log-change))
-                            key-kvd-specs))
-         (log-changes-ask-timestamp (-any (lambda (spec)
-                              (plist-get spec :log-ask-timestamp))
-                            key-kvd-specs))
-         (timestamp (if log-changes-ask-timestamp
-                        (pkm2-get-user-selected-timestamp)
-                        timestamp))
-         (node-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it)))
-         (new-link  (when new-kvd-id
-                      (pkm2--db-insert-link-between-node-and-kvd node-id new-kvd-id timestamp kvd-type context-id))))
-    (if log-changes
-        (pkm2-db-archive-link-between-node-and-kvd old-link-id kvd-type timestamp)
-      (pkm2--db-delete-link-between-node-and-kvd old-link-id kvd-type))
-    new-link))
+(defvar pkm2--sync-event-list '())
+(defvar pkm2--sync-device-id nil)
+(defun pkm2--sync-add-event (event)
+  (setq pkm2--sync-event-list (-concat pkm2--sync-event-list (list (plist-put event :device-id pkm2--sync-device-id)))))
 
 (provide 'pkm-new-core)
