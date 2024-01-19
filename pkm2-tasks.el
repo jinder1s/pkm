@@ -69,6 +69,11 @@
 
 (pkm-register-structure 'project-s
                         (list :parent 'task-n
+                              :browse-insert-format-string (format "%s %s PROJ %s %s"
+                                                                   "<insert>(:display kvd-value :key \"task-status\" :face-value pkm2-tasks-status-face-plist)</insert>"
+                                                                   "<insert>(:display kvd-value :key \"task-priority\")</insert>"
+                                                                   "<insert>(:display content)</insert>"
+                                                                   "<insert>(:display hidden :prefix \"\\n\")</insert>")
                               :assets (list
                                        '(:pkm-type kvd :name "is-project" :key "node-type" :value "project" :link-to ("base-node") :data-type TEXT))
                               ))
