@@ -349,7 +349,11 @@
                          (format "id: %d" db-id)
                          "\n"
                          prefix2
-                         (format "browse-id: %s" browse-id))))
+                         (format "browse-id: %s" browse-id)
+                         "\n"
+                         prefix2
+                         (format "types: %S" (pkm2-node-types pkm-node))
+                         )))
     hidden-string))
 
 (defun pkm2--browse-convert-object-to-string (object)
