@@ -315,7 +315,6 @@
                    "SELECT node_id FROM subs_table"))))
     query))
 (defun pkm2--compile-db-query (single-query-spec &optional nodes-table)
-  (message "q-1: %S" nodes-table)
   (if-let* ((type-strategies (plist-get pkm2--query-spec-options-plist (car single-query-spec)))
             (db-query-func (plist-get type-strategies :get-db-query))
             (db-query (funcall db-query-func (cadr single-query-spec) nodes-table)))
@@ -323,7 +322,6 @@
     (error (format "Spec wrong: %S" single-query-spec))))
 
 (defun pkm2--compile-full-db-query (query-plist &optional nodes-table)
-  (message "nodes table: %S" nodes-table)
   (let* ((prefix (pkm-random-id))
          (query query-plist)
          (reduced-output

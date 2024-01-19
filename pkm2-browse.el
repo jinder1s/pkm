@@ -525,8 +525,6 @@
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-node (get-text-property current-point :db-node))
          (kvd (get-text-property current-point :db-kvd)))
-    (message "b-n: %S\n p-n: %S" browse-node pkm-node)
-    (message "db_node: %S, kvd: %S" db-node kvd)
     (if  (not (xor db-node kvd) )
         (error "there should be one and only one type of object at point: either db-node or kvd.")
       (if db-node
@@ -706,7 +704,7 @@
                      (setf (pkm2-browse-section-end-ewoc-node section) nil) ))
     (pkm2--browse buffer-state buffer-name)))
 
-(defun pkm2--browse-add-node-as-child-to-node-at-point ()
+(defun pkm2--browse-add-search-child ()
   (interactive)
   (let* ((selected-node-id (pkm2-nodes-search "Select node to add as child: "))
          (browse-node (pkm2--browse-get-browse-node-at-point))
@@ -722,7 +720,7 @@
                     (pkm2-get-current-timestamp))))
     new-link))
 
-(defun pkm2--browse-add-node-as-parent-to-node-at-point ()
+(defun pkm2--browse-add-search-parent ()
   (interactive)
   (let* ((selected-node-id (pkm2-nodes-search "Select node to add as parent "))
          (browse-node (pkm2--browse-get-browse-node-at-point))
@@ -750,6 +748,7 @@
 
 
 (defun pkm2--browse-promote-node-at-point ()
+  "Move node higher in its current hierarchy."
   (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
          (section (pkm2-browse-node-section browse-node))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
@@ -831,6 +830,7 @@
          (sql-query (pkm2--compile-full-db-query full-query))
          (db-nodes-ids (-flatten (sqlite-select pkm2-database-connection sql-query) )))
     (pkm2--browse-see-nodes-as-children browse-id db-nodes-ids)))
+
 
 
 (defun pkm2--browse-see-nodes-as-children (browse-id nodes-db-ids)
@@ -1160,8 +1160,8 @@
       (:prefix "n"
                (:prefix ("a" . "add")
                 (:prefix ("r" . "relationship")
-                         "p" #'pkm2--browse-add-node-as-parent-to-node-at-point
-                         "c" #'pkm2--browse-add-node-as-child-to-node-at-point)
+                         "p" #'pkm2--browse-add-search-parent
+                         "c" #'pkm2--browse-add-search-child)
                 :desc "Add kvd" "k" #'pkm2--browse-add-kvd-at-point
                 "c" #'pkm--browse-capture-node-as-child-of-node-at-point
                 "s" #'pkm--browse-capture-node-as-sibling-of-node-at-point )
