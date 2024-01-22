@@ -75,7 +75,7 @@
 (defun pkm2-clock-in (&optional db-id)
   (interactive)
   (let* ((structure-name 'clock-node)
-         (parent-node-db-id (or db-id (--> (pkm2-get-pkm-node-at-point)
+         (parent-node-db-id (or db-id (--> (funcall pkm2-get-pkm-node-at-point-func)
                                            (when it (pkm2-node-db-node it))
                                            (when it (pkm2-db-node-id it) ))
                                 (pkm2-nodes-search "Search node to clock into: ")))

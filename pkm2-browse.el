@@ -498,6 +498,8 @@
 (defun pkm2-get-pkm-node-at-point ()
   (--> (pkm2--browse-get-browse-node-at-point) (when it (pkm2-browse-node-pkm-node it) )))
 
+(setq pkm2-get-pkm-node-at-point-func #'pkm2-get-pkm-node-at-point)
+
 (defun pkm2--browse-get-browse-node-id-at-point (&optional current-point)
   (if-let* ((current-ewoc-node (when pkm2-browse-ewoc (ewoc-locate pkm2-browse-ewoc (or current-point (point)))))
             (browse-node-id (ewoc-data current-ewoc-node)))
@@ -689,8 +691,7 @@
          (link (if (length= links-between-nodes 1)
                    (car links-between-nodes)
                  (error "There are either zero or more than 1 links between node and its parent")))
-         (link-db-id (pkm2-db-nodes-link-id link))
-         )
+         (link-db-id (pkm2-db-nodes-link-id link)))
     (pkm2--db-delete-link-between-nodes link-db-id)))
 
 
@@ -761,7 +762,7 @@
          (connecting-link-label (pkm2-db-nodes-link-type connecting-link))
          (connecting-context-id (pkm2-db-nodes-link-context connecting-link))
          (grandparent-browse-node (--> (pkm2-browse-node-parent parent-browse-node)
-                                         (assoc-default it pkm2-browse--browse-nodes-alist)))
+                                       (assoc-default it pkm2-browse--browse-nodes-alist)))
          (grandparent-pkm-node (pkm2-browse-node-pkm-node grandparent-browse-node))
          (grandparent-db-node (pkm2-node-db-node grandparent-pkm-node))
          (grandparent-node-id (pkm2-db-node-id grandparent-db-node))
@@ -777,6 +778,7 @@
                                           grandparent-browse-node
                                           new-link
                                           section `(after . ,parent-browse-node))))
+
 
 
 
