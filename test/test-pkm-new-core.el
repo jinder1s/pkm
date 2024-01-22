@@ -61,6 +61,7 @@
       (expect (pkm2-node-next-sequencial-links node) :to-be nil)
       (expect (pkm2-node-flat-links node) :to-be nil)
       (expect (pkm2-node-kvds node) :to-be nil)))
+
   (it "Inserting text kvd"
     (let* ((key "test-key")
            (value "test-value")
@@ -80,6 +81,7 @@
       (expect (pkm2-db-kvd-key kvd) :to-equal key)
       (expect (pkm2-db-kvd-value kvd) :to-equal value)
       (expect (pkm2-db-kvd-created_at kvd) :to-equal timestamp)))
+
 (it "Inserting text kvd without specifying type. It should default to TEXT"
     (let* ((key "test-key")
            (value "test-value")
