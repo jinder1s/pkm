@@ -18,7 +18,7 @@
 (unless  pkm2-browse-saved-queries (persist-load 'pkm2-browse-saved-queries) )
 (unless  pkm2-browse-saved-named-queries (persist-load 'pkm2-browse-saved-named-queries) )
 
-(defun pkm2-get-pkm-node-at-point ())
+(defvar pkm2-get-pkm-node-at-point-func nil)
 
 ;;; pkm utils
 (defun pkm-random-id ()
@@ -32,6 +32,30 @@
 			  user-mail-address
 			  (recent-keys)))))
     (substring (format "id%s" rnd ) 0 6)))
+
+(defun pkm-uuid ()
+  "Return string with random (version 4) UUID."
+  (let ((rnd (md5 (format "%s%s%s%s%s%s"
+			  (random)
+
+			  (user-uid)
+			  (emacs-pid)
+			  (user-full-name)
+			  user-mail-address
+			  (recent-keys)))))
+    (format "%s-%s-4%s-%s%s-%s"
+	    (substring rnd 0 8)
+	    (substring rnd 8 12)
+	    (substring rnd 13 16)
+	    (format "%x"
+		    (logior
+		     #b10000000
+		     (logand
+		      #b10111111
+		      (string-to-number
+		       (substring rnd 16 18) 16))))
+	    (substring rnd 18 20)
+	    (substring rnd 20 32))))
 
 (defun pkm2--db-sanatize-text (input)
   "Single-quote (scalar) input for use in a SQL expression."
@@ -146,6 +170,7 @@ The original alist is not modified."
   (kvds nil :type list))
 
 (defvar pkm2-database-connection nil)
+(defvar pkm2-database-file-path nil)
 
 
 (defun pkm2-setup-database (database_handle)
@@ -155,12 +180,14 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS node (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   content,
   created_at INTEGER NOT NULL,
   modified_at INTEGER) ;")
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS nodes_link (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   type TEXT,
   created_at INTEGER NOT NULL,
   node_a INTEGER NOT NULL,
@@ -173,29 +200,34 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS key_value_data (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   created_at INTEGER NOT NULL,
   key TEXT NOT NULL,
   value TEXT);" )
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS key_value_data_integer (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   created_at INTEGER NOT NULL,
   key TEXT NOT NULL,
   value INTEGER) STRICT;" )
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS key_value_data_real (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   created_at INTEGER NOT NULL,
   key TEXT NOT NULL,
   value REAL) STRICT;" )
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS key_value_data_blob (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   created_at INTEGER NOT NULL,
   key TEXT NOT NULL,
   value BLOB) STRICT;")
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS data_or_properties_link (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   created_at INTEGER NOT NULL,
   node INTEGER,
   key_value_data INTEGER,
@@ -207,6 +239,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS data_or_properties_link_integer (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   created_at INTEGER NOT NULL,
   node INTEGER,
   key_value_data INTEGER,
@@ -218,6 +251,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS data_or_properties_link_real (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   created_at INTEGER NOT NULL,
   node INTEGER,
   key_value_data INTEGER,
@@ -229,6 +263,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS data_or_properties_link_blob (
   id INTEGER PRIMARY KEY NOT NULL,
+  shadow_id TEXT,
   created_at INTEGER NOT NULL,
   node INTEGER,
   key_value_data INTEGER,
@@ -293,7 +328,6 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   (--> pkm2--key_value_data-type-to-table-plist (plist-get it (or type 'TEXT ))(plist-get it :link-table )))
 
 ;; * Mutations
-
 (defun pkm2--db-compile-insert-statement (table-name value-names values)
   (concat
     (format "INSERT INTO %s "  table-name)
@@ -314,37 +348,70 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
      (format "RETURNING %s" (string-join returning-column-names ", ")))
    ";"))
 
+(defun pkm2--db-delete-link-between-node-and-kvd (id type &optional no-new-event)
+  ;; schema
+  ;; (:action delete :what kvd-link :data (:id id :type type))
+  (let* ((link-table (pkm2--db-get-kvd-link-table-for-type type))
+         (delete-query (format "DELETE FROM %s WHERE id = %d" link-table id))
+         (shadow-id-query (format "SELECT shadow_id from %s WHERE id = %d" link-table id))
+         (shadow-id (caar (sqlite-select pkm2-database-connection shadow-id-query) ))
+         (delete-output (sqlite-execute pkm2-database-connection delete-query)))
+    (when (and delete-output (not no-new-event))
+      (pkm2--sync-add-event
+       `(:action delete :what kvd-link :data (:id ,id :type ,type :shadow-id ,shadow-id))))
+    delete-output))
 
-(defun pkm2--db-delete-link-between-node-and-kvd (id type)
-  (--> (pkm2--db-get-kvd-link-table-for-type type)
-       (format "DELETE FROM %s WHERE id = %d" it id)
-       (sqlite-execute pkm2-database-connection it) ))
-
-(defun pkm2-db-archive-link-between-node-and-kvd (id type &optional timestamp)
-  (--> (pkm2--db-get-kvd-link-table-for-type type)
-       (pkm2--db-compile-update-statement it (list "is_archive") (list (or timestamp 1)) (format "id = %d" id) )
-       (sqlite-execute pkm2-database-connection it)))
-
-(defun pkm2--db-delete-node (id)
-  (--> (format "delete from node where id = %d" id)
-       (sqlite-execute pkm2-database-connection it)))
-
-(defun pkm2--db-delete-link-between-nodes (id)
-  (--> (format "delete from nodes_link where id = %d" id)
-       (sqlite-execute pkm2-database-connection it)))
+(defun pkm2-db-archive-link-between-node-and-kvd (id type timestamp &optional  no-new-event)
+  ;; schema
+  ;; (:action archive :what kvd-link :data (:id id :type type :timestamp timestamp))
+  (let* ((link-table (pkm2--db-get-kvd-link-table-for-type type))
+         (archive-query (format "UPDATE %s SET is_archive = 1 WHERE id = %d" link-table id))
+         (shadow-id-query (format "SELECT shadow_id from %s WHERE id = %d" link-table id))
+         (shadow-id (caar (sqlite-select pkm2-database-connection shadow-id-query) ))
+         (archive-output (sqlite-execute pkm2-database-connection archive-query)))
+    (when (and archive-output (not no-new-event))
+      (pkm2--sync-add-event
+       `(:action archive :what kvd-link :data (:id ,id :type ,type :shadow-id ,shadow-id :timestamp ,timestamp))))
+    archive-output))
 
 
-(defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive)
+(defun pkm2--db-delete-node (id &optional no-new-event)
+  ;; schema
+  ;; (:action delete :what node :data (:id id))
+  (let* ((delete-query (format "DELETE FROM node WHERE id = %d" id))
+         (shadow-id-query (format "SELECT shadow_id from node WHERE id = %d" id))
+         (shadow-id (caar (sqlite-select pkm2-database-connection shadow-id-query) ))
+         (delete-output (sqlite-execute pkm2-database-connection delete-query)))
+    (when (and delete-output (not no-new-event))
+      (pkm2--sync-add-event
+       `(:action delete :what node :data (:id ,id :shadow-id ,shadow-id))))
+    delete-output))
+
+(defun pkm2--db-delete-link-between-nodes (id &optional no-new-event)
+  ;; schema
+  ;; (:action delete :what nodes-link :data (:id id))
+  (let* ((delete-query (format "DELETE FROM nodes_link WHERE id = %d" id))
+         (shadow-id-query (format "SELECT shadow_id from nodes_link WHERE id = %d" id))
+         (shadow-id (caar (sqlite-select pkm2-database-connection shadow-id-query) ))
+         (delete-output (sqlite-execute pkm2-database-connection delete-query)))
+    (when (and delete-output (not no-new-event))
+      (pkm2--sync-add-event
+       `(:action delete :what nodes-link :data (:id ,id :shadow-id ,shadow-id))))
+    delete-output))
+
+
+(defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive no-new-event)
   ;; schema
   ;; (:action insert :what kvd-link :data (:node-id node-id :kvd-id kvd-id :timestamp timestamp :type type :context-node-id context-node-id :is-archive is-archive))
   (let* ((table-name (pkm2--db-get-kvd-link-table-for-type type))
-         (value-names (-concat (list "node" "key_value_data" "created_at")
+         (value-names (-concat (list "node" "key_value_data" "created_at" "shadow_id")
                                (when context-node-id
                                  '("context"))
                                (when is-archive
                                  '("is_archive"))))
+         (shadow-id (pkm-uuid))
 
-         (values (-concat `(,node-id ,key_value_data-id ,timestamp)
+         (values (-concat `(,node-id ,key_value_data-id ,timestamp ,shadow-id)
                           (when context-node-id
                             (list context-node-id))
                           (when is-archive
@@ -354,20 +421,36 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                (sqlite-execute pkm2-database-connection it)
                (car it)
                (car it)
-               (make-pkm2-db-kvd-link :id2 it  :type type :node node-id :key_value_data key_value_data-id :context context-node-id :created_at timestamp :is_archive is-archive))))
-    (when output
+               (make-pkm2-db-kvd-link :id2 it
+                                      :type type
+                                      :node node-id
+                                      :key_value_data key_value_data-id
+                                      :context context-node-id
+                                      :created_at timestamp
+                                      :is_archive is-archive))))
+    (when (and output (not no-new-event))
       (pkm2--sync-add-event
-       `(:action insert :what kvd-link :data (:node-id ,node-id :kvd-id ,key_value_data-id :timestamp ,timestamp :type ,type :context-node-id ,context-node-id :is-archive ,is-archive)))
-      output)))
+       `(:action insert
+         :what kvd-link
+         :data (:node-id ,node-id
+                :new-link-id ,(pkm2-db-kvd-link-id2 output)
+                :shadow-id ,shadow-id
+                :kvd-id ,key_value_data-id
+                :timestamp ,timestamp
+                :type ,type
+                :context-node-id ,context-node-id
+                :is-archive ,is-archive))))
+    output))
 
-(defun pkm2--db-insert-link-between-nodeA-and-nodeB (type from-node-id to-node-id timestamp &optional  context-node-id)
+(defun pkm2--db-insert-link-between-nodeA-and-nodeB (type node-a node-b timestamp &optional  context-node-id no-new-event)
   ;; schema
-  ;; (:action insert :what node-link :data (:type type :from-node-id from-node-id :to-node-id to-node-id :timestamp timestamp :context-node-id context-node-id))
+  ;; (:action insert :what nodes-link :data (:type type :from-node-id node-a :to-node-id node-b :timestamp timestamp :context-node-id context-node-id))
   (let* ((table-name "nodes_link")
-         (value-names (-concat (list "type" "node_a" "node_b" "created_at")
+         (shadow-id (pkm-uuid))
+         (value-names (-concat (list "type" "node_a" "node_b" "created_at" "shadow_id")
                                (when context-node-id
                                  '("context"))))
-         (values (-concat `(,type ,from-node-id ,to-node-id ,timestamp)
+         (values (-concat `(,type ,node-a ,node-b ,timestamp ,shadow-id)
                           (when context-node-id
                             (list context-node-id))))
          (output
@@ -375,37 +458,94 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                (sqlite-execute pkm2-database-connection it)
                (car it)
                (car it)
-               (make-pkm2-db-nodes-link :id it :type type :node_a from-node-id :node_b to-node-id :context context-node-id :created_at timestamp))))
-    (when output
+               (make-pkm2-db-nodes-link
+                :id it
+                :type type
+                :node_a node-a
+                :node_b node-b
+                :context context-node-id
+                :created_at timestamp))))
+    (when (and output (not no-new-event))
       (pkm2--sync-add-event
-       `(:action insert :what node-link :data (:type ,type :from-node-id ,from-node-id :to-node-id ,to-node-id :timestamp ,timestamp :context-node-id ,context-node-id)))
-      output)))
+       `(:action insert
+         :what nodes-link
+         :data
+         (:type ,type
+          :new-link-id ,(pkm2-db-nodes-link-id output)
+          :shadow-id ,shadow-id
+          :node-a-id ,node-a
+          :node-b-id ,node-b
+          :timestamp ,timestamp
+          :context-node-id ,context-node-id))))
+    output))
 
 (defun pkm2--db-insert-link-between-parent-and-child (type parent-id child-id timestamp &optional  context-node-id)
   (pkm2--db-insert-link-between-nodeA-and-nodeB type parent-id child-id timestamp context-node-id))
 
 
-(defun pkm2--db-insert-node (content timestamp)
+(defun pkm2--db-insert-node (content timestamp &optional no-new-event)
   ;; schema
   ;; (:action insert :what node :data (:content content :timestamp timestamp))
   (let* ((table-name "node")
-         (value-names (if content
-                          '("content" "created_at")
-                        '("created_at") ))
-         (values (if content
-                     (list content timestamp)
-                   (list timestamp)))
+         (shadow-id (pkm-uuid))
+         (value-names (-concat (list "created_at" "shadow_id")
+                               (when content
+                                 '("content"))))
+         (values (-concat `(,timestamp ,shadow-id)
+                          (when content
+                            (list content))))
          (output (--> (pkm2--db-compile-insert-statement table-name value-names values)
                       (sqlite-execute pkm2-database-connection it)
                       (car it)
                       (car it)
                       (make-pkm2-db-node :id it :content content :created_at timestamp))))
-    (when output
+    (when (and output (not no-new-event))
       (pkm2--sync-add-event
-       `(:action insert :what node :data (:content ,content :timestamp ,timestamp)))
-      output)))
+       `(:action insert
+         :what node
+         :data
+         (:content ,content
+          :new-node-id ,(pkm2-db-node-id output)
+          :shadow-id ,shadow-id
+          :timestamp ,timestamp))))
+    output))
+(defun pkm2--db-insert-kvd (key value timestamp &optional type no-new-event)
+  ;; schema
+  ;; (:action insert :what kvd :data (:key key :value value :timestamp timestamp :type type))
+  (let* ((table-name (pkm2--db-get-kvd-data-table-for-type type))
+         (shadow-id  (pkm-uuid))
+         (value-names (-concat '("key" "value" "created_at" "shadow_id")))
+         (values (-concat `(,key ,value ,timestamp ,shadow-id)))
+         (output (--> (pkm2--db-compile-insert-statement table-name value-names values)
+                      (sqlite-execute pkm2-database-connection it)
+                      (car it)
+                      (car it)
+                      (make-pkm2-db-kvd :type type :id it :key key :value value :created_at timestamp))))
+    (when (and output (not no-new-event))
+      (pkm2--sync-add-event
+       `(:action insert
+         :what kvd
+         :data
+         (:key ,key
+          :value ,value
+          :new-kvd-id ,(pkm2-db-kvd-id output)
+          :shadow-id ,shadow-id
+          :timestamp ,timestamp
+          :type ,type))))
+    output))
 
-(defun pkm2--db-update-node (node-id new-content timestamp)
+(defun pkm2--db-get-or-insert-kvd (key value &optional type)
+  (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type) )
+         (db-info (car (sqlite-select pkm2-database-connection (format "SELECT id, key, value, created_at from %s WHERE key is '%s' AND value is %s" data-table key (pkm2--db-format-value-correctly value type))) )))
+    (if db-info
+        (make-pkm2-db-kvd :type type
+                          :id (nth 0 db-info)
+                          :key key
+                          :value value
+                          :created_at (nth 3 db-info))
+      (pkm2--db-insert-kvd key value (pkm2-get-current-timestamp) type))))
+
+(defun pkm2--db-update-node (node-id new-content timestamp &optional no-new-event)
   ;; schema
   ;; (:action update :what node :data (:node-id node-id :new-content new-content :timestamp timestamp))
   (let* ((table-name "node")
@@ -417,35 +557,24 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
           (--> (pkm2--db-compile-update-statement table-name value-names values where-clause returning-column-names)
                (sqlite-execute pkm2-database-connection it)
                (car it)
-               (make-pkm2-db-node :id (nth 0 it) :content (nth 1 it) :created_at (nth 2 it) :modified_at (nth 3 it)))))
-    (when output
+               (make-pkm2-db-node
+                :id (nth 0 it)
+                :content (nth 1 it)
+                :created_at (nth 2 it)
+                :modified_at (nth 3 it)))))
+    (when (and output (not no-new-event))
       (pkm2--sync-add-event
-       `(:action update :what node :data (:node-id ,node-id :new-content ,new-content :timestamp ,timestamp))))
+       `(:action update
+         :what node
+         :data
+         (:node-id ,node-id
+          :new-content ,new-content
+          :timestamp ,timestamp))))
     output))
 
-(defun pkm2--db-insert-kvd (key value timestamp &optional type)
-  ;; schema
-  ;; (:action insert :what kvd :data (:key key :value value :timestamp timestamp :type type))
 
-  (let* ((table-name (pkm2--db-get-kvd-data-table-for-type type))
-         (value-names '("key" "value" "created_at"))
-         (values `(,key ,value ,timestamp))
-         (output (--> (pkm2--db-compile-insert-statement table-name value-names values)
-                      (sqlite-execute pkm2-database-connection it)
-                      (car it)
-                      (car it)
-                      (make-pkm2-db-kvd :type type :id it :key key :value value :created_at timestamp))))
-    (when output
-      (pkm2--sync-add-event
-       `(:action insert :what kvd :data (:key ,key :value ,value :timestamp ,timestamp :type ,type)))
-      output)))
 
-(defun pkm2--db-get-or-insert-kvd (key value &optional type)
-  (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type) )
-         (db-info (car (sqlite-select pkm2-database-connection (format "SELECT id, key, value, created_at from %s WHERE key is '%s' AND value is %s" data-table key (pkm2--db-format-value-correctly value type))) )))
-    (if db-info
-        (make-pkm2-db-kvd :type type :id (nth 0 db-info) :key key :value value :created_at (nth 3 db-info))
-      (pkm2--db-insert-kvd key value (pkm2-get-current-timestamp) type))))
+
 
 
 ;; ** log change
@@ -495,6 +624,110 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
       (pkm2--db-delete-link-between-node-and-kvd old-link-id kvd-type))
     new-link))
 
+;; * sync
+
+(defvar pkm-sync-directory nil)
+(defvar pkm-sync--get-remote-events-func nil)
+(defvar pkm-sync--get-main-events-func nil)
+(defvar pkm-sync-add-event-func nil)
+(defvar pkm2-device-name nil)
+(defun pkm2--sync-add-event (event)
+  (when (functionp pkm-sync-add-event-func)
+    (funcall pkm-sync-add-event-func event) ))
+
+
+(defun pkm-sync--apply-remote-events (remote-events no-new-events)
+  (dolist (event remote-events)
+    (pcase (plist-get event :action)
+      ('delete (pcase (plist-get event :what)
+                 ('kvd-link
+                  (pkm2--db-delete-link-between-node-and-kvd
+                   (plist-get (plist-get event :data ) :id)
+                   (plist-get (plist-get event :data ) :type)
+                   no-new-events))
+                 ('node (pkm2--db-delete-node
+                         (plist-get (plist-get event :data ) :id)
+                         no-new-events))
+                 ('nodes-link (pkm2--db-delete-link-between-nodes
+                              (plist-get (plist-get event :data ) :id)
+                              no-new-events))
+                 ('kvd (error "Syncing kvd delete not yet implemented"))))
+      ('archive (pcase (plist-get event :what)
+                  ('kvd-link (pkm2-db-archive-link-between-node-and-kvd
+                              (plist-get (plist-get event :data )  :id)
+                              (plist-get (plist-get event :data )  :type)
+                              (plist-get (plist-get event :data )  :timestamp)
+                              no-new-events))
+                  ('node (error "Syncing node archive not yet implemented"))
+                  ('nodes-link (error "Syncing node link archive not yet implemented"))
+                  ('kvd (error "Syncing kvd archive not yet implemented"))))
+      ('insert (pcase (plist-get event :what)
+                 ('kvd-link (pkm2--db-insert-link-between-node-and-kvd
+                             (plist-get (plist-get event :data )  :node-id)
+                             (plist-get (plist-get event :data )  :kvd-id)
+                             (plist-get (plist-get event :data )  :timestamp)
+                             (plist-get (plist-get event :data )  :type)
+                             (plist-get (plist-get event :data )  :context-node-id)
+                             (plist-get (plist-get event :data )  :is-archive)
+                             no-new-events))
+                 ('node (pkm2--db-insert-node
+                         (plist-get (plist-get event :data )  :content)
+                         (plist-get (plist-get event :data )  :timestamp)
+                         no-new-events))
+                 ('nodes-link (pkm2--db-insert-link-between-nodeA-and-nodeB
+                              (plist-get (plist-get event :data )  :type)
+                              (plist-get (plist-get event :data )  :node-a-id)
+                              (plist-get (plist-get event :data )  :node-b-id)
+                              (plist-get (plist-get event :data )  :timestamp)
+                              (plist-get (plist-get event :data )  :context-node-id)
+                              no-new-events))
+                 ('kvd (pkm2--db-insert-kvd
+                        (plist-get (plist-get event :data )  :key)
+                        (plist-get (plist-get event :data )  :value)
+                        (plist-get (plist-get event :data )  :timestamp)
+                        (plist-get (plist-get event :data )  :type)
+                        no-new-events))))
+      ('update (pcase (plist-get event :what)
+                 ('node (pkm2--db-update-node
+                         (plist-get (plist-get event :data )  :node-id)
+                         (plist-get (plist-get event :data )  :new-content)
+                         (plist-get (plist-get event :data )  :timestamp)
+                         no-new-events))
+                 ('kvd (error "Syncing kvd update not yet implemented")))))))
+
+
+(defun pkm-sync-on-main ()
+  "Sync pkm databases between two devices."
+  (interactive)
+  (let* ((active-sync-db-file (make-temp-file "pkm-sync-db"))
+         (pkm2-database-connection (progn
+                                     (copy-file pkm2-database-file-path active-sync-db-file t)
+                                     (sqlite-open active-sync-db-file)))
+         (remote-events (funcall pkm-sync--get-remote-events-func)))
+    (pkm-sync--apply-remote-events remote-events nil)
+    (sqlite-close pkm2-database-connection)
+    (copy-file active-sync-db-file pkm2-database-file-path t)
+    (sqlite-open pkm2-database-file-path)))
+
+(defun pkm-sync-on-remote ()
+  (let* ((saved-db-file-path (concat pkm2-database-file-path ".bak"))
+         (active-sync-db-file (make-temp-file "pkm-sync-db"))
+         (pkm2-database-connection (progn
+                                     (copy-file saved-db-file-path active-sync-db-file t)
+                                     (sqlite-open active-sync-db-file)))
+         (main-events (funcall pkm-sync--get-main-events-func))
+         (no-new-events t))
+    (pkm-sync--apply-remote-events main-events no-new-events)
+    (sqlite-close pkm2-database-connection)
+    (copy-file active-sync-db-file pkm2-database-file-path t)
+    (copy-file pkm2-database-file-path saved-db-file-path t)
+    (sqlite-open pkm2-database-file-path)))
+
+(defun pkm-sync ()
+  (setq pkm2-database-connection
+        (if (equal pkm2-device-name "main")
+            (pkm-sync-on-main)
+          (pkm-sync-on-remote)) ))
 (defun pkm2-node-has-key-value (node key value)
   "Check if NODE has KEY VALUE kvd.
 VAlue can be a number, string, or list of numbers or strings."
@@ -563,6 +796,7 @@ Returns output in two formats:
                            :created_at (plist-get link-data "created_at" #'equal)
                            :is_archive (plist-get link-data "is_archive" #'equal)
                            :context (plist-get link-data "context" #'equal))))
+
 (defun pkm2--db-query-get-kvds-for-node-with-id (id &optional allow-archive)
   ; TODO test
   (let* ((query (concat
@@ -1486,7 +1720,6 @@ Commit everything.
 (pkm2--register-link-label 'HIERARCHICAL "instance")
 (pkm2--register-link-label 'HIERARCHICAL "type-of")
 
-
 ;;; db cleaner
 (defun pkm2--db-find-kvds-with-no-links ()
   (let* ((query (concat "SELECT kvd.id FROM key_value_data_integer kvd "
@@ -1506,9 +1739,6 @@ Commit everything.
              (delete-query (format "DELETE FROM %s WHERE id IN (%s)" data-table select-query)))
         (sqlite-execute pkm2-database-connection delete-query)))))
 
-(defvar pkm2--sync-event-list '())
-(defvar pkm2--sync-device-id nil)
-(defun pkm2--sync-add-event (event)
-  (setq pkm2--sync-event-list (-concat pkm2--sync-event-list (list (plist-put event :device-id pkm2--sync-device-id)))))
+
 
 (provide 'pkm-new-core)
