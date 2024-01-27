@@ -815,8 +815,6 @@
                                           section `(after . ,parent-browse-node))))
 
 
-
-
 (defun pkm2-browse-demote-node-at-point ()
   "Move node lower in hierarchy."
   ;; TODO TEST
@@ -875,44 +873,19 @@
          (ewoc-node (pkm2-browse-node-ewoc-node browse-node))
          (base-level (pkm2-browse-node-level browse-node))
          (section (pkm2-browse-node-section browse-node))
-         (browse-nodes
-          (-map (lambda (id)
-                  (let* ((pkm-node (pkm2--db-query-get-node-with-id id))
-                         (b-n-id (pkm-random-id))
-                         (b-n (make-pkm2-browse-node :pkm-node pkm-node :section section :browse-id b-n-id)))
-                    (push (cons b-n-id b-n) pkm2-browse--browse-nodes-alist)
-                    b-n))
-                nodes-db-ids))
-         (nodes-in-hierarchy  (pkm2-browse--organize-into-hierarchies browse-nodes))
-         (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (pkm2-db-node-id it)))
-         (browse-node (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id db-id) :section section))
+         (pkm-nodes (-map #'pkm2--db-query-get-node-with-id nodes-db-ids))
+         (browse-nodes (when pkm-nodes (--> (pkm2-browse-hierarchy-organize-as-hierarchy2 pkm-nodes)
+                                            (-map (lambda (branch)
+                                                    (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree branch section base-level)) it))))
          (inhibit-read-only t))
-    (-each browse-nodes
-      (lambda (b-n)
-        (setf (pkm2-browse-node-level b-n)
-              (+ (pkm2-browse-node-level b-n) base-level 1))))
-    (setf (pkm2-browse-node-children browse-node) nodes-in-hierarchy)
-    (pkm2--browse-remove-node browse-id)
-    (pkm2-browse--insert-browse-node browse-node `(after . ,ewoc-node))))
+    (when (length> browse-nodes 1)
+      (error "Children should be in a hierarchy with only one root."))
+    (-each browse-nodes (lambda (b-n-to-insert)
+                          (pkm2-browse-insert-node-in-hierarchy b-n-to-insert browse-node nil section 'first)))))
 
 (defun pkm2--browse-see-node-as-child (browse-id child-db-id)
-  (let* ((browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
-         (ewoc-node (pkm2-browse-node-ewoc-node browse-node))
-         (base-level (pkm2-browse-node-level browse-node))
-         (section (pkm2-browse-node-section browse-node))
-         (child-browse-id (pkm-random-id))
-         (child-browse-node
-          (let* ((pkm-node (pkm2--db-query-get-node-with-id child-db-id))
-                 (b-n (make-pkm2-browse-node :pkm-node pkm-node :section section
-                                             :browse-id child-browse-id
-                                             :parent browse-id :level (+ base-level 1))))
-            (push (cons child-browse-id b-n) pkm2-browse--browse-nodes-alist)
-            b-n))
-         (browse-node-children (pkm2-browse-node-children browse-node))
-         (b-n-children-new (-concat (list child-browse-id ) browse-node-children))
-         (inhibit-read-only t))
-    (setf (pkm2-browse-node-children browse-node) b-n-children-new)
-    (pkm2-browse--insert-browse-node child-browse-node `(after . ,ewoc-node))))
+  (pkm2--browse-see-nodes-as-children browse-id (list child-db-id)))
+
 
 (defun pkm--browse-capture-node-as-child-of-node-at-point ()
   (interactive)
