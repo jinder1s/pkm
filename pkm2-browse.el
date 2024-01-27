@@ -583,27 +583,37 @@
   (interactive)
   (pkm2--browse-see-children (pkm2--browse-get-browse-node-id-at-point)))
 
-
 (defun pkm2--browse-see-children (browse-id &optional level-children)
   (let* ((browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
          (ewoc-node (pkm2-browse-node-ewoc-node browse-node))
          (base-level (pkm2-browse-node-level browse-node))
          (section (pkm2-browse-node-section browse-node))
+         (parent-id (pkm2-browse-node-parent browse-node))
+         (parent-browse-node (assoc-default parent-id pkm2-browse--browse-nodes-alist))
          (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (pkm2-db-node-id it)))
          (level-children (or level-children (read (completing-read "How many levels of children would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
          (query-spec `((:or db-node (:db-id ,db-id )) (:convert-or convert-to-children (:levels ,level-children) )) )
-         (nodes-ids (pkm2--browse-get-query-nodes query-spec))
-         (browse-nodes
-          (-map (lambda (id)
-                  (make-pkm2-browse-node :pkm-node (pkm2--db-query-get-node-with-id id)  :section section)) nodes-ids) )
-         (nodes-in-hierarchy  (pkm2-browse--organize-into-hierarchies browse-nodes))
+         (pkm-nodes (--> (pkm2--browse-get-query-nodes query-spec)
+                         (-map #'pkm2--db-query-get-node-with-id it)))
+
+         (browse-nodes (when pkm-nodes (--> (pkm2-browse-hierarchy-organize-as-hierarchy2 pkm-nodes)
+                                            (-map (lambda (branch)
+                                                    (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree branch section base-level)) it))))
+         (root-browse-id (progn
+                           (when (length> browse-nodes 1)
+                             (error "Children should be in a hierarchy with only one root."))
+                           (pkm2-browse-node-browse-id (car browse-nodes)) ))
          (inhibit-read-only t))
-    (-each browse-nodes
-      (lambda (b-n)
-        (setf (pkm2-browse-node-level b-n) (+ (pkm2-browse-node-level b-n) base-level))))
-    (pkm2--browse-remove-node browse-id)
-    (-each nodes-in-hierarchy (lambda (browse-node)
-                                (pkm2-browse--insert-browse-node browse-node `(after . ,ewoc-node))))))
+    (setf (pkm2-browse-node-children parent-browse-node)
+          (-map (lambda (children-id)
+                  (if (equal children-id browse-id) root-browse-id children-id))
+                (pkm2-browse-node-children parent-browse-node)))
+
+    (-each browse-nodes (lambda (browse-node)
+                          (setf (pkm2-browse-node-parent browse-node) parent-id)
+                          ;; (setf (pkm2-browse-node-children parent-browse-node) (-concat (pkm2-browse-node-children parent-browse-node) (list (pkm2-browse-node-browse-id browse-node))))
+                          (pkm2-browse--insert-browse-node browse-node `(after . ,ewoc-node))))
+    (pkm2--browse-remove-node browse-id)))
 
 
 (defun pkm2--browse-see-parents (browse-id &optional db-id level-parents)
