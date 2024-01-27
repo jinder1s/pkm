@@ -599,41 +599,60 @@
          (browse-nodes (when pkm-nodes (--> (pkm2-browse-hierarchy-organize-as-hierarchy2 pkm-nodes)
                                             (-map (lambda (branch)
                                                     (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree branch section base-level)) it))))
-         (root-browse-id (progn
-                           (when (length> browse-nodes 1)
-                             (error "Children should be in a hierarchy with only one root."))
-                           (pkm2-browse-node-browse-id (car browse-nodes)) ))
          (inhibit-read-only t))
-    (setf (pkm2-browse-node-children parent-browse-node)
-          (-map (lambda (children-id)
-                  (if (equal children-id browse-id) root-browse-id children-id))
-                (pkm2-browse-node-children parent-browse-node)))
 
-    (-each browse-nodes (lambda (browse-node)
-                          (setf (pkm2-browse-node-parent browse-node) parent-id)
-                          ;; (setf (pkm2-browse-node-children parent-browse-node) (-concat (pkm2-browse-node-children parent-browse-node) (list (pkm2-browse-node-browse-id browse-node))))
-                          (pkm2-browse--insert-browse-node browse-node `(after . ,ewoc-node))))
+    (when (length> browse-nodes 1)
+      (error "Children should be in a hierarchy with only one root."))
+    (pkm2-browse-insert-node-in-hierarchy (car browse-nodes) parent-browse-node nil section (or (save-excursion
+                                                                                                  (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
+                                                                                                  (--> (pkm2--browse-section-previous-sibling-node)
+                                                                                                       (when it (list 'after it))))
+                                                                                                (save-excursion
+                                                                                                  (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
+                                                                                                  (--> (pkm2--browse-section-next-sibling-node)
+                                                                                                       (when it (list 'before it))))
+                                                                                                'first))
     (pkm2--browse-remove-node browse-id)))
 
 
-(defun pkm2--browse-see-parents (browse-id &optional db-id level-parents)
-  "Very hacky and not very well done. Needs to be fixed."
-  (error "Function hasn't yet been setup")
+(defun pkm2--browse-see-parents (browse-id &optional level-parents)
   (let* ((browse-node (assoc-default browse-id pkm2-browse--browse-nodes-alist))
          (ewoc-node (pkm2-browse-node-ewoc-node browse-node))
+         (previous-sibling-browse-node (save-excursion
+                                         (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
+                                         (pkm2--browse-section-previous-sibling-node)))
+         (next-sibling-browse-node (save-excursion
+                                     (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
+                                     (pkm2--browse-section-previous-sibling-node)))
          (base-level (pkm2-browse-node-level browse-node))
          (section (pkm2-browse-node-section browse-node))
+         (parent-id (pkm2-browse-node-parent browse-node))
+         (parent-browse-node (assoc-default parent-id pkm2-browse--browse-nodes-alist))
          (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (pkm2-db-node-id it)))
          (level-parents (or level-parents (read (completing-read "How many levels of parents would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
-         (pkm-query `((:or db-node (:db-id ,db-id))
-                      (:convert-and convert-to-parents (:levels ,level-parents :link-labels ("sub") ))))
+         (query-spec `((:or db-node (:db-id ,db-id)) (:convert-or convert-to-parents (:levels ,level-parents))))
 
-         (query (pkm2--compile-full-db-query pkm-query))
-         (query-results (sqlite-select pkm2-database-connection query))
+         (pkm-nodes (--> (pkm2--browse-get-query-nodes query-spec)
+                         (-map #'pkm2--db-query-get-node-with-id it)))
 
+         (browse-nodes (when pkm-nodes (--> (pkm2-browse-hierarchy-organize-as-hierarchy2-parents pkm-nodes)
+                                            (-map (lambda (branch)
+                                                    (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree branch section base-level)) it))))
          (inhibit-read-only t))
-    (pkm2--browse-remove-node browse-id)
-    ))
+    (when (length> browse-nodes 1)
+      (error "Children should be in a hierarchy with only one root."))
+
+    (pkm2-browse-insert-node-in-hierarchy (car browse-nodes) parent-browse-node nil section (or (save-excursion
+                                                                                                  (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
+                                                                                                  (--> (pkm2--browse-section-previous-sibling-node)
+                                                                                                       (when it (list 'after it))))
+                                                                                                (save-excursion
+                                                                                                  (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
+                                                                                                  (--> (pkm2--browse-section-next-sibling-node)
+                                                                                                       (when it (list 'before it))))
+                                                                                                'first))
+    (pkm2--browse-remove-node browse-id)))
+
 
 
 (defun pkm2--browse-see-parents-at-point ()
@@ -1028,6 +1047,48 @@
                                             (nth index pkm-nodes)) it))))
     (-map (lambda (parentless-pkm-node) (pkm2-browse-hierarchy-organize-children parentless-pkm-node pkm-nodes)) parentless-pkm-nodes)))
 
+
+
+(defun pkm2-browse-hierarchy-organize-parent (pkm-node pkm-nodes)
+  (let* ((parents-links (pkm2-node-parent-links pkm-node))
+         (pkm-node-parent-node-db-ids (-map #'pkm2--link-get-link-parent-id parents-links))
+         (present-parents (-map (lambda (p-id)
+                                   (-find (lambda (p-n)
+                                            (equal (--> (pkm2-node-db-node p-n)
+                                                        (pkm2-db-node-id it))
+                                                   p-id))
+                                          pkm-nodes))
+                                 pkm-node-parent-node-db-ids))
+         (present-parents-organized (-map (lambda (present-parent)
+                                             (when present-parent
+                                               (pkm2-browse-hierarchy-organize-parent present-parent pkm-nodes) ))
+                                           present-parents) )
+         (present-parents-organized-with-links (-non-nil (-map-indexed
+                                                           (lambda (index parent)
+                                                             (when parent
+                                                               (plist-put parent :parent-link (nth index parents-links))))
+                                                           present-parents-organized))))
+
+
+    `(:node ,pkm-node :parents ,present-parents-organized-with-links)))
+
+(defun pkm2-browse-hierarchy-organize-as-hierarchy2-parents (pkm-nodes)
+  (let* ((children-links (-map #'pkm2-node-children-links pkm-nodes))
+         (children-db-ids-list (-map (lambda (p-links)
+                                     (-map #'pkm2--link-get-link-child-id p-links))
+                                   children-links))
+         (db-nodes (-map #'pkm2-node-db-node pkm-nodes))
+         (db-ids (-map #'pkm2-db-node-id db-nodes))
+         (childless-pkm-nodes (--> (-map-indexed (lambda (index c-ids)
+                                                    (cond ((not c-ids) index)
+                                                          ((not (-any? (lambda (c-id)
+                                                                         (member c-id db-ids)) c-ids))
+                                                           index)))
+                                                  children-db-ids-list)
+                                    (-non-nil it)
+                                    (-map (lambda (index)
+                                            (nth index pkm-nodes)) it))))
+    (-map (lambda (parentless-pkm-node) (pkm2-browse-hierarchy-organize-parent parentless-pkm-node pkm-nodes)) childless-pkm-nodes)))
 
 (defun pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree (branch section level)
   (let* ((node (plist-get branch :node))
