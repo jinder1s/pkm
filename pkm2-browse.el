@@ -122,19 +122,18 @@
     ;; (display-buffer-in-side-window (get-buffer-create buffer-name) '((side . right)))
     (with-current-buffer buffer-name
       ;; (set-window-dedicated-p (get-buffer-window buffer-name) t)
-      (+word-wrap-mode )                ; TODO remove this doom specific function
+      (+word-wrap-mode )               ; TODO remove this doom specific function
       (pkm2-browse-mode)
       (tooltip-mode)
       (erase-buffer)
+      (setq pkm2-browse-ewoc nil)
       (setq pkm2-browse-ewoc (ewoc-create #'pkm-browse--insert-ewoc-item nil nil))
       (setq pkm2-browse--browse-nodes-alist ())
       (setq pkm2-browse--browse-sections-alist ())
       (setq pkm2-browse-buffer-states-equal-plist (plist-put pkm2-browse-buffer-states-equal-plist buffer-name buffer-state #'equal))
-      (-each-indexed
+      (-each
           (pkm2-browse-buffer-state-sections buffer-state)
-        (lambda (index section)
-          (when (> index 0))
-          (pkm2-browse--insert-section section)))
+        #'pkm2-browse--insert-section)
       (setq buffer-read-only t) )
     (display-buffer-same-window (get-buffer-create buffer-name) nil)))
 
@@ -180,6 +179,7 @@
 
 
 (defun pkm2-browse--insert-section (section)
+  (when (not pkm2-browse-ewoc) (error (format "No ewoc, %S" (buffer-name) )))
   (let* ((nodes-spec (pkm2-browse-section-spec section))
          (show-as-hierarchy (pkm2-browse-section-show-as-hierarchy section))
          (pkm-nodes (--> (pkm2--browse-get-section-nodes-db-ids nodes-spec)
@@ -197,10 +197,12 @@
                                 browse-nodes) )
          (section-id (or (pkm2-browse-section-section-id section)
                          (setf (pkm2-browse-section-section-id section) (pkm-random-id))))
-         (section-start-ewoc (when pkm-nodes (or  (pkm2-browse-section-start-ewoc-node section)
-                                  (ewoc-enter-last pkm2-browse-ewoc (format "---%s---" (or (pkm2-browse-section-name section) "section") )) ) ))
-         (section-end-ewoc (when pkm-nodes (or (pkm2-browse-section-end-ewoc-node section)
-                               (ewoc-enter-after pkm2-browse-ewoc section-start-ewoc "\n")) )))
+         (section-start-ewoc (when pkm-nodes (or
+                                              (pkm2-browse-section-start-ewoc-node section)
+                                              (ewoc-enter-last pkm2-browse-ewoc (format "---%s---" (or (pkm2-browse-section-name section) "section") )) ) ))
+         (section-end-ewoc (when pkm-nodes (or
+                                            (pkm2-browse-section-end-ewoc-node section)
+                                            (ewoc-enter-after pkm2-browse-ewoc section-start-ewoc "\n")) )))
     (-each sorted-sorted-nodes (lambda (b-n)
                                  (pkm2-browse--insert-browse-node b-n `(before . ,section-end-ewoc))))
 
@@ -1251,7 +1253,8 @@
                                                          (read (assoc-default chosen-section completing-read-choices) ))))
          (new-sections (-concat sections (list new-section))))
     (setf (pkm2-browse-buffer-state-sections buffer-state) new-sections)
-    (pkm2--browse buffer-state buffer-name)))
+    (with-current-buffer buffer-name
+      (pkm2-browse--insert-section new-section))))
 
 (defun pkm2-browse-save-browse-spec (&optional buffer-name)
   (interactive)
