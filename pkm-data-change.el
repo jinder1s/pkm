@@ -50,35 +50,41 @@
     (sqlite-execute db query)))
 
 (defun swap-link-noda-a-and-node-b ()
-  (sqlite-execute pkm2-database-connection "UPDATE nodes_link SET node_a = node_b, node_b = node_a; ")
-  )
+  (sqlite-execute pkm2-database-connection "UPDATE nodes_link SET node_a = node_b, node_b = node_a; "))
 
 (defun update-link-type-log-to-sub ()
-
-  (sqlite-execute pkm2-database-connection "UPDATE nodes_link  SET type = 'sub' WHERE type = 'log';")
-  )
+  (sqlite-execute pkm2-database-connection "UPDATE nodes_link  SET type = 'sub' WHERE type = 'log';"))
 
 
 (defun move-data-over ()
-  (sqlite-execute pkm2-database-connection "ATTACH database '/USERS/msingh15/.doom.d/test_pkm.sqlite3' as old_db")
+  ;; (sqlite-execute pkm2-database-connection "ATTACH database '/USERS/msingh15/.doom.d/pkm/pkm2_database.sqlite3' as old_db;")
 
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO node (id, content, created_at, modified_at)  SELECT ROWID, text, created_at, modified_at FROM old_db.node;")
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO nodes_link (id, type, created_at, node_a, node_b)  SELECT ROWID, type, created_at, node_a, node_b FROM old_db.nodes_link;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO node (id, content, created_at, modified_at)  SELECT id, content, created_at, modified_at FROM old_db.node;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO nodes_link (id, type, created_at, node_a, node_b)  SELECT id, type, created_at, node_a, node_b FROM old_db.nodes_link;")
 
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data;")
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_integer (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_integer;")
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_real (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_real;")
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_blob (id, created_at, key, value)  SELECT ROWID, created_at, key, value FROM old_db.key_value_data_blob;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data (id, created_at, key, value)  SELECT id, created_at, key, value FROM old_db.key_value_data;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_integer (id, created_at, key, value)  SELECT id, created_at, key, value FROM old_db.key_value_data_integer;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_real (id, created_at, key, value)  SELECT id, created_at, key, value FROM old_db.key_value_data_real;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO key_value_data_blob (id, created_at, key, value)  SELECT id, created_at, key, value FROM old_db.key_value_data_blob;")
 
 
 
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link;")
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_integer (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_integer;")
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_real (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_real;")
-  ; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_blob (id, created_at, node, key_value_data)  SELECT ROWID, created_at, node, key_value_data FROM old_db.data_or_properties_link_blob;")
-  (sqlite-execute pkm2-database-connection "DETACH database 'old_db';")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link (id, created_at, node, key_value_data)  SELECT id, created_at, node, key_value_data FROM old_db.data_or_properties_link;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_integer (id, created_at, node, key_value_data)  SELECT id, created_at, node, key_value_data FROM old_db.data_or_properties_link_integer;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_real (id, created_at, node, key_value_data)  SELECT id, created_at, node, key_value_data FROM old_db.data_or_properties_link_real;")
+  ;; (sqlite-execute pkm2-database-connection "INSERT INTO data_or_properties_link_blob (id, created_at, node, key_value_data)  SELECT id, created_at, node, key_value_data FROM old_db.data_or_properties_link_blob;")
+  ;; (sqlite-execute pkm2-database-connection "DETACH database 'old_db';")
   )
 
+(defun reset-search-table ()
+  (sqlite-execute pkm2-database-connection "DROP TABLE IF EXISTS search_node;")
+  (sqlite-execute pkm2-database-connection "CREATE VIRTUAL TABLE IF NOT EXISTS search_node USING fts5(
+   node,
+   content,
+   tokenize=trigram);")
+  (sqlite-execute pkm2-database-connection "INSERT INTO search_node (node, content) SELECT id, content FROM node;")
+
+  )
 (defun add-column-to-table (database table column-name column-type)
   (--> (format "ALTER TABLE %s ADD %s %s;" table column-name column-type)
        (sqlite-execute database it)))
@@ -89,5 +95,17 @@
   (add-column-to-table pkm2-database-connection "data_or_properties_link_integer" "is_archive" "INTEGER")
   (add-column-to-table pkm2-database-connection "data_or_properties_link_real" "is_archive" "INTEGER")
   (add-column-to-table pkm2-database-connection "data_or_properties_link_blob" "is_archive" "INTEGER"))
+
+(defun add-shadow-id-table ()
+  (add-column-to-table pkm2-database-connection "node" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "key_value_data" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "key_value_data_integer" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "key_value_data_real" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "key_value_data_blob" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "nodes_link" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "data_or_properties_link" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "data_or_properties_link_integer" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "data_or_properties_link_real" "shadow_id" "TEXT")
+  (add-column-to-table pkm2-database-connection "data_or_properties_link_blob" "shadow_id" "TEXT"))
 
 (provide 'pkm-data-change)
