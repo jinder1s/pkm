@@ -274,8 +274,8 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   FOREIGN KEY(key_value_data) REFERENCES key_value_data_blob(id) ON DELETE CASCADE);" )
   (sqlite-execute database_handle "CREATE VIRTUAL TABLE IF NOT EXISTS search_node USING fts5(
    node,
-   content
-   );")
+   content,
+   tokenize=trigram);")
   (sqlite-execute database_handle
                   "CREATE TRIGGER IF NOT EXISTS insert_node_fts
                       after INSERT on node
