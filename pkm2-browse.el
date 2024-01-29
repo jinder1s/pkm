@@ -608,11 +608,11 @@
     (pkm2-browse-insert-node-in-hierarchy (car browse-nodes) parent-browse-node nil section (or (save-excursion
                                                                                                   (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
                                                                                                   (--> (pkm2--browse-section-previous-sibling-node)
-                                                                                                       (when it (list 'after it))))
+                                                                                                       (when it (cons 'after it))))
                                                                                                 (save-excursion
                                                                                                   (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
                                                                                                   (--> (pkm2--browse-section-next-sibling-node)
-                                                                                                       (when it (list 'before it))))
+                                                                                                       (when it (cons 'before it))))
                                                                                                 'first))
     (pkm2--browse-remove-node browse-id)))
 
