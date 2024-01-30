@@ -647,11 +647,11 @@
     (pkm2-browse-insert-node-in-hierarchy (car browse-nodes) parent-browse-node nil section (or (save-excursion
                                                                                                   (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
                                                                                                   (--> (pkm2--browse-section-previous-sibling-node)
-                                                                                                       (when it (list 'after it))))
+                                                                                                       (when it (cons 'after it))))
                                                                                                 (save-excursion
                                                                                                   (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
                                                                                                   (--> (pkm2--browse-section-next-sibling-node)
-                                                                                                       (when it (list 'before it))))
+                                                                                                       (when it (cons 'before it))))
                                                                                                 'first))
     (pkm2--browse-remove-node browse-id)))
 
@@ -1245,12 +1245,16 @@
          (buffer-state (plist-get pkm2-browse-buffer-states-equal-plist buffer-name #'equal))
          (sections (pkm2-browse-buffer-state-sections buffer-state))
          (completing-read-choices (-concat (list '("NEW" . "NEW") ) pkm2-browse-saved-named-section-specs))
-         (chosen-section (if (length> completing-read-choices 1)
+         (chosen-section-name (if (length> completing-read-choices 1)
                              (completing-read "Which section would you like to add: " completing-read-choices)
                            "NEW"))
+
+         (chosen-section (assoc-default chosen-section-name completing-read-choices))
          (new-section (make-pkm2-browse-section :spec  (if (equal "NEW" chosen-section)
                                                            (pkm2--create-section-spec)
-                                                         (read (assoc-default chosen-section completing-read-choices) ))))
+                                                         (cond ((stringp chosen-section) (read chosen-section))
+                                                               ((listp chosen-section) chosen-section)
+                                                               (t (error "Something went wrong with chosen-section: %S" chosen-section))))))
          (new-sections (-concat sections (list new-section))))
     (setf (pkm2-browse-buffer-state-sections buffer-state) new-sections)
     (with-current-buffer buffer-name
