@@ -49,7 +49,7 @@
 
 
 ;;;; Persistent buffer
-(defvar pkm2-browse-buffer "*pkm2-browse*"
+(defvar pkm2-browse-buffer "pkm2-browse"
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
 (defvar pkm2-browse-buffer-states-equal-plist ())
 
@@ -77,6 +77,7 @@
                                    (completing-read-multiple "Which sections would you like to add to this section: "
                                                              completing-read-choices)
                                  (list "NEW")))
+              (buffer-name (format "*%s-%s*" pkm2-browse-buffer (apply #'concat chosen-sections) ))
               (sections-specs (-non-nil (-map (lambda (chosen-section)
                                                 (cond ((equal "NEW" chosen-section) (pkm2--create-section-spec))
                                                       ((equal "LAST" chosen-section) nil)
@@ -92,7 +93,7 @@
               (sections (-map (lambda (sections-spec)
                                 (make-pkm2-browse-section :spec  sections-spec :sorter #'pkm2-sort-by-created-on))
                               sections-specs)))
-         (pkm2--browse (make-pkm2-browse-buffer-state :sections sections) nil)))
+         (pkm2--browse (make-pkm2-browse-buffer-state :sections sections) buffer-name)))
     (3 (let* ((query-create-callback (lambda (browse-spec)
                                        (let* ((sections (-map (lambda (section-spec)
                                                                 (make-pkm2-browse-section :spec  section-spec :sorter #'pkm2-sort-by-created-on))
@@ -100,23 +101,25 @@
                                               (browse-state (make-pkm2-browse-buffer-state :sections sections)))
                                          (pkm2--browse browse-state nil)))))
          (pkm-compile-create-browse-spec query-create-callback)))
-    (2 (let* ((browse-spec (--> (completing-read "Which Browse spec?" pkm2-browse-saved-named-browse-specs )
-                                (assoc-default it pkm2-browse-saved-named-browse-specs)
-                                (cond ((stringp it) (read it))
-                                      ((listp it) it))))
+    (2 (let* ((browse-spec-name (completing-read "Which Browse spec?" pkm2-browse-saved-named-browse-specs ))
+              (browse-spec (--> (assoc-default browse-spec-name pkm2-browse-saved-named-browse-specs)
+                                 (cond ((stringp it) (read it))
+                                       ((listp it) it))))
+
+              (buffer-name (format "*%s-%s*" pkm2-browse-buffer browse-spec-name ))
               (sections (-map (lambda (section-spec)
-                                 (make-pkm2-browse-section :spec section-spec
-                                                           :name (plist-get section-spec :name)
-                                                           :hidden (plist-get section-spec :hidden)
-                                                           :sorter (or (plist-get section-spec :sorter)
-                                                                       #'pkm2-sort-by-created-on)))
+                                (make-pkm2-browse-section :spec section-spec
+                                                          :name (plist-get section-spec :name)
+                                                          :hidden (plist-get section-spec :hidden)
+                                                          :sorter (or (plist-get section-spec :sorter)
+                                                                      #'pkm2-sort-by-created-on)))
                               (plist-get browse-spec :sections)))
               (browse-state (make-pkm2-browse-buffer-state :sections sections)))
-         (pkm2--browse browse-state nil)))))
+         (pkm2--browse browse-state buffer-name)))))
 
 
 (defun pkm2--browse (buffer-state &optional buffer-name)
-  (let* ((buffer-name (or buffer-name (format "%s %s" pkm2-browse-buffer (pkm-random-id))))
+  (let* ((buffer-name (or buffer-name (format "*%s-%s*" pkm2-browse-buffer (pkm-random-id))))
          (buffer (get-buffer-create buffer-name))
          (inhibit-read-only t))
     ;; (display-buffer-in-side-window (get-buffer-create buffer-name) '((side . right)))
@@ -135,6 +138,7 @@
           (pkm2-browse-buffer-state-sections buffer-state)
         #'pkm2-browse--insert-section)
       (setq buffer-read-only t) )
+    (persp-add-buffer  buffer-name)
     (display-buffer-same-window (get-buffer-create buffer-name) nil)))
 
 
