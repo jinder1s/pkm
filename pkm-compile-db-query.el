@@ -48,10 +48,20 @@
           nodes-table))
         ((and (or (plist-get type-values :after) (plist-get type-values :before)) (plist-get type-values :key) (plist-get type-values :data-type)) ; TODO Test
          (let* ((after (plist-get type-values :after))
+                (after (-map (lambda (list-item)
+                               (if (equal 'week list-item)
+                                   'woy
+                                 list-item))
+                             after))
                 (after (if (and (plistp after) (length> after 1))
                            (truncate (ts-unix (apply #'ts-adjust (-concat after (list (ts-now))))))
                          after))
                 (before (plist-get type-values :before))
+                (before (-map (lambda (list-item)
+                               (if (equal 'week list-item)
+                                   'woy
+                                 list-item))
+                             before))
                 (before  (if (and (plistp before) (length> before 1))
                              (truncate (ts-unix (apply #'ts-adjust (-concat before (list (ts-now))))))
                            before)))
