@@ -630,6 +630,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 (defvar pkm-sync--get-remote-events-func nil)
 (defvar pkm-sync--get-main-events-func nil)
 (defvar pkm-sync-add-event-func nil)
+(defvar pkm-sync-log-events-applied-func nil)
 (defvar pkm2-device-name nil)
 (defun pkm2--sync-add-event (event)
   (when (functionp pkm-sync-add-event-func)
@@ -698,18 +699,21 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 
 (defun pkm-sync-on-main ()
   "Sync pkm databases between two devices."
-  (interactive)
+  (message "Syncing on main")
   (let* ((active-sync-db-file (make-temp-file "pkm-sync-db"))
          (pkm2-database-connection (progn
                                      (copy-file pkm2-database-file-path active-sync-db-file t)
                                      (sqlite-open active-sync-db-file)))
          (remote-events (funcall pkm-sync--get-remote-events-func)))
-    (pkm-sync--apply-remote-events remote-events nil)
+    (-each remote-events (lambda (device-events)
+                           (pkm-sync--apply-remote-events (cdr device-events) nil)))
+    (funcall pkm-sync-log-events-applied-func remote-events)
     (sqlite-close pkm2-database-connection)
     (copy-file active-sync-db-file pkm2-database-file-path t)
     (sqlite-open pkm2-database-file-path)))
 
 (defun pkm-sync-on-remote ()
+  (message "Syncing on remote")
   (let* ((saved-db-file-path (concat pkm2-database-file-path ".bak"))
          (active-sync-db-file (make-temp-file "pkm-sync-db"))
          (pkm2-database-connection (progn
@@ -718,6 +722,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          (main-events (funcall pkm-sync--get-main-events-func))
          (no-new-events t))
     (pkm-sync--apply-remote-events main-events no-new-events)
+    (funcall pkm-sync-log-events-applied-func main-events)
     (sqlite-close pkm2-database-connection)
     (copy-file active-sync-db-file pkm2-database-file-path t)
     (copy-file pkm2-database-file-path saved-db-file-path t)
@@ -727,7 +732,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   (setq pkm2-database-connection
         (if (equal pkm2-device-name "main")
             (pkm-sync-on-main)
-          (pkm-sync-on-remote)) ))
+          (pkm-sync-on-remote))))
 (defun pkm2-node-has-key-value (node key value)
   "Check if NODE has KEY VALUE kvd.
 VAlue can be a number, string, or list of numbers or strings."
@@ -1738,7 +1743,5 @@ Commit everything.
                                    "WHERE link.node IS NULL"))
              (delete-query (format "DELETE FROM %s WHERE id IN (%s)" data-table select-query)))
         (sqlite-execute pkm2-database-connection delete-query)))))
-
-
 
 (provide 'pkm-new-core)
