@@ -722,7 +722,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          (main-events (funcall pkm-sync--get-main-events-func))
          (no-new-events t))
     (pkm-sync--apply-remote-events main-events no-new-events)
-    (funcall pkm-sync-log-events-applied-func main-events)
+    (funcall pkm-sync-log-events-applied-func (list (cons "main" main-events ) ))
     (sqlite-close pkm2-database-connection)
     (copy-file active-sync-db-file pkm2-database-file-path t)
     (copy-file pkm2-database-file-path saved-db-file-path t)
