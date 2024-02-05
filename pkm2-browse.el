@@ -1,7 +1,6 @@
 ;;; pkm2-browse.el -*- lexical-binding: t; -*-
 
 
-(require 'persist)
 (require 'dash)
 (require 'cl-lib)
 (require 'cl-macs)
@@ -54,20 +53,29 @@
 (defvar pkm2-browse-buffer-states-equal-plist ())
 
 
-(persist-defvar pkm2-browse-saved-section-specs () "Created Section specs")
-(persist-defvar pkm2-browse-saved-named-section-specs () "Created Section specs")
-(unless  pkm2-browse-saved-section-specs (persist-load 'pkm2-browse-saved-section-specs) )
-(unless  pkm2-browse-saved-named-section-specs (persist-load 'pkm2-browse-saved-named-section-specs) )
+(defvar pkm2-browse-saved-section-specs () "Created Section specs")
+(defvar pkm2-browse-saved-named-section-specs nil "Created Section specs")
+(defvar pkm2-browse-saved-named-queries nil "Created queries")
+(defvar pkm2-browse-saved-named-browse-specs nil)
 
 
-(persist-defvar pkm2-browse-saved-named-browse-specs () "Created browse specs")
-(unless  pkm2-browse-saved-named-browse-specs (persist-load 'pkm2-browse-saved-named-browse-specs) )
 (defvar-local pkm2-browse--browse-nodes-alist ())
 (defvar-local pkm2-browse--browse-sections-alist ())
 (defvar-local pkm2-browse-ewoc nil)
 
 
 
+(defun pkm2-browse-get-section-with-name (name &optional choices)
+  (--> (assoc-default name (or choices pkm2-browse-saved-named-section-specs ))
+       (plist-put it :name name)))
+(defun pkm2-browse-convert-section-spec-to-section (section-spec)
+  (setq section-spec (cond ((stringp section-spec) (pkm2-browse-get-section-with-name section-spec))
+                                        (t section-spec)))
+  (make-pkm2-browse-section :spec section-spec
+                            :name (plist-get section-spec :name)
+                            :hidden (plist-get section-spec :hidden)
+                            :sorter (or (plist-get section-spec :sorter)
+                                        #'pkm2-sort-by-created-on)))
 
 (defun pkm2-browse (&optional numeric-prefix-argument)
   (interactive "p")
@@ -81,23 +89,23 @@
               (sections-specs (-non-nil (-map (lambda (chosen-section)
                                                 (cond ((equal "NEW" chosen-section) (pkm2--create-section-spec))
                                                       ((equal "LAST" chosen-section) nil)
-                                                      (t (--> (assoc-default chosen-section completing-read-choices)
-                                                              (cond
-                                                               ((stringp it) (read it))
-                                                               ((listp it) it))))))
+                                                      (t (pkm2-browse-get-section-with-name chosen-section completing-read-choices))))
                                               chosen-sections) ))
 
               (sections-specs (if (member "LAST" chosen-sections)
-                                  (--> (plist-get pkm2-browse-buffer-states-equal-plist pkm2-browse-buffer #'equal) (pkm2-browse-buffer-state-sections it) (-map #'pkm2-browse-section-spec it) (-concat sections-specs it))
+                                  (--> (plist-get pkm2-browse-buffer-states-equal-plist pkm2-browse-buffer #'equal)
+                                       (pkm2-browse-buffer-state-sections it)
+                                       (-map #'pkm2-browse-section-spec it)
+                                       (-concat sections-specs it))
                                 sections-specs))
               (sections (-map (lambda (sections-spec)
-                                (make-pkm2-browse-section :spec  sections-spec :sorter #'pkm2-sort-by-created-on))
+                                (pkm2-browse-convert-section-spec-to-section sections-spec))
                               sections-specs)))
          (pkm2--browse (make-pkm2-browse-buffer-state :sections sections) buffer-name)))
     (3 (let* ((query-create-callback (lambda (browse-spec)
-                                       (let* ((sections (-map (lambda (section-spec)
-                                                                (make-pkm2-browse-section :spec  section-spec :sorter #'pkm2-sort-by-created-on))
-                                                              (plist-get browse-spec :sections)))
+                                       (let* ((sections (-map
+                                                         #'pkm2-browse-convert-section-spec-to-section
+                                                         (plist-get browse-spec :sections)))
                                               (browse-state (make-pkm2-browse-buffer-state :sections sections)))
                                          (pkm2--browse browse-state nil)))))
          (pkm-compile-create-browse-spec query-create-callback)))
@@ -105,15 +113,8 @@
               (browse-spec (--> (assoc-default browse-spec-name pkm2-browse-saved-named-browse-specs)
                                  (cond ((stringp it) (read it))
                                        ((listp it) it))))
-
               (buffer-name (format "*%s-%s*" pkm2-browse-buffer browse-spec-name ))
-              (sections (-map (lambda (section-spec)
-                                (make-pkm2-browse-section :spec section-spec
-                                                          :name (plist-get section-spec :name)
-                                                          :hidden (plist-get section-spec :hidden)
-                                                          :sorter (or (plist-get section-spec :sorter)
-                                                                      #'pkm2-sort-by-created-on)))
-                              (plist-get browse-spec :sections)))
+              (sections (-map #'pkm2-browse-convert-section-spec-to-section (plist-get browse-spec :sections)))
               (browse-state (make-pkm2-browse-buffer-state :sections sections)))
          (pkm2--browse browse-state buffer-name)))))
 
@@ -421,6 +422,12 @@
 
 (defun pkm2--browse-get-section-nodes-db-ids (section-spec)
   (let* ((queries (plist-get section-spec :queries))
+         (queries (-map (lambda (query)
+                          (if (and (stringp query)
+                                   (assoc-default query pkm2-browse-saved-named-queries))
+                              (assoc-default query pkm2-browse-saved-named-queries)
+                            query))
+                        queries))
          (queries-db-query (-map #'pkm2--compile-full-db-query queries))
          (nodes-ids (-flatten (-map (lambda (query)
                                       (--> (sqlite-select pkm2-database-connection query)
