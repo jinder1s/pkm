@@ -125,6 +125,56 @@ The original alist is not modified."
 ;;; pkm db stuff
 
 
+(defclass pkm-base-kvd ()
+  ((type :initarg :type :initform 'TEXT)
+   (key :initarg :key)
+   (value :initarg :value)))
+
+(defclass pkm-db-kvd (pkm-base-kvd)
+  ((id :initarg :id)
+   (shadow-id :initarg)
+   (created-at :initarg)
+   (modified-at :initarg :modified-at )))
+
+(defclass pkm-kvd (pkm-base-kvd)
+  ((link-id :initarg :link-id)
+   (link :initarg :link)
+   (context-id :initarg :context-id)
+   (groups :initarg :groups)))
+
+(defclass pkm-base-node ()
+  ((content :initarg :content)))
+
+(defclass pkm-db-node (pkm-base-node)
+  ((id :initarg :id)
+   (shadow-id :initarg)
+   (created-at :initarg)
+   (modified-at :initarg :modified-at)))
+(defclass pkm-node (pkm-db-node)
+  ((types :initarg :types :initform nil)
+   (parent-links :initarg :parent-links :initform nil)
+   (children-links :initarg :children-links :initform nil)
+   (previous-sequencial-links :initarg :previous-sequencial-links :initform nil)
+   (next-sequencial-links :initarg :next-sequencial-links :initform nil)
+   (flat-links :initarg :flat-links :initform nil)
+   (kvds :initarg :kvds :initform nil)))
+
+(defclass pkm-db-kvd-link ()
+  ((id :initarg :id)
+   (type :initarg :type)
+   (node :initarg :node)
+   (key_value_data :initarg :key_value_data)
+   (context :initarg :context)
+   (created_at :initarg :created_at)
+   (is_archive :initarg :is_archive)))
+
+(defclass pkm-db-nodes-link ()
+  ((id :initarg :id)
+   (type :initarg :type)
+   (node_a :initarg :node_a)
+   (node_b :initarg :node_b)
+   (context :initarg :context)
+   (created_at :initarg :created_at)))
 
 
 (cl-defstruct pkm2-db-kvd
