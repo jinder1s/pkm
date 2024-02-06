@@ -481,13 +481,13 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                (sqlite-execute pkm2-database-connection it)
                (car it)
                (car it)
-               (make-pkm2-db-kvd-link :id2 it
-                                      :type type
-                                      :node node-id
-                                      :key_value_data key_value_data-id
-                                      :context context-node-id
-                                      :created_at timestamp
-                                      :is_archive is-archive))))
+               (pkm-db-kvd-link :id it
+                                :type type
+                                :node node-id
+                                :key_value_data key_value_data-id
+                                :context context-node-id
+                                :created_at timestamp
+                                :is_archive is-archive))))
     (when (and output (not no-new-event))
       (pkm2--sync-add-event
        `(:action insert
@@ -854,13 +854,14 @@ Returns output in two formats:
          (link-table (pkm2--db-get-kvd-link-table-for-type data-type))
          (query (format "SELECT * from %s WHERE id = %d" link-table link-id))
          (link-data (car (pkm2--db-do-sql-query-and-get-all-rows query t) )))
-    (make-pkm2-db-kvd-link :id2 (plist-get link-data "id" #'equal)
-                           :key_value_data (plist-get link-data "key_value_data" #'equal)
-                           :node (plist-get link-data "node" #'equal)
-                           :type data-type
-                           :created_at (plist-get link-data "created_at" #'equal)
-                           :is_archive (plist-get link-data "is_archive" #'equal)
-                           :context (plist-get link-data "context" #'equal))))
+    (pkm-db-kvd-link :id (plist-get link-data "id" #'equal)
+                     :type data-type
+                     :node (plist-get link-data "node" #'equal)
+                     :key_value_data (plist-get link-data "key_value_data" #'equal)
+                     :context (plist-get link-data "context" #'equal)
+                     :created_at (plist-get link-data "created_at" #'equal)
+                     :is_archive (plist-get link-data "is_archive" #'equal)
+                     :groups (plist-get link-data "groups" #'equal))))
 
 (defun pkm2--db-query-get-kvds-for-node-with-id (id &optional allow-archive)
   ; TODO test
