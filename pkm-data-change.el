@@ -108,4 +108,12 @@
   (add-column-to-table pkm2-database-connection "data_or_properties_link_real" "shadow_id" "TEXT")
   (add-column-to-table pkm2-database-connection "data_or_properties_link_blob" "shadow_id" "TEXT"))
 
+
+(defun add-groups-table ()
+  (add-column-to-table pkm2-database-connection "nodes_link" "groups" "TEXT")
+  (add-column-to-table pkm2-database-connection "data_or_properties_link" "groups" "TEXT")
+  (add-column-to-table pkm2-database-connection "data_or_properties_link_integer" "groups" "TEXT")
+  (add-column-to-table pkm2-database-connection "data_or_properties_link_real" "groups" "TEXT")
+  (add-column-to-table pkm2-database-connection "data_or_properties_link_blob" "groups" "TEXT"))
+
 (provide 'pkm-data-change)
