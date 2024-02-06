@@ -1198,14 +1198,19 @@
     output-string ))
 
 ;;; browse-mode
-(defvar pkm2-browse-mode-map (make-sparse-keymap))
 
-(defvar-keymap pkm2-browse-mode-map
-                                        ; Recently, a [tab] keybind in `outline-mode-cycle-map' has begun
-                                        ; overriding org's [tab] keybind in GUI Emacs. This is needed to undo
-                                        ; that, and should probably be PRed to org.
 
-  :doc "Keymap for `pkm2-browse-mode'."
+
+
+(define-derived-mode pkm2-browse-mode special-mode "pkm2-browse"
+  "Major mode to browse pkm2 database.
+\\<pkm2-browse-mode-map>
+sfdsadfas
+\\{pkm2-browse-mode-map}
+")
+
+(define-keymap
+  :keymap pkm2-browse-mode-map
   "<tab>" #'pkm2--browse-toggle-hidden-info-at-point
   "e e" #'pkm2--browse-edit-object-at-point
 
@@ -1240,12 +1245,6 @@
 
 
 
-(define-minor-mode pkm2-browse-mode
-  "Minor mode for simple finish/cancel keybindings."
-  :keymap pkm2-browse-mode-map)
-
-
-
 (defun pkm2-browse-add-section (&optional buffer-name)
   (interactive)
   (let* ((buffer-name (or buffer-name (buffer-name) ))
@@ -1253,8 +1252,8 @@
          (sections (pkm2-browse-buffer-state-sections buffer-state))
          (completing-read-choices (-concat (list '("NEW" . "NEW") ) pkm2-browse-saved-named-section-specs))
          (chosen-section-name (if (length> completing-read-choices 1)
-                             (completing-read "Which section would you like to add: " completing-read-choices)
-                           "NEW"))
+                                  (completing-read "Which section would you like to add: " completing-read-choices)
+                                "NEW"))
 
          (chosen-section (assoc-default chosen-section-name completing-read-choices))
          (new-section (make-pkm2-browse-section :spec  (if (equal "NEW" chosen-section)
