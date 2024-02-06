@@ -75,8 +75,7 @@
                                                                    "<insert>(:display content)</insert>"
                                                                    "<insert>(:display hidden :prefix \"\\n\")</insert>")
                               :assets (list
-                                       '(:pkm-type kvd :name "is-project" :key "node-type" :value "project" :link-to ("base-node") :data-type TEXT))
-                              ))
+                                       '(:pkm-type kvd :name "is-project" :key "node-type" :value "project" :link-to ("base-node") :data-type TEXT))))
 
 
 

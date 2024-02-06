@@ -68,11 +68,7 @@
         "C-c d f" #'pkm-compile-remove-current-filter
         "C-c d q" #'pkm-compile-remove-current-query
         "C-c d s" #'pkm-compile-remove-current-section
-              "C-c e" #'pkm-compile-manually-edit-current-filter
-
-        )
-
-      )
+        "C-c e" #'pkm-compile-manually-edit-current-filter))
 (define-minor-mode pkm2-query-compile-mode
   "Minor mode for simple finish/cancel keybindings."
   :keymap pkm-create-pkm-query-ewoc-mode-map)
