@@ -580,7 +580,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                       (sqlite-execute pkm2-database-connection it)
                       (car it)
                       (car it)
-                      (make-pkm2-db-kvd :type type :id it :key key :value value :created_at timestamp))))
+                      (pkm-db-kvd :type type :id it :key key :value value :created_at timestamp))))
     (when (and output (not no-new-event))
       (pkm2--sync-add-event
        `(:action insert
@@ -598,11 +598,11 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   (let* ((data-table (pkm2--db-get-kvd-data-table-for-type type) )
          (db-info (car (sqlite-select pkm2-database-connection (format "SELECT id, key, value, created_at from %s WHERE key is '%s' AND value is %s" data-table key (pkm2--db-format-value-correctly value type))) )))
     (if db-info
-        (make-pkm2-db-kvd :type type
-                          :id (nth 0 db-info)
-                          :key key
-                          :value value
-                          :created_at (nth 3 db-info))
+        (pkm-db-kvd :type type
+                    :id (nth 0 db-info)
+                    :key key
+                    :value value
+                    :created_at (nth 3 db-info))
       (pkm2--db-insert-kvd key value (pkm2-get-current-timestamp) type))))
 
 (defun pkm2--db-update-node (node-id new-content timestamp &optional no-new-event)
@@ -903,13 +903,13 @@ Returns output in two formats:
          (return-plist t)
          (kvds-l (pkm2--db-do-sql-query-and-get-all-rows query return-plist))
          (kvds (-map (lambda (kvd-plist)
-                       (make-pkm2-db-kvd :id (plist-get kvd-plist "data_id" #'equal)
-                                         :type (intern (plist-get kvd-plist "type" #'equal))
-                                         :link-id (plist-get kvd-plist "link_id" #'equal)
-                                         :context-id (plist-get kvd-plist "context_id" #'equal)
-                                         :key (plist-get kvd-plist "key" #'equal)
-                                         :value (plist-get kvd-plist "value" #'equal)
-                                         :created_at (plist-get kvd-plist "created_at" #'equal)))
+                       (pkm-db-kvd :id (plist-get kvd-plist "data_id" #'equal)
+                                   :type (intern (plist-get kvd-plist "type" #'equal))
+                                   :link-id (plist-get kvd-plist "link_id" #'equal)
+                                   :context-id (plist-get kvd-plist "context_id" #'equal)
+                                   :key (plist-get kvd-plist "key" #'equal)
+                                   :value (plist-get kvd-plist "value" #'equal)
+                                   :created_at (plist-get kvd-plist "created_at" #'equal)))
                      kvds-l)))
     kvds))
 
@@ -946,13 +946,13 @@ Returns output in two formats:
          (return-plist t)
          (kvds-l (pkm2--db-do-sql-query-and-get-all-rows query return-plist))
          (kvds (-map (lambda (kvd-plist)
-                       (make-pkm2-db-kvd :id (plist-get kvd-plist "data_id" #'equal)
-                                         :type (intern (plist-get kvd-plist "type" #'equal))
-                                         :link-id (plist-get kvd-plist "link_id" #'equal)
-                                         :context-id (plist-get kvd-plist "context_id" #'equal)
-                                         :key (plist-get kvd-plist "key" #'equal)
-                                         :value (plist-get kvd-plist "value" #'equal)
-                                         :created_at (plist-get kvd-plist "created_at" #'equal)))
+                       (pkm-db-kvd :id (plist-get kvd-plist "data_id" #'equal)
+                                   :type (intern (plist-get kvd-plist "type" #'equal))
+                                   :link-id (plist-get kvd-plist "link_id" #'equal)
+                                   :context-id (plist-get kvd-plist "context_id" #'equal)
+                                   :key (plist-get kvd-plist "key" #'equal)
+                                   :value (plist-get kvd-plist "value" #'equal)
+                                   :created_at (plist-get kvd-plist "created_at" #'equal)))
                      kvds-l)))
     kvds))
 
