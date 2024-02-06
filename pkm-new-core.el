@@ -193,6 +193,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   node_a INTEGER NOT NULL,
   node_b INTEGER NOT NULL,
   context INTEGER,
+  groups TEXT,
   is_archive INTEGER,
   FOREIGN KEY(context) REFERENCES node(id),
   FOREIGN KEY(node_a) REFERENCES node(id) ON DELETE CASCADE,
@@ -232,6 +233,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   node INTEGER,
   key_value_data INTEGER,
   context INTEGER,
+  groups TEXT,
   is_archive INTEGER,
   FOREIGN KEY(context) REFERENCES node(id),
   FOREIGN KEY(node) REFERENCES node(id) ON DELETE CASCADE,
@@ -244,6 +246,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   node INTEGER,
   key_value_data INTEGER,
   context INTEGER,
+  groups TEXT,
   is_archive INTEGER,
   FOREIGN KEY(context) REFERENCES node(id),
   FOREIGN KEY(node) REFERENCES node(id) ON DELETE CASCADE,
@@ -256,6 +259,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   node INTEGER,
   key_value_data INTEGER,
   context INTEGER,
+  groups TEXT,
   is_archive INTEGER,
   FOREIGN KEY(context) REFERENCES node(id),
   FOREIGN KEY(node) REFERENCES node(id) ON DELETE CASCADE,
@@ -268,6 +272,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   node INTEGER,
   key_value_data INTEGER,
   context INTEGER,
+  groups TEXT,
   is_archive INTEGER,
   FOREIGN KEY(context) REFERENCES node(id),
   FOREIGN KEY(node) REFERENCES node(id) ON DELETE CASCADE,
@@ -400,7 +405,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
     delete-output))
 
 
-(defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive no-new-event)
+(defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive no-new-event group-id)
   ;; schema
   ;; (:action insert :what kvd-link :data (:node-id node-id :kvd-id kvd-id :timestamp timestamp :type type :context-node-id context-node-id :is-archive is-archive))
   (let* ((table-name (pkm2--db-get-kvd-link-table-for-type type))
@@ -408,14 +413,19 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                                (when context-node-id
                                  '("context"))
                                (when is-archive
-                                 '("is_archive"))))
+                                 '("is_archive"))
+                               (when group-id
+                                 '("groups"))))
          (shadow-id (pkm-uuid))
 
          (values (-concat `(,node-id ,key_value_data-id ,timestamp ,shadow-id)
                           (when context-node-id
                             (list context-node-id))
                           (when is-archive
-                            (list is-archive))))
+                            (list is-archive))
+                          (when group-id
+                            (list (format "%s;" group-id)))
+                          ))
          (output
           (--> (pkm2--db-compile-insert-statement table-name value-names values)
                (sqlite-execute pkm2-database-connection it)
@@ -1107,11 +1117,21 @@ Returns output in two formats:
     fully-defined-schema))
 
 (defun pkm--object-validate-structure-schema (structure-schema)
-  (let* ((primary-nodes (--> (plist-get structure-schema :assets)
-                             (-filter (lambda (asset) (when (eq (plist-get asset :pkm-type) 'node) (plist-get asset :primary-node)))
-                                      it)))
+  (let* ((assets (plist-get structure-schema :assets))
+         (primary-nodes (-filter (lambda (asset) (when (eq (plist-get asset :pkm-type) 'node) (plist-get asset :primary-node)))
+                                      assets))
          (has-one-primary-node (= 1 (length primary-nodes))))
-    (if (not has-one-primary-node) t (display-warning 'pkm-object "Object definition need to have one and only one primary node.\nPrimary nodes: %S" primary-nodes))))
+    (-each assets (lambda (asset)
+                    (if (not (plist-get asset :primary-node) )
+                        (if (not (equal (plist-get structure-schema :pkm-type) 'kvd-group ) )
+                            (unless (plist-get asset :link-to)
+                              (error "Asset needs to have a link-to to specify which node this should be linked to: %S \n schema: %S" asset structure-schema))
+                          ))))
+    (if  has-one-primary-node
+        t
+      (if (equal (plist-get structure-schema :pkm-type) 'kvd-group )
+          t
+          (error  (format "Object definition need to have one and only one primary node.\nPrimary nodes: %S" primary-nodes)) ))))
 
 (defun pkm--object-does-specifier-match (specifier asset-schema)
   (cond
@@ -1357,6 +1377,15 @@ Returns output in two formats:
              :db-id (pkm2-db-kvd-id db-kvd))
           (progn (display-warning 'pkm-object "Did not succed in making kvd: %S" s-kvd)
                  (error "Did not succed in creating kvd: %S" s-kvd)))) ))
+(defun pkm--object-add-kvd-group-to-db (s-kvd-group)
+  (when (plist-get s-kvd-group :asset-capture-info)
+    (let* ((temp (plist-get s-kvd-group :asset-capture-info))
+           (kvds (plist-get temp :capture-info))
+           (committed-kvds (-map #'pkm--object-add-kvd-to-db kvds)))
+      (list
+       :asset-schema (plist-get s-kvd-group :asset-schema)
+       :asset-capture-info temp
+       :committed-kvds committed-kvds))))
 
 (defvar pkm--object-capture-alist `((node ,#'pkm--object-capture-node)
                                     (kvd ,#'pkm--object-capture-kvd)))
@@ -1542,6 +1571,13 @@ This code doesn't directly output a formatted string because it seems to be used
                                           (pcase (plist-get asset-spec :pkm-type)
                                             ('node (pkm2--object-capture-node asset-spec values buffer-name)  )
                                             ('kvd (pkm2--object-capture-kvd asset-spec values buffer-name))
+                                            ('kvd-group (list :asset-schema asset-spec
+                                                              :asset-capture-info (pkm2--object-capture-object-verify
+                                                                                   asset-spec
+                                                                                   buffer-name
+                                                                                   skip-verify
+                                                                                   (assoc-default asset-name values)
+                                                                                   asset-name)))
                                             ((pred (lambda (pkm-type) (member pkm-type structure-names)))
                                              (list :asset-schema asset-spec
                                                    :asset-capture-info (pkm2--object-capture-object-verify
@@ -1584,6 +1620,7 @@ Instantiate links.
 Commit links to database.
 Commit everything.
 "
+  (message "IN finalizer")
   (unless within-transaction
     (sqlite-transaction pkm2-database-connection) )
   (condition-case-unless-debug err
@@ -1591,13 +1628,12 @@ Commit everything.
              (assets-by-group (-group-by (lambda (asset)
                                            (--> (plist-get asset :asset-schema)
                                                 (plist-get it :pkm-type)
-                                                (if (or (equal it 'node) (equal it 'kvd))
-                                                    it
-                                                  (if (member it pkm-structure-types)
-                                                      'pkm-type
-                                                    (progn
-                                                      (error  (format "There is an unknown type amoung the assets, it is currently not being handled: %S" asset))
-                                                      'unknown )))))
+                                                (cond ((or (equal it 'node) (equal it 'kvd)) it)
+                                                      ((equal it 'kvd-group)
+                                                       ;; (error "KVD-Group is not yet implemented.")
+                                                       'kvd-group)
+                                                      ((member it pkm-structure-types) 'pkm-type)
+                                                      (t (error  (format "There is an unknown type amoung the assets, it is currently not being handled: %S" asset))))))
                                          created-assets))
              (uncommitted-pkm-structures (assoc-default 'pkm-type assets-by-group))
              (committed-pkm-structures-with-db-ids (-map (lambda (capture-info-structure)
@@ -1618,6 +1654,10 @@ Commit everything.
              (commited-nodes-and-structures-with-db-ids (-concat commited-nodes-with-db-ids committed-pkm-structures-with-db-ids))
              (uncommited-kvds (assoc-default 'kvd assets-by-group))
              (commited-kvds-with-db-ids  (-map #'pkm--object-add-kvd-to-db uncommited-kvds))
+             (uncommited-kvd-groups (assoc-default 'kvd-group assets-by-group))
+             (commited-kvd-groups (-map (lambda (kvd-group)
+                                          (pkm--object-add-kvd-group-to-db kvd-group))
+                                        uncommited-kvd-groups))
                                         ; for each node specifier, get node-db-id and create link between kvd and node-db-id
              (commited-kvds-with-db-ids-and-links
               (-map (lambda (kvd-info)
@@ -1630,19 +1670,57 @@ Commit everything.
                                                     (pkm--object-get-specified-node-db-ids
                                                      node-specifier
                                                      commited-nodes-and-structures-with-db-ids)))
-                                              (-map (lambda (node-db-id) (list
-                                                                          :node-db-id node-db-id
-                                                                          :kvd-db-id kvd-db-id
-                                                                          :db-kvd-link (pkm2--db-insert-link-between-node-and-kvd
-                                                                                        node-db-id
-                                                                                        kvd-db-id
-                                                                                        (pkm2-get-current-timestamp)
-                                                                                        kvd-type)))
+                                              (-map (lambda (node-db-id)
+                                                      (message "Creating link between %s %s" node-db-id kvd-db-id)
+                                                      (list
+                                                       :node-db-id node-db-id
+                                                       :kvd-db-id kvd-db-id
+                                                       :db-kvd-link (pkm2--db-insert-link-between-node-and-kvd
+                                                                     node-db-id
+                                                                     kvd-db-id
+                                                                     (pkm2-get-current-timestamp)
+                                                                     kvd-type)))
                                                     node-db-ids)))
                                           node-specifiers))
                              (output (-copy kvd-info)))
                         (plist-put output :links links)))
                     commited-kvds-with-db-ids))
+             (commited-kvd-groups-with-db-ids-and-links
+              (-map (lambda (kvd-group)
+                      ;; TODO FIX what this lambda returns. Currently, it just returns the links.
+                      (let* ((kvd-group-schema (plist-get kvd-group :asset-schema))
+                             (node-specifiers (--> (plist-get kvd-group-schema :link-to)
+                                                   (if it it (error "KVD-Group does not have a link-to specifier."))))
+                             (committed-kvds (plist-get kvd-group :committed-kvds))
+                             (group-id (pkm-uuid))
+                             (links (-map (lambda (node-specifier)
+                                            (let* ((node-db-ids
+                                                    (pkm--object-get-specified-node-db-ids
+                                                     node-specifier
+                                                     commited-nodes-and-structures-with-db-ids)))
+                                              (-map (lambda (node-db-id)
+                                                        (-map (lambda (kvd-info)
+                                                                (let* ((kvd-asset-schema (plist-get kvd-info :asset-schema))
+                                                                       (kvd-db-id (plist-get kvd-info :db-id))
+                                                                       (kvd-type (plist-get kvd-asset-schema :data-type))
+                                                                       (links (list
+                                                                               :node-db-id node-db-id
+                                                                               :kvd-db-id kvd-db-id
+                                                                               :db-kvd-link (pkm2--db-insert-link-between-node-and-kvd
+                                                                                             node-db-id
+                                                                                             kvd-db-id
+                                                                                             (pkm2-get-current-timestamp)
+                                                                                             kvd-type
+                                                                                             nil
+                                                                                             nil
+                                                                                             nil
+                                                                                             group-id))))
+                                                                  links))
+                                                              committed-kvds))
+                                                    node-db-ids)))
+                                          node-specifiers)))
+                        (plist-put kvd-group :links links)))
+                    commited-kvd-groups))
              (links (--> (plist-get structure-schema :links) (-map (lambda (link)
                                                                      (when (not (equal (plist-get pkm-links-label-to-type-equal-plist (plist-get link :pkm-link-label) #'equal) 'HIERARCHICAL) )
                                                                        (error "Only hierarchical link-labels have been implemented in link capture funcs."))
@@ -1674,7 +1752,7 @@ Commit everything.
                                                                       child-node-db-ids))
                                                               parent-node-db-ids)))))
                                    links))
-             (combined-assets (-concat commited-nodes-and-structures-with-db-ids commited-kvds-with-db-ids-and-links))
+             (combined-assets (-concat commited-nodes-and-structures-with-db-ids commited-kvds-with-db-ids-and-links commited-kvd-groups-with-db-ids-and-links))
              (output (list :schema structure-schema
                            :assets combined-assets
                            :db-id (car (pkm--object-get-specified-node-db-ids 'primary combined-assets) )

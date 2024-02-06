@@ -10,15 +10,23 @@
 (pkm2-register-behavior `(:name dependent :assets ((:pkm-type kvd :name "is-dependent" :key "node-type" :value "DEPENDENT" :data-type TEXT))))
 (pkm2-register-behavior `(:name time-interval
                           :assets ((:pkm-type kvd-group
+                                    :name time-interval
                                     :assets
                                     ((:pkm-type kvd :name "time-start" :key "time-start" :value ,#'pkm2-get-user-selected-timestamp :data-type DATETIME)
-                                     (:pkm-type kvd :name "time-start" :key "time-end" :value ,#'pkm2-get-user-selected-timestamp :data-type DATETIME)
+                                     (:pkm-type kvd :name "time-end" :key "time-end" :value ,#'pkm2-get-user-selected-timestamp :data-type DATETIME :managed t)
                                      (:pkm-type kvd :name "interval-type" :key "interval-type" :value "time-interval" :data-type TEXT))))))
+
+
+(pkm-register-structure 'time-n
+                        (list :parent 'base-n
+                              :is-behavior 'time-interval
+                              :behaviors (list `(:name time-interval :link-to (primary)))))
 
 (pkm-register-structure
  'base-n
  (list :assets  (list
                  '(:pkm-type node :name "base-node" :primary-node t))))
+
 
 (pkm-register-structure 'dependent-n
                         (list :parent 'base-n
