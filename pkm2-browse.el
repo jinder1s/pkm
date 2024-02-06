@@ -45,8 +45,6 @@
   (end-ewoc-node nil))
 
 
-
-
 ;;;; Persistent buffer
 (defvar pkm2-browse-buffer "pkm2-browse"
   "The persistent pkm2 buffer name. Must be surround with \"*\".")
@@ -1202,45 +1200,43 @@
 ;;; browse-mode
 (defvar pkm2-browse-mode-map (make-sparse-keymap))
 
-(map! :map pkm2-browse-mode-map
-      ; Recently, a [tab] keybind in `outline-mode-cycle-map' has begun
-      ; overriding org's [tab] keybind in GUI Emacs. This is needed to undo
-      ; that, and should probably be PRed to org.
+(defvar-keymap pkm2-browse-mode-map
+                                        ; Recently, a [tab] keybind in `outline-mode-cycle-map' has begun
+                                        ; overriding org's [tab] keybind in GUI Emacs. This is needed to undo
+                                        ; that, and should probably be PRed to org.
 
-      :localleader
-      [tab]        #'pkm2--browse-toggle-hidden-info-at-point
-      (:prefix ("e" . "edit")
-               "e" #'pkm2--browse-edit-object-at-point)
-      (:prefix ("b" . "buffer")
-               "r" #'pkm2--refresh-current-buffer
-               "a" #'pkm2-browse-add-section
-               "s" #'pkm2-browse-save-browse-spec
-               )
-      (:prefix ("s" . "section")
-               "r" #'pkm2--refresh-current-buffer
-               "q" #'pkm2--add-query-to-section-at-point
-               "e" #'pkm-browse-section-edit-spec
-               "s" #'pkm-browse-section-save-spec
-               )
-      (:prefix "n"
-               (:prefix ("a" . "add")
-                (:prefix ("r" . "relationship")
-                         "p" #'pkm2--browse-add-search-parent
-                         "c" #'pkm2--browse-add-search-child)
-                :desc "Add kvd" "k" #'pkm2--browse-add-kvd-at-point
-                "c" #'pkm--browse-capture-node-as-child-of-node-at-point
-                "s" #'pkm--browse-capture-node-as-sibling-of-node-at-point )
-               (:prefix ("c" . "clock")
-                        "e" #'pkm2-clock-edit-clock-at-point
-                        "i" #'pkm2-clock-in
-                        "o" #'pkm2-clock-out
-                        "s" #'pkm2-clock-switch)
-               (:prefix ("s" . "show")
-                :desc "Children" "c" #'pkm2--browse-see-children-at-point
-                :desc "Parents"  "p" #'pkm2--browse-see-parents-at-point)
-               "f" #'pkm2--browse-filter-children-nodes-at-point
-               "n" #'pkm2--narrow-to-node-and-children-at-point
-               "d" #'pkm2--browse-delete-node-at-point))
+  :doc "Keymap for `pkm2-browse-mode'."
+  "<tab>" #'pkm2--browse-toggle-hidden-info-at-point
+  "e e" #'pkm2--browse-edit-object-at-point
+
+
+  "s r" #'pkm2--refresh-current-buffer
+  "s q" #'pkm2--add-query-to-section-at-point
+  "s e" #'pkm-browse-section-edit-spec
+  "s s" #'pkm-browse-section-save-spec
+
+  "b r" #'pkm2--refresh-current-buffer
+  "b a" #'pkm2-browse-add-section
+  "b s" #'pkm2-browse-save-browse-spec
+
+  "n a r p" #'pkm2--browse-add-search-parent
+  "x a r c" #'pkm2--browse-add-search-child
+
+  "n a k" #'pkm2--browse-add-kvd-at-point
+  "n a c" #'pkm--browse-capture-node-as-child-of-node-at-point
+  "n a s" #'pkm--browse-capture-node-as-sibling-of-node-at-point
+
+  "n c e" #'pkm2-clock-edit-clock-at-point
+  "n c i" #'pkm2-clock-in
+  "n c o" #'pkm2-clock-out
+  "n c s" #'pkm2-clock-switch
+
+  "n s c" #'pkm2--browse-see-children-at-point
+  "n s n p" #'pkm2--browse-see-parents-at-point
+
+  "n f" #'pkm2--browse-filter-children-nodes-at-point
+  "n n" #'pkm2--narrow-to-node-and-children-at-point
+  "n d" #'pkm2--browse-delete-node-at-point)
 
 
 
