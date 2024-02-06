@@ -30,7 +30,9 @@
 
 (describe "Sync Tests"
   :var (database-file
-        (events))
+        events
+        logged-events
+        )
   (before-each
     (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
     (setq pkm2-database-connection (sqlite-open database-file))
@@ -474,9 +476,12 @@
            (shadow-id "21d6b80d-a2f7-4899-9c0e-a4f3d8c02d78")
            (saved-connection pkm2-database-connection)
            (pkm-sync--get-remote-events-func (lambda ()
-                                               `((:action insert :what node :data (:content ,content :new-node-id 1 :shadow-id ,shadow-id :timestamp ,timestamp))
+                                               `(
+                                                 ("mobile" . ((:action insert :what node :data (:content ,content :new-node-id 1 :shadow-id ,shadow-id :timestamp ,timestamp)) ) )
                                                  ;; (:action update :what node :data (:node-id 1 :new-content Updated content :timestamp 1705866591))
                                                  )))
+           (pkm-sync-log-events-applied-func (lambda (events)
+                                               (setq logged-events events)))
            (pkm2-database-file-path database-file)
            (sql-query "SELECT id, content, created_at, modified_at FROM node;")
            database-nodes
@@ -484,6 +489,9 @@
       (setq pkm2-database-connection (pkm-sync-on-main))
       (expect saved-connection :not :to-equal pkm2-database-connection)
       (setq database-nodes (sqlite-select pkm2-database-connection sql-query))
+      (message "logged-events %s" logged-events)
+      (expect (length logged-events) :to-be 1)
+      (expect (length (car logged-events )) :to-be 2)
       (expect (length database-nodes) :to-equal 1)
       (expect (nth 1 (car database-nodes)) :to-equal content)
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
@@ -503,6 +511,8 @@
                                              `((:action insert :what node :data (:content ,content :new-node-id 1 :shadow-id ,shadow-id :timestamp ,timestamp))
                                                ;; (:action update :what node :data (:node-id 1 :new-content Updated content :timestamp 1705866591))
                                                )))
+           (pkm-sync-log-events-applied-func (lambda (events)
+                                               (setq logged-events events)))
            (pkm2-database-file-path database-file)
            (sql-query "SELECT id, content, created_at, modified_at FROM node;")
            database-nodes
@@ -513,6 +523,9 @@
       (setq pkm2-database-connection (pkm-sync-on-remote))
       (expect saved-connection :not :to-equal pkm2-database-connection)
       (setq database-nodes (sqlite-select pkm2-database-connection sql-query))
+      (message "logged-events %s" logged-events)
+      (expect (length logged-events) :to-be 2)
+      (expect (car logged-events) :to-equal "main")
       (expect (length database-nodes) :to-equal 1)
       (expect (nth 1 (car database-nodes)) :to-equal content)
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
@@ -521,12 +534,6 @@
       (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal content)
       (expect (--> (pkm2-node-db-node node) (pkm2-db-node-created_at it)) :to-equal timestamp)
       (expect (length (plist-get events :main)) :to-be 0))))
-
-
-
-
-
-
 
 
 
