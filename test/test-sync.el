@@ -524,8 +524,8 @@
       (expect saved-connection :not :to-equal pkm2-database-connection)
       (setq database-nodes (sqlite-select pkm2-database-connection sql-query))
       (message "logged-events %s" logged-events)
-      (expect (length logged-events) :to-be 2)
-      (expect (car logged-events) :to-equal "main")
+      (expect (length logged-events) :to-be 1)
+      (expect (caar logged-events) :to-equal "main")
       (expect (length database-nodes) :to-equal 1)
       (expect (nth 1 (car database-nodes)) :to-equal content)
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
