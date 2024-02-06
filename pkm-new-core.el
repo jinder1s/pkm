@@ -132,14 +132,14 @@ The original alist is not modified."
 
 (defclass pkm-db-kvd (pkm-base-kvd)
   ((id :initarg :id)
-   (shadow-id :initarg)
-   (created-at :initarg)
-   (modified-at :initarg :modified-at )))
+   (shadow_id :initarg :shadow_id)
+   (created_at :initarg :created_at)
+   (modified_at :initarg :modified_at )))
 
-(defclass pkm-kvd (pkm-base-kvd)
+(defclass pkm-kvd (pkm-db-kvd)
   ((link-id :initarg :link-id)
    (link :initarg :link)
-   (context-id :initarg :context-id)
+   (context_id :initarg :context_id)
    (groups :initarg :groups)))
 
 (defclass pkm-base-node ()
@@ -147,9 +147,10 @@ The original alist is not modified."
 
 (defclass pkm-db-node (pkm-base-node)
   ((id :initarg :id)
-   (shadow-id :initarg)
-   (created-at :initarg)
-   (modified-at :initarg :modified-at)))
+   (shadow_id :initarg :shadow_id)
+   (created_at :initarg :created_at)
+   (modified_at :initarg :modified_at)))
+
 (defclass pkm-node (pkm-db-node)
   ((types :initarg :types :initform nil)
    (parent-links :initarg :parent-links :initform nil)
