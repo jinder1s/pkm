@@ -8,6 +8,12 @@
 
 
 (pkm2-register-behavior `(:name dependent :assets ((:pkm-type kvd :name "is-dependent" :key "node-type" :value "DEPENDENT" :data-type TEXT))))
+(pkm2-register-behavior `(:name time-interval
+                          :assets ((:pkm-type kvd-group
+                                    :assets
+                                    ((:pkm-type kvd :name "time-start" :key "time-start" :value ,#'pkm2-get-user-selected-timestamp :data-type DATETIME)
+                                     (:pkm-type kvd :name "time-start" :key "time-end" :value ,#'pkm2-get-user-selected-timestamp :data-type DATETIME)
+                                     (:pkm-type kvd :name "interval-type" :key "interval-type" :value "time-interval" :data-type TEXT))))))
 
 (pkm-register-structure
  'base-n
