@@ -177,48 +177,14 @@ The original alist is not modified."
    (context :initarg :context)
    (created_at :initarg :created_at)))
 
-
-(cl-defstruct pkm2-db-kvd
-  id
-  (type 'TEXT)
-  key
-  value
-  created_at
-  (link-id nil)
-  (context-id nil))
-
-(cl-defstruct pkm2-db-kvd-link
-  id2
-  (type 'TEXT)
-  node
-  key_value_data
-  context
-  created_at
-  is_archive)
-
 (cl-defstruct pkm2-db-nodes-link
-  id
-  type
-  node_a
-  node_b
-  context
-  created_at)
+  )
 
 (cl-defstruct pkm2-db-node
-  id
-  content
-  created_at
-  modified_at)
+  )
 
 (cl-defstruct pkm2-node
-  db-node
-  (types nil :type list)
-  (parent-links nil :type list)         ; links to node's parents (where node is child)
-  (children-links nil :type list)       ; links to node's children (where node is parent)
-  (previous-sequencial-links nil :type list) ; links to previous in sequence
-  (next-sequencial-links nil :type list)     ; links to next in sequence
-  (flat-links nil :type list)
-  (kvds nil :type list))
+  )
 
 (defvar pkm2-database-connection nil)
 (defvar pkm2-database-file-path nil)
