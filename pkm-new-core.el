@@ -654,6 +654,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 
 ;; * sync
 
+(defvar pkm-sync-active nil)
 (defvar pkm-sync-directory nil)
 (defvar pkm-sync--get-remote-events-func nil)
 (defvar pkm-sync--get-main-events-func nil)

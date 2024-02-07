@@ -113,7 +113,7 @@
             (active-clocks-parents (-map (lambda (a-c)
                                            (--> (oref a-c :parent-links)
                                                 (-filter (lambda (link)
-                                                           (equal "clock" (pkm2-db-nodes-link-type link))) it)
+                                                           (equal "clock" (oref link :type))) it)
                                                 (-map #'pkm2--link-get-link-parent-id it)
                                                 (-map #'pkm2--db-query-get-node-with-id it)))
                                          active-clocks))
