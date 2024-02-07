@@ -226,7 +226,7 @@
                 (browse-insert-format-string
                  (or
                   (-->
-                   (pkm2-node-types pkm-node)
+                   (oref pkm-node :types)
                    (-map (lambda (type)
                            (let* ((schema (plist-get pkm-structure-defined-schemas-plist type) )
                                   (parents (plist-get schema :parents))
@@ -338,7 +338,7 @@
 
 
 (defun pkm2-browse--default-kvd-display-string (kvd)
-  (let* ((key (pkm2-db-kvd-key kvd))
+  (let* ((key (oref kvd :types))
          (value (pkm2-db-kvd-value kvd))
          (types (doom-plist-keys pkm-data-type-to-kvd-key-plist))
          (type (or (-find (lambda (type) (member key (plist-get pkm-data-type-to-kvd-key-plist type))) types) (pkm2-db-kvd-type kvd) )))
@@ -347,7 +347,7 @@
 (defun pkm2-browse--default-hidden-info-string (browse-node)
   (let* ((browse-id (pkm2-browse-node-browse-id browse-node))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
-         (db-id (--> (pkm2-node-db-node pkm-node) (oref it :id)))
+         (db-id (oref pkm-node :id))
          (kvds (oref pkm-node :kvds))
          (level (pkm2-browse-node-level browse-node))
          (prefix2 (concat (propertize " " 'display `(space :width ,(*  2 (abs (or level 0)))))))
@@ -363,7 +363,7 @@
                          (format "browse-id: %s" browse-id)
                          "\n"
                          prefix2
-                         (format "types: %S" (pkm2-node-types pkm-node))
+                         (format "types: %S" (oref pkm-node :types))
                          )))
     hidden-string))
 
@@ -554,7 +554,7 @@
                  (new-db-node (pkm2--update-node-with-log pkm-node id new-content (pkm2-get-current-timestamp))))
             (setf (pkm2-node-db-node pkm-node) new-db-node))
         (let* ((kvds (oref pkm-node :kvds))
-               (key (pkm2-db-kvd-key kvd))
+               (key (oref kvd :types))
                (old-kvd-id (oref kvd :id))
                (type (assoc-default key (or (-flatten (-map (lambda (type)
                                                               (-map (lambda (key)
@@ -601,7 +601,7 @@
          (section (pkm2-browse-node-section browse-node))
          (parent-id (pkm2-browse-node-parent browse-node))
          (parent-browse-node (assoc-default parent-id pkm2-browse--browse-nodes-alist))
-         (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (oref it :id)))
+         (db-id (oref browse-node :id))
          (level-children (or level-children (read (completing-read "How many levels of children would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
          (query-spec `((:or db-node (:db-id ,db-id )) (:convert-or convert-to-children (:levels ,level-children) )) )
          (pkm-nodes (--> (pkm2--browse-get-query-nodes query-spec)
@@ -639,7 +639,7 @@
          (section (pkm2-browse-node-section browse-node))
          (parent-id (pkm2-browse-node-parent browse-node))
          (parent-browse-node (assoc-default parent-id pkm2-browse--browse-nodes-alist))
-         (db-id (--> (pkm2-browse-node-pkm-node browse-node) (pkm2-node-db-node it) (oref it :id)))
+         (db-id (oref browse-node :id))
          (level-parents (or level-parents (read (completing-read "How many levels of parents would you like?" `("1" "2" "3" "4" "5" "6" "7" "ALL")) ) ))
          (query-spec `((:or db-node (:db-id ,db-id)) (:convert-or convert-to-parents (:levels ,level-parents))))
 
@@ -724,7 +724,7 @@
   (let* ((current-point (point))
          (browse-node (pkm2--browse-get-browse-node-at-point))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
-         (db-id (--> (pkm2-node-db-node pkm-node) (oref it :id)))
+         (db-id (oref pkm-node :id))
          (parent-browse-node (pkm2-browse-node-parent browse-node))
          (parent-pkm-node (pkm2-browse-node-pkm-node parent-browse-node))
          (parent-db-node (pkm2-node-db-node parent-pkm-node))
@@ -737,7 +737,7 @@
          (link (if (length= links-between-nodes 1)
                    (car links-between-nodes)
                  (error "There are either zero or more than 1 links between node and its parent")))
-         (link-db-id (pkm2-db-nodes-link-id link)))
+         (link-db-id (oref link :id)))
     (pkm2--db-delete-link-between-nodes link-db-id)))
 
 
@@ -804,7 +804,7 @@
          (parent-browse-node (--> (pkm2-browse-node-parent browse-node)
                                   (assoc-default it pkm2-browse--browse-nodes-alist)))
          (connecting-link (--> (pkm2-browse-node-parent-link browse-node)))
-         (connecting-link-id (pkm2-db-nodes-link-id connecting-link))
+         (connecting-link-id (oref connecting-link :id))
          (connecting-link-label (pkm2-db-nodes-link-type connecting-link))
          (connecting-context-id (pkm2-db-nodes-link-context connecting-link))
          (grandparent-browse-node (--> (pkm2-browse-node-parent parent-browse-node)
@@ -835,7 +835,7 @@
          (db-node (pkm2-node-db-node pkm-node))
          (node-id (oref db-node :id))
          (connecting-link (--> (pkm2-browse-node-parent-link browse-node)))
-         (connecting-link-id (pkm2-db-nodes-link-id connecting-link))
+         (connecting-link-id (oref connecting-link :id))
          (connecting-link-label (pkm2-db-nodes-link-type connecting-link))
          (connecting-context-id (pkm2-db-nodes-link-context connecting-link))
          (sibling-above-browse-node (save-excursion
@@ -865,7 +865,7 @@
                      (oref it :id)))
          (c-b-ns (pkm2-browse-node-children browse-node))
          (c-b-n-ids (-map (lambda (c-b-n)
-                            (--> (pkm2-browse-node-pkm-node c-b-n) (pkm2-node-db-node it) (oref it :id)))
+                            (oref c-b-n :id))
                           c-b-ns))
          (sub-query (list (list :or 'db-nodes `(:db-node-ids ,c-b-n-ids) ) ))
          (sub-query (if (equal arg 0)
@@ -927,7 +927,7 @@
                      (oref it :id)))
          (c-b-ns (pkm2-browse-node-children browse-node))
          (c-b-n-ids (-map (lambda (c-b-n)
-                            (--> (pkm2-browse-node-pkm-node c-b-n) (pkm2-node-db-node it) (oref it :id)))
+                            (oref c-b-n :id))
                           c-b-ns))
          (all-ids (-concat (list db-id) c-b-n-ids))
          (sub-query (list :or 'db-nodes `(:db-node-ids ,all-ids)))
@@ -1143,7 +1143,7 @@
   ""
   (let* ((pkm-node (pkm2-browse-node-pkm-node browse-node))
          (show-hidden (pkm2-browse-node-show-hidden browse-node))
-         (types (pkm2-node-types pkm-node))
+         (types (oref pkm-node :types))
          (types-definitions (-map (lambda (type)
                                     (plist-get pkm-structure-defined-schemas-plist type))
                                   types))

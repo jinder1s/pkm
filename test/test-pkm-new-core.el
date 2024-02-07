@@ -53,8 +53,8 @@
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal content)
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-created_at it)) :to-equal timestamp)
+      (expect (oref node :content) :to-equal content)
+      (expect (oref node :created_at) :to-equal timestamp)
       (expect (oref node :children-links) :to-be nil)
       (expect (oref node :parent-links) :to-be nil)
       (expect (oref node :previous-sequencial-links) :to-be nil)
@@ -166,7 +166,7 @@
       (expect (nth 1 (car database-nodes)) :to-equal node-content)
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal node-content)
+      (expect (oref node :content) :to-equal node-content)
       (expect (oref node :children-links) :to-be nil)
       (expect (oref node :parent-links) :to-be nil)
       (expect (oref node :previous-sequencial-links) :to-be nil)
@@ -232,7 +232,7 @@
       (expect (nth 1 (car database-nodes)) :to-equal node-content)
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal node-content)
+      (expect (oref node :content) :to-equal node-content)
       (expect (oref node :children-links) :to-be nil)
       (expect (oref node :parent-links) :to-be nil)
       (expect (oref node :previous-sequencial-links) :to-be nil)

@@ -54,8 +54,8 @@
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal content)
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-created_at it)) :to-equal timestamp)
+      (expect (oref node :content) :to-equal content)
+      (expect (oref node :created_at) :to-equal timestamp)
       (expect (length (plist-get events :main)) :to-be 1)))
   (it "Creating sync event for inserting text kvd"
     (let* ((pkm-sync-add-event-func (lambda (event)
@@ -76,7 +76,7 @@
       (expect (nth 3 (car kvds)) :to-equal timestamp) ; created_at
       (setq kvd (pkm2--db-get-or-insert-kvd key value type))
       (expect (oref inserted-kvd :id) :to-equal (oref kvd :id))
-      (expect (pkm2-db-kvd-key kvd) :to-equal key)
+      (expect (oref kvd :types) :to-equal key)
       (expect (pkm2-db-kvd-value kvd) :to-equal value)
       (expect (pkm2-db-kvd-created_at kvd) :to-equal timestamp)
       (expect (length (plist-get events :main)) :to-be 1)))
@@ -118,7 +118,7 @@
            (nodes-links-query "SELECT id, type, node_a, node_b, created_at FROM nodes_link;")
            (nodes-links (sqlite-select pkm2-database-connection nodes-links-query)))
       (expect (length nodes-links) :to-equal 1)
-      (expect (pkm2-db-nodes-link-id inserted-link) :to-equal (caar nodes-links))
+      (expect (oref inserted-link :id) :to-equal (caar nodes-links))
       (expect  (nth 2 (car nodes-links)) :to-equal (--> (pkm2-node-db-node pkm-node)
                                                         (oref it :id)))
       (expect  (nth 3 (car nodes-links)) :to-equal (--> (pkm2-node-db-node pkm-node-2)
@@ -147,8 +147,8 @@
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal content)
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-created_at it)) :to-equal timestamp)
+      (expect (oref node :content) :to-equal content)
+      (expect (oref node :created_at) :to-equal timestamp)
       (expect (length (plist-get events :main)) :to-be 1)
       (pkm2--db-update-node
        (oref inserted-node :id)
@@ -199,14 +199,14 @@
            (nodes-links-query "SELECT id, type, node_a, node_b, created_at FROM nodes_link;")
            (nodes-links (sqlite-select pkm2-database-connection nodes-links-query)))
       (expect (length nodes-links) :to-equal 1)
-      (expect (pkm2-db-nodes-link-id inserted-link) :to-equal (caar nodes-links))
+      (expect (oref inserted-link :id) :to-equal (caar nodes-links))
       (expect  (nth 2 (car nodes-links)) :to-equal (--> (pkm2-node-db-node pkm-node)
                                                         (oref it :id)))
       (expect  (nth 3 (car nodes-links)) :to-equal (--> (pkm2-node-db-node pkm-node-2)
                                                         (oref it :id)))
 
 
-      (pkm2--db-delete-link-between-nodes (pkm2-db-nodes-link-id inserted-link))
+      (pkm2--db-delete-link-between-nodes (oref inserted-link :id))
 
       (expect (-map (lambda (event) (plist-get event :action)) (plist-get events :main))
               :to-equal '(delete insert insert insert))
@@ -261,8 +261,8 @@
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal content)
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-created_at it)) :to-equal timestamp)
+      (expect (oref node :content) :to-equal content)
+      (expect (oref node :created_at) :to-equal timestamp)
       (expect (length (plist-get events :main)) :to-be 1))
     )
   (it "Test applying insert kvd event"
@@ -287,7 +287,7 @@
       (expect (nth 2 (car kvds)) :to-equal value)
       (expect (nth 3 (car kvds)) :to-equal timestamp) ; created_at
       (setq kvd (pkm2--db-get-or-insert-kvd key value type))
-      (expect (pkm2-db-kvd-key kvd) :to-equal key)
+      (expect (oref kvd :types) :to-equal key)
       (expect (pkm2-db-kvd-value kvd) :to-equal value)
       (expect (pkm2-db-kvd-created_at kvd) :to-equal timestamp)
       (expect (length (plist-get events :main)) :to-be 1)))
@@ -497,8 +497,8 @@
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal content)
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-created_at it)) :to-equal timestamp)
+      (expect (oref node :content) :to-equal content)
+      (expect (oref node :created_at) :to-equal timestamp)
       (expect (length (plist-get events :main)) :to-be 1)))
   (it "Sync remote with 1 main event"
     (let* ((pkm-sync-add-event-func (lambda (event)
@@ -531,8 +531,8 @@
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal content)
-      (expect (--> (pkm2-node-db-node node) (pkm2-db-node-created_at it)) :to-equal timestamp)
+      (expect (oref node :content) :to-equal content)
+      (expect (oref node :created_at) :to-equal timestamp)
       (expect (length (plist-get events :main)) :to-be 0))))
 
 

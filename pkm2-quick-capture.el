@@ -27,7 +27,7 @@
                                         (assoc-default it completing-read-choices)))))
                     choice)
                 (car pkm2--capture-parent-nodes-candidates)))
-             (node-db-id (--> (pkm2-node-db-node choice-node) (oref it :id)))
+             (node-db-id  (oref choice-node :id))
              (link-type (or link-type "sub")))
         (pkm--object-capture-sub node-db-id structure-name link-type))
     (message "No capture cadidates, please set capture candidate")))

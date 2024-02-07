@@ -598,12 +598,12 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 ;; ** log change
 (defun pkm2--update-node-with-log (pkm-node db-id new-content timestamp)
   (message "In update log node")
-  (let* ((node-types (pkm2-node-types pkm-node))
+  (let* ((node-types (oref pkm-node :types))
          (log-node (-any (lambda (type)
                            (--> (plist-get pkm-structure-defined-schemas-plist type)
                                 (plist-get it :log-primary)))
                          node-types))
-         (old-content (when log-node (--> (pkm2-node-db-node pkm-node) (oref it :content))))
+         (old-content (when log-node (oref pkm-node :content)))
          (content-type (when log-node
                          (if (stringp old-content)
                              'TEXT
@@ -612,14 +612,14 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                         (pkm2--db-get-or-insert-kvd "history"
                                              old-content
                                              content-type)))
-         (db-id (or db-id (--> (pkm2-node-db-node pkm-node) (oref it :id))))
+         (db-id (or db-id (oref pkm-node :id)))
          (new-db-node (pkm2--db-update-node db-id  new-content timestamp)))
     (when (and log-node history-kvd)
       (pkm2--db-insert-link-between-node-and-kvd db-id (oref history-kvd :id) timestamp content-type nil timestamp))
     new-db-node))
 
 (defun pkm2--update-node-kvd (pkm-node old-kvd new-kvd-id kvd-type context-id old-link-id timestamp)
-  (let* ((node-types (pkm2-node-types pkm-node))
+  (let* ((node-types (oref pkm-node :types))
          (kvd-key (oref old-kvd :key))
          (key-kvd-specs (-non-nil
                          (-map (lambda (structure-name)
@@ -634,7 +634,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          (timestamp (if log-changes-ask-timestamp
                         (pkm2-get-user-selected-timestamp)
                         timestamp))
-         (node-id (--> (pkm2-node-db-node pkm-node) (oref it :id)))
+         (node-id (oref pkm-node :id))
          (new-link  (when new-kvd-id
                       (pkm2--db-insert-link-between-node-and-kvd node-id new-kvd-id timestamp kvd-type context-id))))
     (if log-changes
@@ -968,7 +968,7 @@ Returns output in two formats:
                     :kvds kvds
                     :parent-links parent-links
                     :children-links children-links)))
-    (setf (pkm2-node-types pkm-node) (pkm-object-get-structures pkm-node))
+    (setf (oref pkm-node :types) (pkm-object-get-structures pkm-node))
     pkm-node))
 
 
@@ -1711,24 +1711,24 @@ Commit everything.
                                                      node-specifier
                                                      commited-nodes-and-structures-with-db-ids)))
                                               (-map (lambda (node-db-id)
-                                                        (-map (lambda (kvd-info)
-                                                                (let* ((kvd-asset-schema (plist-get kvd-info :asset-schema))
-                                                                       (kvd-db-id (plist-get kvd-info :db-id))
-                                                                       (kvd-type (plist-get kvd-asset-schema :data-type))
-                                                                       (links (list
-                                                                               :node-db-id node-db-id
-                                                                               :kvd-db-id kvd-db-id
-                                                                               :db-kvd-link (pkm2--db-insert-link-between-node-and-kvd
-                                                                                             node-db-id
-                                                                                             kvd-db-id
-                                                                                             (pkm2-get-current-timestamp)
-                                                                                             kvd-type
-                                                                                             nil
-                                                                                             nil
-                                                                                             nil
-                                                                                             group-id))))
-                                                                  links))
-                                                              committed-kvds))
+                                                      (-map (lambda (kvd-info)
+                                                              (let* ((kvd-asset-schema (plist-get kvd-info :asset-schema))
+                                                                     (kvd-db-id (plist-get kvd-info :db-id))
+                                                                     (kvd-type (plist-get kvd-asset-schema :data-type))
+                                                                     (links (list
+                                                                             :node-db-id node-db-id
+                                                                             :kvd-db-id kvd-db-id
+                                                                             :db-kvd-link (pkm2--db-insert-link-between-node-and-kvd
+                                                                                           node-db-id
+                                                                                           kvd-db-id
+                                                                                           (pkm2-get-current-timestamp)
+                                                                                           kvd-type
+                                                                                           nil
+                                                                                           nil
+                                                                                           nil
+                                                                                           group-id))))
+                                                                links))
+                                                            committed-kvds))
                                                     node-db-ids)))
                                           node-specifiers)))
                         (plist-put kvd-group :links links)))
@@ -1823,6 +1823,7 @@ Commit everything.
                         "WHERE link.node IS NULL;"))
          (output (sqlite-select pkm2-database-connection query)))
     output))
+
 (defun pkm2--db-delete-kvds-with-no-links ()
   (-each (doom-plist-keys pkm2--key_value_data-type-to-table-plist)
     (lambda (type)

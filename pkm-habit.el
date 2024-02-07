@@ -81,7 +81,7 @@
 (defun pkm-habit-plan-daily-instances (habit-pkm-node &optional num-instances from-unix-timestamp to-unix-timestamp)
   "Creates habit instaces for daily habits. "
   (when (and num-instances to-unix-timestamp) (error "Only specify num-instances or to-unix-timestamp"))
-  (let* ((content (--> (pkm2-node-db-node habit-pkm-node) (pkm2-db-node-content it)))
+  (let* ((content (oref habit-pkm-node :content) )
          (habit-frequency (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-freq")
                                (when it
                                  (if (length> it 1)

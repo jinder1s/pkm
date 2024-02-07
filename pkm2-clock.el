@@ -131,11 +131,11 @@
             (start-time-string (--> (pkm2-node-get-kvds-with-key active-clock "clock-start") (car it) (pkm2-db-kvd-value it) (pkm2--convert-object-to-string it 'DATETIME)))
             (end (pkm2-get-user-selected-timestamp (format "start: %s, Clock end: " start-time-string)))
             (kvd  (pkm2--db-get-or-insert-kvd "clock-end" end 'INTEGER))
-            (node-id (--> (pkm2-node-db-node active-clock) (oref it :id)))
+            (node-id (oref active-clock :id))
             (kvd-id (oref kvd :id))
             (link (pkm2--db-insert-link-between-node-and-kvd node-id kvd-id (pkm2-get-current-timestamp) 'INTEGER)))
       (when (and (not dont-ask-parent) (y-or-n-p "Clock out done, would you like to clock into a parent node?") )
-        (if-let* ((clocked-node-db-id (--> (pkm2-node-db-node active-clock-parent) (oref it :id)))
+        (if-let* ((clocked-node-db-id (oref active-clock-parent :id))
                   (clockable-parents (when pkm2-clock-auto-clock-into-parent
                                        (pkm2-clock--find-clockable-parents `(,clocked-node-db-id) pkm2-clock-auto-clock-node-types)))
                   (completing-read-choices (-flatten (-map (lambda (c-p)
@@ -146,7 +146,7 @@
                   (choice (when completing-read-choices
                             (--> (completing-read "Which clock would you like to stop?" completing-read-choices)
                                  (assoc-default it completing-read-choices))))
-                  (parent-clock (--> (pkm2-node-db-node choice) (oref it :id) (pkm2-clock-in it))))
+                  (parent-clock (--> (oref choice :id)  (pkm2-clock-in it))))
             parent-clock
           (message "No parent clock to clock into")))
     (message "No active clock")))
@@ -202,7 +202,7 @@
                      choice)
                  (car active-clocked-nodes))))
 
-            (clocked-node-id (--> (pkm2-node-db-node clocked-node) (oref it :id)))
+            (clocked-node-id (oref clocked-node :id))
             (link-type (or link-type "sub")))
       (pkm--object-capture-sub clocked-node-id structure-name link-type)
     (message "No active clocked-node")))
