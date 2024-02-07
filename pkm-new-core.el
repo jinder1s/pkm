@@ -3,6 +3,7 @@
 (require 'cl-generic)
 (require 'cl-macs)
 (require 'ts)
+(require 'eieio)
 (defgroup pkm2 nil
   "Personal knowledge management package."
   :group 'outlines)
