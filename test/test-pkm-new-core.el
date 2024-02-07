@@ -55,9 +55,9 @@
       (setq node (pkm2--db-query-get-node-with-id 1))
       (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal content)
       (expect (--> (pkm2-node-db-node node) (pkm2-db-node-created_at it)) :to-equal timestamp)
-      (expect (pkm2-node-children-links node) :to-be nil)
-      (expect (pkm2-node-parent-links node) :to-be nil)
-      (expect (pkm2-node-previous-sequencial-links node) :to-be nil)
+      (expect (oref node :children-links) :to-be nil)
+      (expect (oref node :parent-links) :to-be nil)
+      (expect (oref node :previous-sequencial-links) :to-be nil)
       (expect (pkm2-node-next-sequencial-links node) :to-be nil)
       (expect (pkm2-node-flat-links node) :to-be nil)
       (expect (pkm2-node-kvds node) :to-be nil)))
@@ -78,9 +78,9 @@
       (expect (nth 2 (car database-nodes)) :to-equal value)
       (expect (nth 3 (car database-nodes)) :to-equal timestamp) ; created_at
       (setq kvd (pkm2--db-get-or-insert-kvd key value type))
-      (expect (pkm2-db-kvd-key kvd) :to-equal key)
-      (expect (pkm2-db-kvd-value kvd) :to-equal value)
-      (expect (pkm2-db-kvd-created_at kvd) :to-equal timestamp)))
+      (expect (oref kvd :key) :to-equal key)
+      (expect (oref kvd :value) :to-equal value)
+      (expect (oref kvd :created_at) :to-equal timestamp)))
 
 (it "Inserting text kvd without specifying type. It should default to TEXT"
     (let* ((key "test-key")
@@ -98,9 +98,9 @@
       (expect (nth 2 (car database-kvds)) :to-equal value)
       (expect (nth 3 (car database-kvds)) :to-equal timestamp) ; created_at
       (setq kvd (pkm2--db-get-or-insert-kvd key value))
-      (expect (pkm2-db-kvd-key kvd) :to-equal key)
-      (expect (pkm2-db-kvd-value kvd) :to-equal value)
-      (expect (pkm2-db-kvd-created_at kvd) :to-equal timestamp))))
+      (expect (oref kvd :key) :to-equal key)
+      (expect (oref kvd :value) :to-equal value)
+      (expect (oref kvd :created_at) :to-equal timestamp))))
 
 
 (describe "Object definition tests"
@@ -167,9 +167,9 @@
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
       (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal node-content)
-      (expect (pkm2-node-children-links node) :to-be nil)
-      (expect (pkm2-node-parent-links node) :to-be nil)
-      (expect (pkm2-node-previous-sequencial-links node) :to-be nil)
+      (expect (oref node :children-links) :to-be nil)
+      (expect (oref node :parent-links) :to-be nil)
+      (expect (oref node :previous-sequencial-links) :to-be nil)
       (expect (pkm2-node-next-sequencial-links node) :to-be nil)
       (expect (pkm2-node-flat-links node) :to-be nil)
       (expect (length (pkm2-node-kvds node)) :to-be  1)
@@ -180,8 +180,8 @@
       (expect (nth 1 (car database-kvds)) :to-equal kvd-key)
       (expect (nth 2 (car database-kvds)) :to-equal kvd-value)
       (setq kvd (pkm2--db-get-or-insert-kvd kvd-key kvd-value))
-      (expect (pkm2-db-kvd-key kvd) :to-equal kvd-key)
-      (expect (pkm2-db-kvd-value kvd) :to-equal kvd-value)
+      (expect (oref kvd :key) :to-equal kvd-key)
+      (expect (oref kvd :value) :to-equal kvd-value)
       )))
 
 
@@ -233,9 +233,9 @@
       (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
       (setq node (pkm2--db-query-get-node-with-id 1))
       (expect (--> (pkm2-node-db-node node) (pkm2-db-node-content it)) :to-equal node-content)
-      (expect (pkm2-node-children-links node) :to-be nil)
-      (expect (pkm2-node-parent-links node) :to-be nil)
-      (expect (pkm2-node-previous-sequencial-links node) :to-be nil)
+      (expect (oref node :children-links) :to-be nil)
+      (expect (oref node :parent-links) :to-be nil)
+      (expect (oref node :previous-sequencial-links) :to-be nil)
       (expect (pkm2-node-next-sequencial-links node) :to-be nil)
       (expect (pkm2-node-flat-links node) :to-be nil)
       (expect (length (pkm2-node-kvds node)) :to-be  4)
@@ -247,8 +247,8 @@
       (expect (nth 1 (car database-kvds)) :to-equal kvd-key)
       (expect (nth 2 (car database-kvds)) :to-equal kvd-value)
       (setq kvd (pkm2--db-get-or-insert-kvd kvd-key kvd-value))
-      (expect (pkm2-db-kvd-key kvd) :to-equal kvd-key)
-      (expect (pkm2-db-kvd-value kvd) :to-equal kvd-value)
+      (expect (oref kvd :key) :to-equal kvd-key)
+      (expect (oref kvd :value) :to-equal kvd-value)
 
       (setq datetime-database-kvds (sqlite-select pkm2-database-connection datetime-kvd-sql-query))
       (message "datetime Database kvds: %s" datetime-database-kvds)

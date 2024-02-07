@@ -177,15 +177,6 @@ The original alist is not modified."
    (context :initarg :context)
    (created_at :initarg :created_at)))
 
-(cl-defstruct pkm2-db-nodes-link
-  )
-
-(cl-defstruct pkm2-db-node
-  )
-
-(cl-defstruct pkm2-node
-  )
-
 (defvar pkm2-database-connection nil)
 (defvar pkm2-database-file-path nil)
 
@@ -460,7 +451,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
        `(:action insert
          :what kvd-link
          :data (:node-id ,node-id
-                :new-link-id ,(pkm2-db-kvd-link-id2 output)
+                :new-link-id ,(oref output :id)
                 :shadow-id ,shadow-id
                 :kvd-id ,key_value_data-id
                 :timestamp ,timestamp
@@ -485,7 +476,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                (sqlite-execute pkm2-database-connection it)
                (car it)
                (car it)
-               (make-pkm2-db-nodes-link
+               (pkm-db-nodes-link
                 :id it
                 :type type
                 :node_a node-a
@@ -498,7 +489,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          :what nodes-link
          :data
          (:type ,type
-          :new-link-id ,(pkm2-db-nodes-link-id output)
+          :new-link-id ,(oref output :id)
           :shadow-id ,shadow-id
           :node-a-id ,node-a
           :node-b-id ,node-b
@@ -525,14 +516,14 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                       (sqlite-execute pkm2-database-connection it)
                       (car it)
                       (car it)
-                      (make-pkm2-db-node :id it :content content :created_at timestamp))))
+                      (pkm-db-node :id it :content content :created_at timestamp))))
     (when (and output (not no-new-event))
       (pkm2--sync-add-event
        `(:action insert
          :what node
          :data
          (:content ,content
-          :new-node-id ,(pkm2-db-node-id output)
+          :new-node-id ,(oref output :id)
           :shadow-id ,shadow-id
           :timestamp ,timestamp))))
     output))
@@ -555,7 +546,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          :data
          (:key ,key
           :value ,value
-          :new-kvd-id ,(pkm2-db-kvd-id output)
+          :new-kvd-id ,(oref output :id)
           :shadow-id ,shadow-id
           :timestamp ,timestamp
           :type ,type))))
@@ -584,7 +575,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
           (--> (pkm2--db-compile-update-statement table-name value-names values where-clause returning-column-names)
                (sqlite-execute pkm2-database-connection it)
                (car it)
-               (make-pkm2-db-node
+               (pkm-db-node
                 :id (nth 0 it)
                 :content (nth 1 it)
                 :created_at (nth 2 it)
@@ -612,7 +603,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                            (--> (plist-get pkm-structure-defined-schemas-plist type)
                                 (plist-get it :log-primary)))
                          node-types))
-         (old-content (when log-node (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-content it))))
+         (old-content (when log-node (--> (pkm2-node-db-node pkm-node) (oref it :content))))
          (content-type (when log-node
                          (if (stringp old-content)
                              'TEXT
@@ -621,15 +612,15 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                         (pkm2--db-get-or-insert-kvd "history"
                                              old-content
                                              content-type)))
-         (db-id (or db-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it))))
+         (db-id (or db-id (--> (pkm2-node-db-node pkm-node) (oref it :id))))
          (new-db-node (pkm2--db-update-node db-id  new-content timestamp)))
     (when (and log-node history-kvd)
-      (pkm2--db-insert-link-between-node-and-kvd db-id (pkm2-db-kvd-id history-kvd) timestamp content-type nil timestamp))
+      (pkm2--db-insert-link-between-node-and-kvd db-id (oref history-kvd :id) timestamp content-type nil timestamp))
     new-db-node))
 
 (defun pkm2--update-node-kvd (pkm-node old-kvd new-kvd-id kvd-type context-id old-link-id timestamp)
   (let* ((node-types (pkm2-node-types pkm-node))
-         (kvd-key (pkm2-db-kvd-key old-kvd))
+         (kvd-key (oref old-kvd :key))
          (key-kvd-specs (-non-nil
                          (-map (lambda (structure-name)
                                  (pkm-object-kvd-get-kvd-spec-for-key-in-structure kvd-key structure-name))
@@ -643,7 +634,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          (timestamp (if log-changes-ask-timestamp
                         (pkm2-get-user-selected-timestamp)
                         timestamp))
-         (node-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it)))
+         (node-id (--> (pkm2-node-db-node pkm-node) (oref it :id)))
          (new-link  (when new-kvd-id
                       (pkm2--db-insert-link-between-node-and-kvd node-id new-kvd-id timestamp kvd-type context-id))))
     (if log-changes
@@ -765,7 +756,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 VAlue can be a number, string, or list of numbers or strings."
   (--> (pkm2-node-kvds node)
        (-find (lambda (kvd)
-                (and (equal (pkm2-db-kvd-key kvd) key)(equal (pkm2-db-kvd-value kvd) value))) it)
+                (and (equal (oref kvd :key)  key)(equal (oref kvd :value) value))) it)
        (when it t)))
 
 
@@ -773,13 +764,14 @@ VAlue can be a number, string, or list of numbers or strings."
   "Get value of kvd  in NODE whose key = KEY"
   (--> (pkm2-node-kvds node)
        (-filter (lambda (kvd)
-                  (equal (pkm2-db-kvd-key kvd) key)) it)))
+                  (equal (oref kvd :key) key)) it)))
 
 (defun pkm2-node-get-kvd-value-with-key(node key &optional allow-multiple)
   "Get value or values of kvd in NODE whose key = KEY"
   (let* ((kvds (pkm2-node-get-kvds-with-key node key))
          (has-multiple (length> kvds 1))
-         (values (-map #'pkm2-db-kvd-value kvds)))
+         (values (-map (lambda (kvd)
+                         (oref kvd :value)) kvds)))
     (if allow-multiple
         values
       (if has-multiple
@@ -871,10 +863,10 @@ Returns output in two formats:
          (return-plist t)
          (kvds-l (pkm2--db-do-sql-query-and-get-all-rows query return-plist))
          (kvds (-map (lambda (kvd-plist)
-                       (pkm-db-kvd :id (plist-get kvd-plist "data_id" #'equal)
+                       (pkm-kvd :id (plist-get kvd-plist "data_id" #'equal)
                                    :type (intern (plist-get kvd-plist "type" #'equal))
                                    :link-id (plist-get kvd-plist "link_id" #'equal)
-                                   :context-id (plist-get kvd-plist "context_id" #'equal)
+                                   :context_id (plist-get kvd-plist "context_id" #'equal)
                                    :key (plist-get kvd-plist "key" #'equal)
                                    :value (plist-get kvd-plist "value" #'equal)
                                    :created_at (plist-get kvd-plist "created_at" #'equal)))
@@ -917,7 +909,7 @@ Returns output in two formats:
                        (pkm-db-kvd :id (plist-get kvd-plist "data_id" #'equal)
                                    :type (intern (plist-get kvd-plist "type" #'equal))
                                    :link-id (plist-get kvd-plist "link_id" #'equal)
-                                   :context-id (plist-get kvd-plist "context_id" #'equal)
+                                   :context_id (plist-get kvd-plist "context_id" #'equal)
                                    :key (plist-get kvd-plist "key" #'equal)
                                    :value (plist-get kvd-plist "value" #'equal)
                                    :created_at (plist-get kvd-plist "created_at" #'equal)))
@@ -933,7 +925,7 @@ Returns output in two formats:
          (return-plist t)
          (links-l (pkm2--db-do-sql-query-and-get-all-rows query return-plist))
          (links (-map (lambda (link-plist)
-                        (make-pkm2-db-nodes-link
+                        (pkm-db-nodes-link
                          :id (plist-get link-plist "id" #'equal)
                          :type (plist-get link-plist "type" #'equal)
                          :node_a (plist-get link-plist "node_a" #'equal)
@@ -951,7 +943,7 @@ Returns output in two formats:
          (return-plist t)
          (links-l (pkm2--db-do-sql-query-and-get-all-rows query return-plist))
          (links (-map (lambda (link-plist)
-                        (make-pkm2-db-nodes-link
+                        (pkm-db-nodes-link
                          :id (plist-get link-plist "id" #'equal)
                          :type (plist-get link-plist "type" #'equal)
                          :node_a (plist-get link-plist "node_a" #'equal)
@@ -966,16 +958,16 @@ Returns output in two formats:
   (let* ((kvds (pkm2--db-query-get-kvds-for-node-with-id id))
          (query (format "SELECT * FROM node WHERE id = '%d';" id))
          (node-info (car (pkm2--db-do-sql-query-and-get-all-rows query t)))
-         (db-node (make-pkm2-db-node :id (plist-get node-info "id" #'equal)
-                                     :content (plist-get node-info "content" #'equal)
-                                     :created_at (plist-get node-info "created_at" #'equal)
-                                     :modified_at (plist-get node-info "modified_at" #'equal)))
          (parent-links (pkm2--db-query-get-links-where-node-is-child id))
          (children-links (pkm2--db-query-get-links-where-node-is-parent id))
-         (pkm-node (make-pkm2-node :db-node db-node
-                                   :kvds kvds
-                                   :parent-links parent-links
-                                   :children-links children-links)))
+         (pkm-node (pkm-node
+                    :id (plist-get node-info "id" #'equal)
+                    :content (plist-get node-info "content" #'equal)
+                    :created_at (plist-get node-info "created_at" #'equal)
+                    :modified_at (plist-get node-info "modified_at" #'equal)
+                    :kvds kvds
+                    :parent-links parent-links
+                    :children-links children-links)))
     (setf (pkm2-node-types pkm-node) (pkm-object-get-structures pkm-node))
     pkm-node))
 
@@ -1375,7 +1367,7 @@ Returns output in two formats:
            :asset-schema (plist-get s-node :asset-schema)
            :asset-capture-info temp
            :db-node db-node
-           :db-id (or db-id (pkm2-db-node-id db-node) ))
+           :db-id (or db-id (oref db-node :id) ))
         (progn (display-warning 'pkm-object "Did not succed in making node %S" s-node)
                (error "Did not succeed at creating node: %S" s-node)) )) ))
 
@@ -1392,7 +1384,7 @@ Returns output in two formats:
              :asset-schema asset-schema
              :asset-capture-info temp
              :db-kvd  db-kvd
-             :db-id (pkm2-db-kvd-id db-kvd))
+             :db-id (oref db-kvd :id))
           (progn (display-warning 'pkm-object "Did not succed in making kvd: %S" s-kvd)
                  (error "Did not succed in creating kvd: %S" s-kvd)))) ))
 (defun pkm--object-add-kvd-group-to-db (s-kvd-group)
@@ -1811,9 +1803,9 @@ Commit everything.
                    (-distinct (-concat (list label) (plist-get pkm-links-type-to-label-eq-plist link-type))))))
 
 (defun pkm2--link-get-link-parent-id (link)
-  (pkm2-db-nodes-link-node_a link))
+  (oref link :node_a))
 (defun pkm2--link-get-link-child-id (link)
-  (pkm2-db-nodes-link-node_b link))
+  (oref link :node_b))
 
 (pkm2--register-link-label 'HIERARCHICAL "sub")
 (pkm2--register-link-label 'HIERARCHICAL "related")
