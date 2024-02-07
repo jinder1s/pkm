@@ -754,7 +754,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 (defun pkm2-node-has-key-value (node key value)
   "Check if NODE has KEY VALUE kvd.
 VAlue can be a number, string, or list of numbers or strings."
-  (--> (pkm2-node-kvds node)
+  (--> (oref node :kvds)
        (-find (lambda (kvd)
                 (and (equal (oref kvd :key)  key)(equal (oref kvd :value) value))) it)
        (when it t)))
@@ -762,7 +762,7 @@ VAlue can be a number, string, or list of numbers or strings."
 
 (defun pkm2-node-get-kvds-with-key(node key)
   "Get value of kvd  in NODE whose key = KEY"
-  (--> (pkm2-node-kvds node)
+  (--> (oref node :kvds)
        (-filter (lambda (kvd)
                   (equal (oref kvd :key) key)) it)))
 
@@ -1297,7 +1297,7 @@ Returns output in two formats:
                                                      (pkm2-node-has-key-value pkm-node key actual-choice)))
                                                  (plist-get kvd-schema :choices)))))
                                   fully-specified) )))
-    ; (message "fs: %S, hk: %S\nkvd:%S" fully-specified has-kvd (pkm2-node-kvds pkm-node))
+    ; (message "fs: %S, hk: %S\nkvd:%S" fully-specified has-kvd (oref pkm-node :kvds))
     (eq (length fully-specified ) (length has-kvd))))
 
 

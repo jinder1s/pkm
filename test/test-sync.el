@@ -93,7 +93,7 @@
                            (pkm2-get-current-timestamp)
                            type))
            (pkm-node (pkm2--db-query-get-node-with-id 1))
-           (kvds (pkm2-node-kvds pkm-node)))
+           (kvds (oref pkm-node :kvds)))
       (expect (length kvds) :to-equal 1)
       (expect (pkm2-db-kvd-id inserted-kvd) :to-equal (pkm2-db-kvd-id (car kvds)))
       (expect (pkm2-db-kvd-link-id2 inserted-link) :to-equal (pkm2-db-kvd-link-id (car kvds)))
@@ -173,7 +173,7 @@
                            (pkm2-get-current-timestamp)
                            type))
            (pkm-node (pkm2--db-query-get-node-with-id 1))
-           (kvds (pkm2-node-kvds pkm-node)))
+           (kvds (oref pkm-node :kvds)))
       (expect (length kvds) :to-equal 1)
       (expect (pkm2-db-kvd-id inserted-kvd) :to-equal (pkm2-db-kvd-id (car kvds)))
       (expect (pkm2-db-kvd-link-id2 inserted-link) :to-equal (pkm2-db-kvd-link-id (car kvds)))
@@ -225,7 +225,7 @@
                            (pkm2-get-current-timestamp)
                            type))
            (pkm-node (pkm2--db-query-get-node-with-id 1))
-           (kvds (pkm2-node-kvds pkm-node)))
+           (kvds (oref pkm-node :kvds)))
       (expect (length kvds) :to-equal 1)
       (expect (pkm2-db-kvd-id inserted-kvd) :to-equal (pkm2-db-kvd-id (car kvds)))
       (expect (pkm2-db-kvd-link-id2 inserted-link) :to-equal (pkm2-db-kvd-link-id (car kvds)))
@@ -307,7 +307,7 @@
            (pkm-node (progn
                        (pkm-sync--apply-remote-events (list node-event kvd-event kvd-link-event) nil)
                        (pkm2--db-query-get-node-with-id 1) ))
-           (kvds (pkm2-node-kvds pkm-node)))
+           (kvds (oref pkm-node :kvds)))
       (expect (length kvds) :to-equal 1)
       (expect (length (plist-get events :main)) :to-be 3)
       (expect (-map (lambda (event) (plist-get event :action)) (plist-get events :main))
@@ -390,13 +390,13 @@
            (pkm-node (progn
                        (pkm-sync--apply-remote-events (list node-event kvd-event kvd-link-event) nil)
                        (pkm2--db-query-get-node-with-id 1) ))
-           (kvds (pkm2-node-kvds pkm-node)))
+           (kvds (oref pkm-node :kvds)))
       (expect (length kvds) :to-equal 1)
       (expect (length (plist-get events :main)) :to-be 3)
 
       (pkm-sync--apply-remote-events (list kvd-link-delete-event) nil)
       (setq pkm-node (pkm2--db-query-get-node-with-id 1))
-      (setq kvds (pkm2-node-kvds pkm-node))
+      (setq kvds (oref pkm-node :kvds))
       (expect (length kvds) :to-equal 0)
 
       (expect (length (plist-get events :main)) :to-be 4)
@@ -420,13 +420,13 @@
            (pkm-node (progn
                        (pkm-sync--apply-remote-events (list node-event kvd-event kvd-link-event) nil)
                        (pkm2--db-query-get-node-with-id 1) ))
-           (kvds (pkm2-node-kvds pkm-node)))
+           (kvds (oref pkm-node :kvds)))
       (expect (length kvds) :to-equal 1)
       (expect (length (plist-get events :main)) :to-be 3)
 
       (pkm-sync--apply-remote-events (list kvd-link-archive-event) nil)
       (setq pkm-node (pkm2--db-query-get-node-with-id 1))
-      (setq kvds (pkm2-node-kvds pkm-node))
+      (setq kvds (oref pkm-node :kvds))
       (expect (length kvds) :to-equal 0)
 
       (expect (length (plist-get events :main)) :to-be 4)

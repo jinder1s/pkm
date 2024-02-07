@@ -348,7 +348,7 @@
   (let* ((browse-id (pkm2-browse-node-browse-id browse-node))
          (pkm-node (pkm2-browse-node-pkm-node browse-node))
          (db-id (--> (pkm2-node-db-node pkm-node) (pkm2-db-node-id it)))
-         (kvds (pkm2-node-kvds pkm-node))
+         (kvds (oref pkm-node :kvds))
          (level (pkm2-browse-node-level browse-node))
          (prefix2 (concat (propertize " " 'display `(space :width ,(*  2 (abs (or level 0)))))))
          (hidden-string (concat
@@ -553,7 +553,7 @@
                  (id (pkm2-db-node-id db-node))
                  (new-db-node (pkm2--update-node-with-log pkm-node id new-content (pkm2-get-current-timestamp))))
             (setf (pkm2-node-db-node pkm-node) new-db-node))
-        (let* ((kvds (pkm2-node-kvds pkm-node))
+        (let* ((kvds (oref pkm-node :kvds))
                (key (pkm2-db-kvd-key kvd))
                (old-kvd-id (pkm2-db-kvd-id kvd))
                (type (assoc-default key (or (-flatten (-map (lambda (type)
@@ -579,7 +579,7 @@
                (new-link (pkm2--update-node-kvd pkm-node kvd new-kvd-id type context-id old-link-id (pkm2-get-current-timestamp))))
           (setf (pkm2-db-kvd-link-id new-kvd) (pkm2-db-kvd-link-id2 new-link))
           (setf (pkm2-db-kvd-context-id new-kvd) context-id)
-          (setf (pkm2-node-kvds pkm-node) (-map (lambda (temp-kvd)
+          (setf (oref pkm-node :kvds) (-map (lambda (temp-kvd)
 
                                                   (if (equal (pkm2-db-kvd-id temp-kvd) (pkm2-db-kvd-id kvd))
                                                       new-kvd ; Replace modified kvd with new kvd
@@ -700,7 +700,7 @@
          (new-kvd-id (pkm2-db-kvd-id new-kvd))
          (new-link (pkm2--db-insert-link-between-node-and-kvd node-id new-kvd-id (pkm2-get-current-timestamp) type)))
     (setf (pkm2-db-kvd-link-id new-kvd) (pkm2-db-kvd-link-id2 new-link))
-    (setf (pkm2-node-kvds pkm-node) (-concat (pkm2-node-kvds pkm-node) (list new-kvd)))))
+    (setf (oref pkm-node :kvds) (-concat (oref pkm-node :kvds) (list new-kvd)))))
 
 
 (defun pkm2--browse-delete-link-to-kvd-at-point ()
@@ -711,10 +711,10 @@
          (kvd (get-text-property current-point :db-kvd))
          (type (pkm2-db-kvd-type kvd))
          (link-id (pkm2-db-kvd-link-id kvd))
-         (kvds (pkm2-node-kvds pkm-node))
+         (kvds (oref pkm-node :kvds))
          (timestamp (pkm2-get-current-timestamp)))
     (pkm2--update-node-kvd pkm-node kvd nil type nil link-id timestamp)
-    (setf (pkm2-node-kvds pkm-node) (-filter (lambda (temp-kvd)
+    (setf (oref pkm-node :kvds) (-filter (lambda (temp-kvd)
                                                (if (equal (pkm2-db-kvd-id temp-kvd) (pkm2-db-kvd-id kvd))
                                                    nil ; delete this kvd from node
                                                  t))
@@ -730,7 +730,7 @@
          (parent-db-node (pkm2-node-db-node parent-pkm-node))
          (parent-node-db-id (pkm2-db-node-id parent-db-node))
 
-         (links-between-nodes (--> (pkm2-node-parent-links pkm-node) (-filter (lambda (link)
+         (links-between-nodes (--> (oref pkm-node :parent-links) (-filter (lambda (link)
                                                                                 (and (equal (pkm2--link-get-link-child-id link) db-id)
                                                                                      (equal (pkm2--link-get-link-parent-id link) parent-node-db-id)))
                                                                               it)))
@@ -1034,7 +1034,7 @@
 
 
 (defun pkm2-browse-hierarchy-organize-parent (pkm-node pkm-nodes)
-  (let* ((parents-links (pkm2-node-parent-links pkm-node))
+  (let* ((parents-links (oref pkm-node :parent-links))
          (pkm-node-parent-node-db-ids (-map #'pkm2--link-get-link-parent-id parents-links))
          (present-parents (-map (lambda (p-id)
                                    (-find (lambda (p-n)

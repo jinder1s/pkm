@@ -82,7 +82,7 @@
          (existing-clock (--> (pkm2-clock--get-current-clock-pkm-nodes)
                               (-find
                                (lambda (clock-pkm-node)
-                                 (-as-> (pkm2-node-parent-links clock-pkm-node)
+                                 (-as-> (oref clock-pkm-node :parent-links)
                                         it-clock
                                         (-map  #'pkm2-db-nodes-link-node_a it-clock)
                                         (member parent-node-db-id it-clock)))
@@ -111,7 +111,7 @@
   (interactive)
   (if-let* ((active-clocks  (pkm2-clock--get-current-clock-pkm-nodes))
             (active-clocks-parents (-map (lambda (a-c)
-                                           (--> (pkm2-node-parent-links a-c)
+                                           (--> (oref a-c :parent-links)
                                                 (-filter (lambda (link)
                                                            (equal "clock" (pkm2-db-nodes-link-type link))) it)
                                                 (-map #'pkm2--link-get-link-parent-id it)

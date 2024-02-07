@@ -58,9 +58,9 @@
       (expect (oref node :children-links) :to-be nil)
       (expect (oref node :parent-links) :to-be nil)
       (expect (oref node :previous-sequencial-links) :to-be nil)
-      (expect (pkm2-node-next-sequencial-links node) :to-be nil)
-      (expect (pkm2-node-flat-links node) :to-be nil)
-      (expect (pkm2-node-kvds node) :to-be nil)))
+      (expect (oref node :next-sequencial-links) :to-be nil)
+      (expect (oref node :flat-links) :to-be nil)
+      (expect (oref node :kvds) :to-be nil)))
 
   (it "Inserting text kvd"
     (let* ((key "test-key")
@@ -170,9 +170,9 @@
       (expect (oref node :children-links) :to-be nil)
       (expect (oref node :parent-links) :to-be nil)
       (expect (oref node :previous-sequencial-links) :to-be nil)
-      (expect (pkm2-node-next-sequencial-links node) :to-be nil)
-      (expect (pkm2-node-flat-links node) :to-be nil)
-      (expect (length (pkm2-node-kvds node)) :to-be  1)
+      (expect (oref node :next-sequencial-links) :to-be nil)
+      (expect (oref node :flat-links) :to-be nil)
+      (expect (length (oref node :kvds)) :to-be  1)
 
 
       (setq database-kvds (sqlite-select pkm2-database-connection kvd-sql-query))
@@ -236,9 +236,9 @@
       (expect (oref node :children-links) :to-be nil)
       (expect (oref node :parent-links) :to-be nil)
       (expect (oref node :previous-sequencial-links) :to-be nil)
-      (expect (pkm2-node-next-sequencial-links node) :to-be nil)
-      (expect (pkm2-node-flat-links node) :to-be nil)
-      (expect (length (pkm2-node-kvds node)) :to-be  4)
+      (expect (oref node :next-sequencial-links) :to-be nil)
+      (expect (oref node :flat-links) :to-be nil)
+      (expect (length (oref node :kvds)) :to-be  4)
 
 
       (setq database-kvds (sqlite-select pkm2-database-connection text-kvd-sql-query))
