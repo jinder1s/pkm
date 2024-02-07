@@ -53,7 +53,7 @@
     answer))
 
 (defun pkm-ques-commit-answer (question answer timestamp)
-  (let* ((question-db-id (--> (pkm2-node-db-node question) (pkm2-db-node-id it)))
+  (let* ((question-db-id (--> (pkm2-node-db-node question) (oref it :id)))
          (link-label "clock")
          (link-definition (list :pkm-link-label link-label
                                 :parent 'parent
