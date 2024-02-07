@@ -1129,19 +1129,21 @@ Returns output in two formats:
 (defun pkm--object-validate-structure-schema (structure-schema)
   (let* ((assets (plist-get structure-schema :assets))
          (primary-nodes (-filter (lambda (asset) (when (eq (plist-get asset :pkm-type) 'node) (plist-get asset :primary-node)))
-                                      assets))
+                                 assets))
          (has-one-primary-node (= 1 (length primary-nodes))))
-    (-each assets (lambda (asset)
-                    (if (not (plist-get asset :primary-node) )
-                        (if (not (equal (plist-get structure-schema :pkm-type) 'kvd-group ) )
-                            (unless (plist-get asset :link-to)
-                              (error "Asset needs to have a link-to to specify which node this should be linked to: %S \n schema: %S" asset structure-schema))
-                          ))))
-    (if  has-one-primary-node
-        t
-      (if (equal (plist-get structure-schema :pkm-type) 'kvd-group )
-          t
-          (error  (format "Object definition need to have one and only one primary node.\nPrimary nodes: %S" primary-nodes)) ))))
+    ;; (-each assets (lambda (asset)
+    ;;                 (if (not (plist-get asset :primary-node) )
+    ;;                     (if (not (equal (plist-get structure-schema :pkm-type) 'kvd-group ) )
+    ;;                         (unless (plist-get asset :link-to)
+    ;;                           (error "Asset needs to have a link-to to specify which node this should be linked to: %S \n schema: %S" asset structure-schema))
+    ;;                       ))))
+    ;; (if  has-one-primary-node
+    ;;     t
+    ;;   (if (equal (plist-get structure-schema :pkm-type) 'kvd-group )
+    ;;       t
+    ;;     (error  (format "Object definition need to have one and only one primary node.\nPrimary nodes: %S" primary-nodes)) ))
+    t
+    ))
 
 (defun pkm--object-does-specifier-match (specifier asset-schema)
   (cond
