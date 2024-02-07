@@ -15,8 +15,8 @@
 
 
 (defun change-link-from-a-to-b-verbose (a-key a-value b-key b-value type)
-  (let* ((a-id (--> (pkm2--db-get-or-insert-kvd a-key a-value type) (oref it :id)))
-         (b-id (--> (pkm2--db-get-or-insert-kvd b-key b-value type) (oref it :id))))
+  (let* ((a-id (--> (pkm2--db-get-or-insert-kvd a-key a-value type) (pkm-get-db-id it)))
+         (b-id (--> (pkm2--db-get-or-insert-kvd b-key b-value type) (pkm-get-db-id it))))
     (change-link-from-a-to-b pkm2-database-connection a-id b-id type)))
 
 

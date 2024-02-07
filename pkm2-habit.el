@@ -265,7 +265,7 @@
 
 
 (defun pkm2-habit-should-create-habit-instance (habit-pkm-node)
-  (let* ((node-id (oref habit-pkm-node :id))
+  (let* ((node-id (pkm-get-db-id habit-pkm-node))
          (habit-frequency (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-freq")
                                (when it
                                  (if (length> it 1)
@@ -373,7 +373,7 @@
 (defun pkm2-habit-should-delete-habit-instance (habit-instance-pkm-node)
   "If no active clock, and habit instance is hourly and no recent clocks, delete the hourly instance."
   (unless (pkm2-clock--get-current-clock-pkm-nodes)
-    (let* ((node-id (oref habit-instance-pkm-node :id))
+    (let* ((node-id (pkm-get-db-id habit-instance-pkm-node))
            (habit-nodes (--> `((:or db-nodes (:db-node-ids (,node-id)))
                                (:convert-and convert-to-parents (:levels 1))
                                (:and structure-type (:structure-name habit-node)))
@@ -394,7 +394,7 @@
         t))))
 
 (defun pkm2-habit-should-kill-habit-instance (habit-instance-pkm-node)
-  (let* ((node-id (oref habit-instance-pkm-node :id))
+  (let* ((node-id (pkm-get-db-id habit-instance-pkm-node))
          (habit-instance-deadline (--> (pkm2-node-get-kvds-with-key habit-instance-pkm-node "deadline")
                               (when it
                                 (if (length> it 1)
@@ -425,7 +425,7 @@
 (defun pkm2-habit-switch-to-alternative ())
 
 (defun pkm2-habit-create-instances (habit-pkm-node)
-  (let* ((node-id (oref habit-pkm-node :id))
+  (let* ((node-id (pkm-get-db-id habit-pkm-node))
          (content (oref habit-pkm-node :content))
          (habit-frequency (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-freq")
                                (when it
@@ -555,7 +555,7 @@
                                       (when it (* it 60))) )
                                active-habit-instances-with-deadlines))
          (is-hourly (-map (lambda (h-i-d)
-                            (--> `((:or db-nodes (:db-node-ids (,(oref h-i-d :id))))
+                            (--> `((:or db-nodes (:db-node-ids (,(pkm-get-db-id h-i-d))))
                                    (:convert-or convert-to-parents (:levels ALL))
                                    (:and structure-type (:structure-name habit-node))
                                    (:and kvd (:key "habit-freq" :value "hourly" :data-type TEXT)))
@@ -593,7 +593,7 @@
                (-map #'pkm2--db-query-get-node-with-id it)))
          (a-h-i-delete (-filter #'pkm2-habit-should-delete-habit-instance active-habit-instances))
          (a-h-i-d-db-ids (-map (lambda (h-i-pkm-node)
-                                  (oref h-i-pkm-node :id)
+                                  (pkm-get-db-id h-i-pkm-node)
                                       )
                                a-h-i-delete))
          (a-h-i-kill (-filter #'pkm2-habit-should-kill-habit-instance active-habit-instances))
@@ -605,7 +605,7 @@
                                                       (car it)))))
                                            a-h-i-kill))
          (kill-kvd-id (--> (pkm2--db-get-or-insert-kvd "task-status" "KILL" 'TEXT)
-                           (oref it :id))))
+                           (pkm-get-db-id it))))
 
     (-each a-h-i-d-db-ids #'pkm2--db-delete-node )
     (-each-indexed

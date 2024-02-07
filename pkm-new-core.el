@@ -178,6 +178,15 @@ The original alist is not modified."
    (context :initarg :context)
    (created_at :initarg :created_at)))
 
+(cl-defmethod pkm-get-db-id ((kvd pkm-db-kvd))
+  (oref kvd :id))
+(cl-defmethod pkm-get-db-id ((node pkm-db-node))
+  (oref node :id))
+(cl-defmethod pkm-get-db-id ((link pkm-db-kvd-link))
+  (oref link :id))
+(cl-defmethod pkm-get-db-id ((link pkm-db-nodes-link))
+  (oref link :id))
+
 (defvar pkm2-database-connection nil)
 (defvar pkm2-database-file-path nil)
 
@@ -452,7 +461,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
        `(:action insert
          :what kvd-link
          :data (:node-id ,node-id
-                :new-link-id ,(oref output :id)
+                :new-link-id ,(pkm-get-db-id output)
                 :shadow-id ,shadow-id
                 :kvd-id ,key_value_data-id
                 :timestamp ,timestamp
@@ -490,7 +499,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          :what nodes-link
          :data
          (:type ,type
-          :new-link-id ,(oref output :id)
+          :new-link-id ,(pkm-get-db-id output)
           :shadow-id ,shadow-id
           :node-a-id ,node-a
           :node-b-id ,node-b
@@ -524,7 +533,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          :what node
          :data
          (:content ,content
-          :new-node-id ,(oref output :id)
+          :new-node-id ,(pkm-get-db-id output)
           :shadow-id ,shadow-id
           :timestamp ,timestamp))))
     output))
@@ -547,7 +556,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          :data
          (:key ,key
           :value ,value
-          :new-kvd-id ,(oref output :id)
+          :new-kvd-id ,(pkm-get-db-id output)
           :shadow-id ,shadow-id
           :timestamp ,timestamp
           :type ,type))))
@@ -613,10 +622,10 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                         (pkm2--db-get-or-insert-kvd "history"
                                              old-content
                                              content-type)))
-         (db-id (or db-id (oref pkm-node :id)))
+         (db-id (or db-id (pkm-get-db-id pkm-node)))
          (new-db-node (pkm2--db-update-node db-id  new-content timestamp)))
     (when (and log-node history-kvd)
-      (pkm2--db-insert-link-between-node-and-kvd db-id (oref history-kvd :id) timestamp content-type nil timestamp))
+      (pkm2--db-insert-link-between-node-and-kvd db-id (pkm-get-db-id history-kvd) timestamp content-type nil timestamp))
     new-db-node))
 
 (defun pkm2--update-node-kvd (pkm-node old-kvd new-kvd-id kvd-type context-id old-link-id timestamp)
@@ -635,7 +644,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
          (timestamp (if log-changes-ask-timestamp
                         (pkm2-get-user-selected-timestamp)
                         timestamp))
-         (node-id (oref pkm-node :id))
+         (node-id (pkm-get-db-id pkm-node))
          (new-link  (when new-kvd-id
                       (pkm2--db-insert-link-between-node-and-kvd node-id new-kvd-id timestamp kvd-type context-id))))
     (if log-changes
@@ -1370,7 +1379,7 @@ Returns output in two formats:
            :asset-schema (plist-get s-node :asset-schema)
            :asset-capture-info temp
            :db-node db-node
-           :db-id (or db-id (oref db-node :id) ))
+           :db-id (or db-id (pkm-get-db-id db-node) ))
         (progn (display-warning 'pkm-object "Did not succed in making node %S" s-node)
                (error "Did not succeed at creating node: %S" s-node)) )) ))
 
@@ -1387,7 +1396,7 @@ Returns output in two formats:
              :asset-schema asset-schema
              :asset-capture-info temp
              :db-kvd  db-kvd
-             :db-id (oref db-kvd :id))
+             :db-id (pkm-get-db-id db-kvd))
           (progn (display-warning 'pkm-object "Did not succed in making kvd: %S" s-kvd)
                  (error "Did not succed in creating kvd: %S" s-kvd)))) ))
 (defun pkm--object-add-kvd-group-to-db (s-kvd-group)
