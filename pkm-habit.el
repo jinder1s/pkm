@@ -86,30 +86,30 @@
                                (when it
                                  (if (length> it 1)
                                      (error "habit node has more than one frequency")
-                                   (pkm2-db-kvd-value (car it))))))
+                                   (oref (car it) :id)))))
          (habit-period (assoc-default habit-frequency pkm2-habit-freq-to-seconds))
          (habit-interval (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-interval")
                               (when it
                                 (if (length> it 1)
                                     (error "habit node has more than one interval")
-                                  (pkm2-db-kvd-value (car it))))
+                                  (oref (car it) :id)))
                               (or it 1)))
          (period (* habit-period habit-interval))
          (habit-schedule-hour (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-schedule-hour")
                                    (when it
                                      (if (length> it 1)
                                          (error "habit node has more than one habit-schedule-hour")
-                                       (pkm2-db-kvd-value (car it))))))
+                                       (oref (car it) :id)))))
          (habit-duration-hours (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-duration-hours")
                                     (when it
                                       (if (length> it 1)
                                           (error "habit node has more than one habit-duration-hours")
-                                        (pkm2-db-kvd-value (car it))))))
+                                        (oref (car it) :id)))))
          (habit-deadline-hour (--> (pkm2-node-get-kvds-with-key habit-pkm-node "habit-deadline-hour")
                                     (when it
                                       (if (length> it 1)
                                           (error "habit node has more than one habit-deadline-hour")
-                                        (pkm2-db-kvd-value (car it))))))
+                                        (oref (car it) :id)))))
          (from-unix-timestamp  (--> (or from-unix-timestamp
                                           (pkm2-get-current-timestamp))
                                       (make-ts :unix it)

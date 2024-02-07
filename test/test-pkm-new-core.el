@@ -82,7 +82,7 @@
       (expect (oref kvd :value) :to-equal value)
       (expect (oref kvd :created_at) :to-equal timestamp)))
 
-(it "Inserting text kvd without specifying type. It should default to TEXT"
+  (it "Inserting text kvd without specifying type. It should default to TEXT"
     (let* ((key "test-key")
            (value "test-value")
            (type 'TEXT)

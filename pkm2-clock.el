@@ -76,8 +76,8 @@
   (interactive)
   (let* ((structure-name 'clock-node)
          (parent-node-db-id (or db-id (--> (funcall pkm2-get-pkm-node-at-point-func)
-                                           (when it (pkm2-node-db-node it))
-                                           (when it (oref it :id) ))
+                                           (when it (oref it :id))
+                                           )
                                 (pkm2-nodes-search "Search node to clock into: ")))
          (existing-clock (--> (pkm2-clock--get-current-clock-pkm-nodes)
                               (-find
@@ -118,8 +118,8 @@
                                                 (-map #'pkm2--db-query-get-node-with-id it)))
                                          active-clocks))
             (completing-read-choices (-flatten-n 1 (-map-indexed (lambda (index a-c-ps)
-                                                               (--> (-map #'pkm2-node-db-node a-c-ps)
-                                                                    (-map #'pkm2-db-node-content it)
+                                                               (--> (-map (lambda (a-c-p) (oref a-c-p :content))  a-c-ps)
+                                                                    
                                                                     (-map-indexed (lambda (index2 clock-content)
                                                                                     (cons clock-content (cons (nth index active-clocks) (nth index2 a-c-ps) ))) it)))
                                                              active-clocks-parents) ) )
@@ -128,7 +128,7 @@
                            (assoc-default it completing-read-choices)) ))
             (active-clock (car choice))
             (active-clock-parent (cdr choice))
-            (start-time-string (--> (pkm2-node-get-kvds-with-key active-clock "clock-start") (car it) (pkm2-db-kvd-value it) (pkm2--convert-object-to-string it 'DATETIME)))
+            (start-time-string (--> (pkm2-node-get-kvds-with-key active-clock "clock-start") (car it) (oref it :value) (pkm2--convert-object-to-string it 'DATETIME)))
             (end (pkm2-get-user-selected-timestamp (format "start: %s, Clock end: " start-time-string)))
             (kvd  (pkm2--db-get-or-insert-kvd "clock-end" end 'INTEGER))
             (node-id (oref active-clock :id))
@@ -139,8 +139,8 @@
                   (clockable-parents (when pkm2-clock-auto-clock-into-parent
                                        (pkm2-clock--find-clockable-parents `(,clocked-node-db-id) pkm2-clock-auto-clock-node-types)))
                   (completing-read-choices (-flatten (-map (lambda (c-p)
-                                                                     (--> (pkm2-node-db-node c-p)
-                                                                          (pkm2-db-node-content it)
+                                                                     (--> (oref c-p :content) 
+                                                                          
                                                                           (cons it c-p)))
                                                                    clockable-parents)))
                   (choice (when completing-read-choices
@@ -190,8 +190,8 @@
                    (let* ((completing-read-choices
                            (-map
                             (lambda (a-c-p)
-                              (--> (pkm2-node-db-node a-c-p)
-                                   (pkm2-db-node-content it)
+                              (--> (oref a-c-p :content)
+                                   
                                    (cons it a-c-p)))
                             active-clocked-nodes))
                           (choice (when completing-read-choices

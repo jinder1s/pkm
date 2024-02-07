@@ -48,7 +48,7 @@
                                    (when it
                                      (if (length> it 1)
                                          (error "question node has more than one answer-type")
-                                       (read (pkm2-db-kvd-value (car it)) )))))
+                                       (read (oref (car it) :value) )))))
          (answer (pkm-read (format "%s: " content) answer-type)))
     answer))
 

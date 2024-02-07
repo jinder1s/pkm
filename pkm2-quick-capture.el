@@ -16,8 +16,8 @@
                   (let* ((completing-read-choices
                           (-map
                            (lambda (a-c-p)
-                             (--> (pkm2-node-db-node a-c-p)
-                                  (pkm2-db-node-content it)
+                             (--> (oref a-c-p :content)
+                                  
                                   (cons it a-c-p)))
                            pkm2--capture-parent-nodes-candidates))
                          (choice (when completing-read-choices
