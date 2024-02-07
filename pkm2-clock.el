@@ -84,7 +84,7 @@
                                (lambda (clock-pkm-node)
                                  (-as-> (oref clock-pkm-node :parent-links)
                                         it-clock
-                                        (-map  #'pkm2-db-nodes-link-node_a it-clock)
+                                        (-map  #'pkm2--link-get-link-parent-id it-clock)
                                         (member parent-node-db-id it-clock)))
                                it)))
 
