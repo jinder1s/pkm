@@ -85,8 +85,7 @@
   (let* ((structure-name 'schedule-node)
          (parent-node-db-id (or db-id
                                 (--> (funcall pkm2-get-pkm-node-at-point-func)
-                                     (when it (pkm2-node-db-node it))
-                                     (when it (pkm2-db-node-id it) ))
+                                     (when it (oref it :id)))
                                 (pkm2-nodes-search "Search node to schedule into: ")))
          (link-label "instance")
          (link-definition (list :pkm-link-label link-label
@@ -103,8 +102,7 @@
 (defun pkm2-tasks-set-node-deadline (&optional db-id)
   (interactive)
   (let* ((target-node (or db-id (--> (funcall pkm2-get-pkm-node-at-point-func)
-                                     (when it (pkm2-node-db-node it))
-                                     (when it (pkm2-db-node-id it) ))
+                                     (when it (oref it :id)))
                           (pkm2-nodes-search "Search node to schedule into: ")))
          (link-label "instance")
          (structure-schema (list :name 'parent-child-node
@@ -131,8 +129,7 @@
           (when  (< (- (nth index deadlines)
                        (nth index alert-seconds))
                     (pkm2-get-current-timestamp))
-            (--> (pkm2-node-db-node h-i-d)
-                 (pkm2-db-node-content it)
+            (--> (oref h-i-d :content)
                  (pkm-hammerspoon-alert it))))))))
 
 (provide 'pkm2-tasks)

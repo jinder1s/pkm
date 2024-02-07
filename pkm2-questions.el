@@ -29,7 +29,7 @@
   (let* ((questions-pkm-query '((:or structure-type (:structure-name question-n))))
          (questions (pkm2-get-nodes-with-pkm-query questions-pkm-query))
          (questions-choices (-map (lambda (question)
-                                    (cons (--> (pkm2-node-db-node question) (pkm2-db-node-content it))
+                                    (cons (oref question :content) 
                                           question))
                                   questions))
          (questions-strings (completing-read-multiple "What questions would you like to answer?" questions-choices))
@@ -43,17 +43,17 @@
                                              (pkm2-get-current-timestamp))))))
 
 (defun pkm-ques-get-answer (question-pkm-node)
-  (let* ((content (--> (pkm2-node-db-node question-pkm-node) (pkm2-db-node-content it)))
+  (let* ((content (oref question-pkm-node :content))
          (answer-type (--> (pkm2-node-get-kvds-with-key question-pkm-node "answer-type")
                                    (when it
                                      (if (length> it 1)
                                          (error "question node has more than one answer-type")
-                                       (read (pkm2-db-kvd-value (car it)) )))))
+                                       (read (oref (car it) :value) )))))
          (answer (pkm-read (format "%s: " content) answer-type)))
     answer))
 
 (defun pkm-ques-commit-answer (question answer timestamp)
-  (let* ((question-db-id (--> (pkm2-node-db-node question) (pkm2-db-node-id it)))
+  (let* ((question-db-id (oref question :id))
          (link-label "clock")
          (link-definition (list :pkm-link-label link-label
                                 :parent 'parent

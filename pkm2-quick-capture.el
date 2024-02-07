@@ -16,8 +16,8 @@
                   (let* ((completing-read-choices
                           (-map
                            (lambda (a-c-p)
-                             (--> (pkm2-node-db-node a-c-p)
-                                  (pkm2-db-node-content it)
+                             (--> (oref a-c-p :content)
+                                  
                                   (cons it a-c-p)))
                            pkm2--capture-parent-nodes-candidates))
                          (choice (when completing-read-choices
@@ -27,7 +27,7 @@
                                         (assoc-default it completing-read-choices)))))
                     choice)
                 (car pkm2--capture-parent-nodes-candidates)))
-             (node-db-id (--> (pkm2-node-db-node choice-node) (pkm2-db-node-id it)))
+             (node-db-id  (oref choice-node :id))
              (link-type (or link-type "sub")))
         (pkm--object-capture-sub node-db-id structure-name link-type))
     (message "No capture cadidates, please set capture candidate")))
