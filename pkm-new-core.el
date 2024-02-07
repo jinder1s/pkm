@@ -1051,6 +1051,12 @@ Returns output in two formats:
        (-map (lambda (asset)
                (plist-put asset :link-to link-to))
              it)))
+(defun pkm2--get-behavior-assets2 (behavior-name link-to)
+  (--> (object-assoc behavior-name :name pkm-structure-behavior-schemas)
+       (oref it :assets)
+       (-map (lambda (asset)
+               (clone asset :link-to link-to))
+             it)))
 
 ;;; pkm-object
 
@@ -1087,6 +1093,7 @@ Returns output in two formats:
     (-each to-mapped (lambda (item-mapped)
                        (push (cadr item-mapped) output)))
     output))
+
 
 
 (defun pkm--object-define (structure-name)
@@ -1454,6 +1461,204 @@ TODO TEST!"
 
 ;;; capture
 
+(defclass base-schema ()
+  ((name :initarg :name :initform nil)
+   (optional :initarg :optional :initform nil)
+   (managed :initarg :managed :initform nil)
+   (multiple :initarg :multiple :initform nil)
+   ))
+(defclass kvd-schema (base-schema)
+  ((key :initarg :key)
+   (value :initarg :value)
+   (choices :initarg :choices)
+   (data-type :initarg :data-type)
+   (link-to :initarg :link-to :initform nil)))
+(defclass container-schema (base-schema)
+  ((assets :initarg :assets :initform nil)))
+(defclass kvd-group-schema (container-schema)
+  ((link-to :initarg :link-to :initform nil) ))
+(defclass node-schema (base-schema)
+  ((content :initarg :content :initform nil)
+   (primary-node :initarg :primary-node :initform nil)
+   (db-id :initarg :db-id :initform nil)
+   (data-type :initarg :data-type :initform nil)
+   (no-input :initarg :no-input :initform nil)
+
+   ))
+(defclass object-schema (container-schema)
+  ((parent-schema-name :initarg :parent-schema-name :initform nil)
+   (behaviors :initarg :behaviors :initform nil)
+   (is-behavior :initarg :is-behavior :initform nil)
+   (log-primary :initarg :log-primary :initform nil)
+   (browse-insert-format-string :initarg :browse-insert-format-string :initform nil)
+   (asset-modifications :initarg :asset-modifications :initform nil)
+   (links :initarg :links :initform nil)))
+
+(defclass behavior-schema (container-schema)
+  ())
+
+(defclass compiled-object-schema (container-schema)
+  ((original-schema :initarg :original-schema :initform nil)
+   (parents :initarg :parents :initform nil)
+   (log-primary :initarg :log-primary :initform nil)
+   (browse-insert-format-string :initarg :browse-insert-format-string :initform nil)
+   (links :initarg :links :initform nil)
+   (name :initarg :name :initform nil) )
+  )
+
+(defclass captured-base ()
+  ((schema :initarg :schema :initform nil)))
+(defclass captured-node (captured-base pkm-base-kvd)
+  ((content :initarg :content :initform nil)
+   (db-id :initarg :db-id :initform nil)))
+(defclass captured-kvd (captured-base pkm-base-node) ())
+(defclass captured-kvd-group (captured-base)
+  ((assets :initarg :assets :initform nil) ))
+(defclass captured-compiled-object-schema (captured-base)
+  ((assets :initarg :assets :initform nil)))
+
+
+(defclass committed-captured-base ()
+  ((schema :initarg :schema :initform nil)))
+(defclass committed-captured-node (committed-captured-base pkm-kvd)
+  ((content :initarg :content :initform nil)
+   (db-id :initarg :db-id :initform nil)))
+(defclass committed-captured-kvd (committed-captured-base pkm-node) ())
+
+(defclass committed-captured-kvd-group (committed-captured-base)
+  ((assets :initarg :assets :initform nil) ))
+
+(defclass committed-captured-compiled-object-schema (committed-captured-base)
+  ((assets :initarg :assets :initform nil)))
+
+(defmacro oset-variable (obj slot value)
+  "Set the value in OBJ for slot SLOT to VALUE.
+SLOT is the slot name as specified in `defclass' or the tag created
+with in the :initarg slot.  VALUE can be any Lisp object."
+  (declare (debug (form symbolp form)))
+  `(eieio-oset ,obj ,slot ,value))
+
+(defvar pkm-structure-uncompiled-schemas ())
+(defvar pkm-structure-behavior-schemas ())
+(cl-defmethod schema-compile ((schema object-schema))
+  "Used to create internal representation of pkm-object."
+  (let* ((behaviors (oref schema :behaviors))
+         (behavior-assets (-map (lambda (behavior)
+                                  (pkm2--get-behavior-assets2 (plist-get behavior :name) (plist-get behavior :link-to)))
+                                behaviors))
+           (parent-name (oref schema :parent-schema-name))
+           (parent-schema (when parent-name (schema-compile (object-assoc parent-name :name pkm-structure-uncompiled-schemas))))
+           (parent-assets (when parent-schema (-map #'-copy (oref parent-schema :assets)) ))
+           (self-assets (-map #'-copy (oref schema :assets)))
+           (combined-assets (-reduce-from #'pkm--object-nondestructively-combine (pkm--object-nondestructively-combine parent-assets self-assets) behavior-assets))
+           (asset-modifications (oref schema :asset-modifications))
+           (combined-assets (-map (lambda (asset)
+                                    (if-let*
+                                        ((a-mod (-find (lambda (mod)
+                                                         (when (equal (plist-get mod :name) (oref asset :name))
+                                                           t))
+                                                       asset-modifications))
+                                         (plist-key (plist-get a-mod :plist-key))
+                                         (plist-value (plist-get a-mod :plist-value)))
+                                        (progn (oset-variable asset plist-key plist-value)
+                                               asset)
+                                      asset))
+                                  combined-assets))
+           (parent-links (when parent-schema (-map #'-copy (oref parent-schema :links)) ))
+           (self-links (oref schema :links))
+           (links-in-both (pkm--object-nondestructively-combine self-links parent-links))
+           (parents (-concat (when parent-name `(,parent-name) ) (when parent-schema (oref parent-schema :parents) ))) )
+      (compiled-object-schema
+       :parents parents
+       :links links-in-both
+       :assets combined-assets
+       :name (oref schema :name)
+       :log-primary (oref schema :log-primary)
+       :browse-insert-format-string (oref schema :browse-insert-format-string)
+       :original-schema schema)))
+(cl-defmethod pkm-capture-test ((schema compiled-object-schema))
+  (let* ((assets (oref schema :assets))
+         (captured-assets (-map (lambda (asset)
+                                  (pkm-capture-test asset))
+                                assets)))
+    (captured-compiled-object-schema :schema schema :assets captured-assets)))
+
+(cl-defmethod pkm-capture-test ((schema node-schema))
+  (let* ((asset-name (oref schema :name))
+         (prompt (or (oref schema :prompt)
+                     (when (oref schema :name)
+                       (format "%s: " (oref schema :name)))))
+         (content (oref schema :content))
+         (type (or (oref schema :data-type) 'TEXT))
+         (dont-ask-for-input (oref schema :no-input))
+         (db-id (oref schema :db-id))
+         (content (cond (db-id "")
+                        ((assoc-default asset-name values) (assoc-default asset-name values) )
+                        (content content)
+                        (dont-ask-for-input "")
+                        (t (pkm-read prompt type)))))
+    (captured-node :schema schema :content content :db-id db-id)))
+
+(cl-defmethod pkm-capture-test ((schema kvd-schema))
+  (let* ((asset-name (oref schema :name))
+         (prompt (or (oref schema :prompt)
+                     (when (oref schema :name)
+                       (format "%s: " (oref schema :name))
+                       (when (oref schema :key)
+                         (format "%s: " (oref schema :key)) )))
+                 )
+         (type (or (oref schema :data-type) 'TEXT))
+         (key (oref schema :key))
+         (choices (oref schema :choices))
+         (value
+          (cond ((assoc-default asset-name values) (assoc-default asset-name values))
+                ((functionp it) (funcall it))
+                ((and it (not (listp it))) it)
+                (t (pkm-read prompt type choices)))))
+    (captured-kvd :schema schema :key key :value value)))
+
+(cl-defmethod pkm-capture-test ((schema kvd-group-schema))
+  (let* ((assets (oref schema :assets))
+         (captured-assets (-map (lambda (asset)
+                                  (pkm-capture-test asset))
+                                assets)))
+    (captured-kvd-group :schema schema :assets captured-assets)))
+
+
+(cl-defmethod pkm-commit-test ((captured-object captured-node) )
+  ;; TODO: Test this
+  (let* ((content (oref captured-object :content))
+         (db-id (oref captured-object :db-id))
+         (timestamp (pkm2-get-current-timestamp))
+         (db-node (unless db-id
+                    (pkm2--db-insert-node content timestamp))))
+    (committed-captured-node :schema schema :content content :db-id (or db-id  (pkm-get-db-id db-node)))))
+
+(cl-defmethod pkm-commit-test ((captured-object captured-kvd) )
+  (let* ((key (oref captured-object :key))
+         (value (oref captured-object :value))
+         (type (or (oref schema :data-type) 'TEXT))
+         (db-kvd (or  (pkm2--db-get-or-insert-kvd key value type) )))
+    (committed-captured-kvd :schema schema :key key :value value :db-kvd  db-kvd :db-id (pkm-get-db-id db-kvd))))
+
+
+
+(cl-defmethod pkm-commit-test ((captured-object captured-kvd-group) )
+  (let* ((assets (oref captured-object :assets))
+         (committed-assets (-map (lambda (asset)
+                                   (pkm-commit-test asset))
+                                 assets)))
+    ;; TODO: TEST and figure out what to return
+    ))
+(cl-defmethod pkm-commit-test ((captured-object captured-compiled-object-schema) )
+  (let* ((assets (oref captured-object :assets))
+         (committed-assets (-map (lambda (asset)
+                                   (pkm-commit-test asset))
+                                 assets))
+         (node-links (oref (oref captured-object :schema) links)))
+    ;; TODO: process link-to values
+    ;; TODO: Test and figure out what to return
+    ))
 (defvar pkm2-buffer-capture-data-equal-plist ())
 
 (defun pkm2--capture-verify-insert (buffer-name text read-only create-markers)
@@ -1589,7 +1794,7 @@ This code doesn't directly output a formatted string because it seems to be used
                                            (is-managed (plist-get asset-spec :managed))
                                            (create-optional (cond (input-value t)
                                                                   (skip-verify nil)
-                                                                  ((or is-managed is-optional) (y-or-n-p (format "Create optional or managed asset with promp: %s" prompt)) ))))
+                                                                  ((or is-managed is-optional) (y-or-n-p (format "Create optional or managed asset with promp: %s" prompt))))))
                                       (if (or (not (or is-optional is-managed)) create-optional)
                                           (pcase (plist-get asset-spec :pkm-type)
                                             ('node (pkm2--object-capture-node asset-spec values buffer-name)  )
