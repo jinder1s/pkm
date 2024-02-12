@@ -420,10 +420,10 @@
                             query))
                         queries))
          (queries-db-query (-map #'pkm2--compile-full-db-query queries))
-         (nodes-ids (-flatten (-map (lambda (query)
+         (nodes-ids (-distinct (-flatten (-map (lambda (query)
                                       (--> (sqlite-select pkm2-database-connection query)
                                            (-flatten it)))
-                                    queries-db-query) )))
+                                    queries-db-query) ) )))
     nodes-ids))
 
 (defun pkm2--browse-get-query-nodes (query-spec)
