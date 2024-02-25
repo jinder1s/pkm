@@ -63,28 +63,42 @@
                     :name "base-n"
                     :assets (list node-asset)
                     :asset-modifications (list mod)))
-           (object-def (schema-compile schema)))
+           (object-def (schema-compile schema))
+           (object-assets (oref object-def :assets)))
       (expect object-def :not :to-be nil)
-      (expect (oref object-def :assets) :not :to-be nil)
-      (expect (length (oref object-def :assets)) :to-be 1)
-      (expect (car (oref object-def :assets)) :not :to-be node-asset)
-      (expect (car (oref object-def :assets)) :not :to-equal node-asset)
-      (message "assets eieio: %S" (oref object-def :assets))
+      (expect object-assets :not :to-be nil)
+      (expect (length object-assets) :to-be 1)
+      (expect (car object-assets) :not :to-be node-asset)
+      (expect (car object-assets) :not :to-equal node-asset)
+
       (expect (oref (car (oref object-def :assets)) :content) :to-equal "World")))
-  (it "Define base node with behavior"
+
+  (it "Define base node with kvd with behavior"
     (let* ((node-asset (node-schema :name "base-node" :content "Hello" :primary-node t))
+           (kvd-key "node-type")
+           (kvd-value "first")
+           (kvd-asset (kvd-schema :name "is-first-note"
+                                  :key kvd-key
+                                  :value kvd-value
+                                  :data-type 'TEXT))
            (schema (object-schema
                     :name "base-n"
+                    :assets (list node-asset)
                     :behaviors '((:name "test-behavior" :link-to (primary)))))
-           (pkm-structure-behavior-schemas (list (behavior-schema :name "test-behavior" :assets (list node-asset))))
-           (object-def (schema-compile schema)))
+           (pkm-structure-behavior-schemas (list
+                                            (behavior-schema :name "test-behavior"
+                                                             :assets (list kvd-asset))))
+           (object-def (schema-compile schema))
+           (object-assets (oref object-def :assets)))
+      (message "object def: %S, assets: %S"  object-def object-assets)
       (expect object-def :not :to-be nil)
-      (expect (oref object-def :assets) :not :to-be nil)
-      (expect (length (oref object-def :assets)) :to-be 1)
-      (expect (car (oref object-def :assets)) :not :to-be node-asset)
-      (expect (car (oref object-def :assets)) :not :to-equal node-asset)
-      (message "assets eieio: %S" (oref object-def :assets))
-      (expect (oref (car (oref object-def :assets)) :content) :to-equal "Hello"))))
+      (expect  object-assets :not :to-be nil)
+      (expect (length  object-assets) :to-be 2)
+      (expect (car  object-assets) :not :to-be node-asset)
+      (expect (cadr  object-assets)  :to-equal node-asset)
+      (expect (car  object-assets) :not :to-equal kvd-asset)
+      (expect (oref (car  object-assets) :key) :to-equal kvd-key)
+      (expect (oref (car  object-assets) :value) :to-equal kvd-value))))
 
 (describe "EIEIO Object creation tests"
   :var (database-file)
@@ -138,7 +152,11 @@
       (expect (nth 2 (car database-kvds)) :to-equal kvd-value)
       (setq kvd (pkm2--db-get-or-insert-kvd kvd-key kvd-value))
       (expect (oref kvd :key) :to-equal kvd-key)
-      (expect (oref kvd :value) :to-equal kvd-value))))
+      (expect (oref kvd :value) :to-equal kvd-value)))
+  (it "Test creating kvd groups"
+    (expect "This test still needs to be created" :to-be nil))
+
+  )
 
 (provide 'test-eieio-capture)
 ;;; test-eieio-capture.el ends here

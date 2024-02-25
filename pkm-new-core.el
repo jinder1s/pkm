@@ -424,7 +424,6 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 (defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive no-new-event group-ids)
   ;; schema
   ;; (:action insert :what kvd-link :data (:node-id node-id :kvd-id kvd-id :timestamp timestamp :type type :context-node-id context-node-id :is-archive is-archive))
-  (message "Inserting link between node and kvd: %s %s %s %s %s %s" node-id key_value_data-id timestamp type context-node-id is-archive)
   (let* ((table-name (pkm2--db-get-kvd-link-table-for-type type))
          (value-names (-concat (list "node" "key_value_data" "created_at" "shadow_id")
                                (when context-node-id
@@ -1051,11 +1050,17 @@ Returns output in two formats:
                (plist-put asset :link-to link-to))
              it)))
 (defun pkm2--get-behavior-assets2 (behavior-name link-to)
+  (message "In get behavior assets: %S %S %S" behavior-name link-to pkm-structure-behavior-schemas)
   (--> (object-assoc behavior-name :name pkm-structure-behavior-schemas)
+       (progn (message "Found behavior: %S, assets: %S" it (oref it :assets)) it)
        (oref it :assets)
        (-map (lambda (asset)
-               (when (same-class-p asset 'kvd-schema) (clone asset :link-to link-to) ))
-             it)))
+               (if (same-class-p asset 'kvd-schema)
+                   (clone asset :link-to link-to)
+                 asset))
+             it)
+       (progn (message "returning assets: %S" it) it)
+       ))
 
 ;;; pkm-object
 
@@ -1080,12 +1085,30 @@ Returns output in two formats:
                  (name (plist-get item :name)))
             (list (list type name) item)))
         input-list))
+(defun pkm--object-psuedo-map-by-type-and-name-eieio (input-list)
+  "INPUT-LIST should be formatted (type (plist)) plist might have :name key"
+  (-map (lambda (item)
+          (let* ((type (object-class-name item ))
+                 (name (oref item :name)))
+            (list (list type name) item)))
+        input-list))
 
 (defun pkm--object-nondestructively-combine (from to)
   "Things from FROM will overwrite things in TO"
   (let* (output
          (from-mapped (pkm--object-psuedo-map-by-type-and-name from))
          (to-mapped (pkm--object-psuedo-map-by-type-and-name to)))
+    (-each from-mapped (lambda (item-mapped)
+                         (unless (assoc-default (car item-mapped) to-mapped)
+                           (push (cadr item-mapped) output))))
+    (-each to-mapped (lambda (item-mapped)
+                       (push (cadr item-mapped) output)))
+    output))
+(defun pkm--object-nondestructively-combine-eieio (from to)
+  "Things from FROM will overwrite things in TO"
+  (let* (output
+         (from-mapped (pkm--object-psuedo-map-by-type-and-name-eieio from))
+         (to-mapped (pkm--object-psuedo-map-by-type-and-name-eieio to)))
     (-each from-mapped (lambda (item-mapped)
                          (unless (assoc-default (car item-mapped) to-mapped)
                            (push (cadr item-mapped) output))))
@@ -1159,8 +1182,7 @@ Returns output in two formats:
     ;;   (if (equal (plist-get structure-schema :pkm-type) 'kvd-group )
     ;;       t
     ;;     (error  (format "Object definition need to have one and only one primary node.\nPrimary nodes: %S" primary-nodes)) ))
-    t
-    ))
+    t))
 
 (defun pkm--object-does-specifier-match (specifier asset-schema)
   (let* ((output (cond
@@ -1169,10 +1191,7 @@ Returns output in two formats:
                   ((eq specifier 'primary)
                    (or (plist-get asset-schema :primary-node)
                        (if (and (object-p asset-schema) (same-class-p asset-schema 'node-schema))
-                           (progn
-                             (message "object is a node-schema: %S, %S"  asset-schema (oref asset-schema :primary-node))
-                             (oref asset-schema :primary-node))
-                         (message "input is not an object or a node-schema: %S" asset-schema)
+                           (oref asset-schema :primary-node)
                          nil)))
                   ((eq specifier 'parent)
                    (plist-get asset-schema :parent-node))
@@ -1181,9 +1200,7 @@ Returns output in two formats:
                    (plist-get asset-schema :child-node))
                   (t (progn (display-warning 'pkm-object "node-specifier is ambigious: %S" specifier)
                             (error "node-specifier was ambigious, be better! %S" specifier))))) )
-    (message "Doing specifier match: %S, %S, OUTPUT: %SBBBBBB" specifier asset-schema output)
-    output
-    ))
+    output))
 
 
 
@@ -1602,6 +1619,7 @@ with in the :initarg slot.  VALUE can be any Lisp object."
 (defvar pkm-structure-behavior-schemas ())
 (cl-defmethod schema-compile ((schema object-schema))
   "Used to create internal representation of pkm-object."
+  (message "compiling schema, behavior: S: %S, B: %S" schema (oref schema :behaviors))
   (let* ((behaviors (oref schema :behaviors))
          (behavior-assets (-map (lambda (behavior)
                                   (pkm2--get-behavior-assets2 (plist-get behavior :name) (plist-get behavior :link-to)))
@@ -1610,7 +1628,9 @@ with in the :initarg slot.  VALUE can be any Lisp object."
          (parent-schema (when parent-name (schema-compile (object-assoc parent-name :name pkm-structure-uncompiled-schemas))))
          (parent-assets (when parent-schema (-map #'-copy (oref parent-schema :assets)) ))
          (self-assets (-map #'-copy (oref schema :assets)))
-         (combined-assets (-reduce-from #'pkm--object-nondestructively-combine (pkm--object-nondestructively-combine parent-assets self-assets) behavior-assets))
+         (combined-assets (--> (-reduce-from #'pkm--object-nondestructively-combine-eieio (pkm--object-nondestructively-combine-eieio parent-assets self-assets) behavior-assets)
+                               (progn (message "HHAAHAHAH: combined-assets: %S" it)
+                                      it)))
          (asset-modifications (oref schema :asset-modifications))
          (combined-assets (-map (lambda (asset)
                                   (if-let*
@@ -1626,7 +1646,7 @@ with in the :initarg slot.  VALUE can be any Lisp object."
                                 combined-assets))
          (parent-links (when parent-schema (-map #'-copy (oref parent-schema :links)) ))
          (self-links (oref schema :links))
-         (links-in-both (pkm--object-nondestructively-combine self-links parent-links))
+         (links-in-both (pkm--object-nondestructively-combine-eieio self-links parent-links))
          (parents (-concat (when parent-name `(,parent-name) ) (when parent-schema (oref parent-schema :parents) ))) )
       (compiled-object-schema
        :parents parents
@@ -1794,7 +1814,6 @@ with in the :initarg slot.  VALUE can be any Lisp object."
   (error "Not yet implemented"))
 
 (cl-defmethod pkm-commit-kvd-link-test ((c-kvd committed-captured-kvd) possible-assets &optional  context group-ids)
-  (message "\n JINDERin kvd link test: %S" possible-assets)
   (let* ((kvd-schema (oref c-kvd :schema))
          (node-specifiers (oref kvd-schema :link-to))
          (context (oref kvd-schema :context))
@@ -2173,9 +2192,6 @@ Commit everything.
                              (when (object-p asset-info)
                                (oref asset-info :schema))))) assets-infos)
                (-map (lambda (asset-info)
-                       (message "ids BAABBBY: %S %S" (or (plist-get asset-info :db-id)
-                                                         (pkm-get-db-id asset-info))
-                                asset-info)
                        (or (plist-get asset-info :db-id)
                            (pkm-get-db-id asset-info)))
                      it))))))
