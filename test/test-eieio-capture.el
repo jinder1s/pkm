@@ -28,17 +28,16 @@
 
 (describe "Eieio object definition tests"
   (it "Define base node"
-    (let* ((node-asset (node-schema  :name "base-node" :primary-node t))
-           (schema  (object-schema
-                     :name "base-n"
-                     :assets (list node-asset)))
+    (let* ((node-asset (node-schema :name "base-node" :primary-node t))
+           (schema (object-schema
+                    :name "base-n"
+                    :assets (list node-asset)))
            (object-def (schema-compile schema)))
       (expect object-def :not :to-be nil)
       (expect (oref object-def :assets) :not :to-be nil)
-      (expect (length (oref object-def :assets) ) :to-be 1)
+      (expect (length (oref object-def :assets)) :to-be 1)
       (expect (car (oref object-def :assets)) :not :to-be node-asset)
-      (expect (car (oref object-def :assets)) :to-equal node-asset)
-      ))
+      (expect (car (oref object-def :assets)) :to-equal node-asset)))
 
 
   (it "Define node with parent"
@@ -54,41 +53,92 @@
            (object-def (schema-compile new-schema)))
       (expect object-def :not :to-be nil)
       (expect (oref object-def :assets) :not :to-be nil)
-      (expect (length (oref object-def :assets) ) :to-be 1)
+      (expect (length (oref object-def :assets)) :to-be 1)
       (expect (car (oref object-def :assets)) :not :to-be node-asset)
       (expect (car (oref object-def :assets)) :to-equal node-asset)))
   (it "Define base node with modifications"
-    (let* ((node-asset (node-schema  :name "base-node" :content "Hello" :primary-node t))
+    (let* ((node-asset (node-schema :name "base-node" :content "Hello" :primary-node t))
            (mod (list :name "base-node" :plist-key :content :plist-value "World"))
-           (schema  (object-schema
-                     :name "base-n"
-                     :assets (list node-asset)
-                     :asset-modifications (list mod )))
+           (schema (object-schema
+                    :name "base-n"
+                    :assets (list node-asset)
+                    :asset-modifications (list mod)))
            (object-def (schema-compile schema)))
       (expect object-def :not :to-be nil)
       (expect (oref object-def :assets) :not :to-be nil)
-      (expect (length (oref object-def :assets) ) :to-be 1)
+      (expect (length (oref object-def :assets)) :to-be 1)
       (expect (car (oref object-def :assets)) :not :to-be node-asset)
       (expect (car (oref object-def :assets)) :not :to-equal node-asset)
       (message "assets eieio: %S" (oref object-def :assets))
-      (expect (oref (car (oref object-def :assets)) :content) :to-equal "World")
-
-      ))
+      (expect (oref (car (oref object-def :assets)) :content) :to-equal "World")))
   (it "Define base node with behavior"
-    (let* ((node-asset (node-schema  :name "base-node" :content "Hello" :primary-node t))
-           (schema  (object-schema
-                     :name "base-n"
-                     :behaviors '((:name "test-behavior" :link-to (primary)))))
+    (let* ((node-asset (node-schema :name "base-node" :content "Hello" :primary-node t))
+           (schema (object-schema
+                    :name "base-n"
+                    :behaviors '((:name "test-behavior" :link-to (primary)))))
            (pkm-structure-behavior-schemas (list (behavior-schema :name "test-behavior" :assets (list node-asset))))
            (object-def (schema-compile schema)))
       (expect object-def :not :to-be nil)
       (expect (oref object-def :assets) :not :to-be nil)
-      (expect (length (oref object-def :assets) ) :to-be 1)
+      (expect (length (oref object-def :assets)) :to-be 1)
       (expect (car (oref object-def :assets)) :not :to-be node-asset)
       (expect (car (oref object-def :assets)) :not :to-equal node-asset)
       (message "assets eieio: %S" (oref object-def :assets))
       (expect (oref (car (oref object-def :assets)) :content) :to-equal "Hello"))))
 
+(describe "EIEIO Object creation tests"
+  :var (database-file)
+  (before-each
+    (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
+    (setq pkm2-database-connection (sqlite-open database-file))
+    (pkm2-setup-database pkm2-database-connection))
+  (it "Creating a basic node with kvd(node-type, first)"
+    (let* ((node-content "First node content")
+           (kvd-key "node-type")
+           (kvd-value "first")
+           (s-schema (object-schema :name 'basic
+                                    :assets (list
+                                             (node-schema :name "first-node" :primary-node t)
+                                             (kvd-schema :name "is-first-note"
+                                                         :key kvd-key
+                                                         :value kvd-value
+                                                         :link-to '(primary)
+                                                         :data-type 'TEXT))))
+           (compiled-schema (schema-compile s-schema))
+           (values `(("first-node" . ,node-content)))
+           (captured-structure (pkm-capture-test compiled-schema values))
+           (committed-structure (pkm-commit-test captured-structure))
+           (sql-query "SELECT id, content, created_at, modified_at FROM node;")
+           (type 'TEXT)
+           (data-table (pkm2--db-get-kvd-data-table-for-type type))
+           (link-table (pkm2--db-get-kvd-link-table-for-type type))
+           (kvd-sql-query (format "SELECT id, key, value, created_at FROM %s;" data-table))
+           (link-sql-query (format "SELECT id, node, key_value_data, created_at FROM %s;" link-table))
+           (database-nodes (sqlite-select pkm2-database-connection sql-query))
+           (database-kvds (sqlite-select pkm2-database-connection kvd-sql-query))
+           (database-kvd-links (sqlite-select pkm2-database-connection link-sql-query))
+           kvd
+           node)
+
+      (message "Database kvds %S" database-kvds)
+      (expect (length database-nodes) :to-equal 1)
+      (expect (length database-kvds) :to-equal 1)
+      (expect (length database-kvd-links) :to-equal 1)
+      (expect (nth 1 (car database-nodes)) :to-equal node-content)
+      (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
+      (setq node (pkm2--db-query-get-node-with-id 1))
+      (expect (oref node :content) :to-equal node-content)
+      (expect (oref node :children-links) :to-be nil)
+      (expect (oref node :parent-links) :to-be nil)
+      (expect (oref node :previous-sequencial-links) :to-be nil)
+      (expect (oref node :next-sequencial-links) :to-be nil)
+      (expect (oref node :flat-links) :to-be nil)
+      (expect (length (oref node :kvds)) :to-be 1)
+      (expect (nth 1 (car database-kvds)) :to-equal kvd-key)
+      (expect (nth 2 (car database-kvds)) :to-equal kvd-value)
+      (setq kvd (pkm2--db-get-or-insert-kvd kvd-key kvd-value))
+      (expect (oref kvd :key) :to-equal kvd-key)
+      (expect (oref kvd :value) :to-equal kvd-value))))
 
 (provide 'test-eieio-capture)
 ;;; test-eieio-capture.el ends here
