@@ -70,7 +70,6 @@
       (expect (length object-assets) :to-be 1)
       (expect (car object-assets) :not :to-be node-asset)
       (expect (car object-assets) :not :to-equal node-asset)
-
       (expect (oref (car (oref object-def :assets)) :content) :to-equal "World")))
 
   (it "Define base node with kvd with behavior"
@@ -90,7 +89,6 @@
                                                              :assets (list kvd-asset))))
            (object-def (schema-compile schema))
            (object-assets (oref object-def :assets)))
-      (message "object def: %S, assets: %S"  object-def object-assets)
       (expect object-def :not :to-be nil)
       (expect  object-assets :not :to-be nil)
       (expect (length  object-assets) :to-be 2)
@@ -133,8 +131,6 @@
            (database-kvd-links (sqlite-select pkm2-database-connection link-sql-query))
            kvd
            node)
-
-      (message "Database kvds %S" database-kvds)
       (expect (length database-nodes) :to-equal 1)
       (expect (length database-kvds) :to-equal 1)
       (expect (length database-kvd-links) :to-equal 1)
@@ -153,8 +149,73 @@
       (setq kvd (pkm2--db-get-or-insert-kvd kvd-key kvd-value))
       (expect (oref kvd :key) :to-equal kvd-key)
       (expect (oref kvd :value) :to-equal kvd-value)))
-  (it "Test creating kvd groups"
-    (expect "This test still needs to be created" :to-be nil))
+(it "Creating a basic node with kvd group"
+    (let* ((node-content "First node content")
+           (kvd-key "node-type")
+           (kvd-value "first")
+           (kvd-key2 "node-type2")
+           (kvd-value2 "second")
+           (group (kvd-group-schema :kvds (list "is-first-note" "is-first-note-2") :name "test-group"))
+           (s-schema (object-schema :name 'basic
+                                    :assets (list
+                                             (node-schema :name "first-node" :primary-node t)
+                                             (kvd-schema :name "is-first-note"
+                                                         :key kvd-key
+                                                         :value kvd-value
+                                                         :link-to '(primary)
+                                                         :data-type 'TEXT)
+                                             (kvd-schema :name "is-first-note-2"
+                                                         :key kvd-key2
+                                                         :value kvd-value2
+                                                         :link-to '(primary)
+                                                         :data-type 'TEXT))
+                                    :groups (list group)))
+           (compiled-schema (schema-compile s-schema))
+           (blah (progn
+                   (message "compiles schema: %S\nGROUPS %S" compiled-schema (oref compiled-schema :groups))
+                   ))
+           (values `(("first-node" . ,node-content)))
+           (captured-structure (pkm-capture-test compiled-schema values))
+           (committed-structure (pkm-commit-test captured-structure))
+           (sql-query "SELECT id, content, created_at, modified_at FROM node;")
+           (type 'TEXT)
+           (data-table (pkm2--db-get-kvd-data-table-for-type type))
+           (link-table (pkm2--db-get-kvd-link-table-for-type type))
+           (kvd-sql-query (format "SELECT id, key, value, created_at FROM %s;" data-table))
+           (link-sql-query (format "SELECT id, node, key_value_data, created_at, groups FROM %s;" link-table))
+           (database-nodes (sqlite-select pkm2-database-connection sql-query))
+           (database-kvds (sqlite-select pkm2-database-connection kvd-sql-query))
+           (database-kvd-links (sqlite-select pkm2-database-connection link-sql-query))
+           kvd
+           node)
+      (message "compiles schema: %S\nGROUPS %S" compiled-schema (oref compiled-schema :groups))
+      (expect (oref compiled-schema :groups) :to-equal (list group))
+      (expect (length database-nodes) :to-equal 1)
+      (expect (length database-kvds) :to-equal 2)
+      (expect (length database-kvd-links) :to-equal 2)
+      (expect (nth 1 (car database-nodes)) :to-equal node-content)
+      (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
+      (setq node (pkm2--db-query-get-node-with-id 1))
+      (expect (oref node :content) :to-equal node-content)
+      (expect (oref node :children-links) :to-be nil)
+      (expect (oref node :parent-links) :to-be nil)
+      (expect (oref node :previous-sequencial-links) :to-be nil)
+      (expect (oref node :next-sequencial-links) :to-be nil)
+      (expect (oref node :flat-links) :to-be nil)
+      (expect (length (oref node :kvds)) :to-be 2)
+      (expect (nth 1 (cadr database-kvds)) :to-equal kvd-key)
+      (expect (nth 2 (cadr database-kvds)) :to-equal kvd-value)
+      (expect (nth 1 (car database-kvds)) :to-equal kvd-key2)
+      (expect (nth 2 (car database-kvds)) :to-equal kvd-value2)
+      (expect (nth 4 (car database-kvd-links)) :to-equal (nth 4 (cadr database-kvd-links)))
+      (message "KVD Links: %S" database-kvd-links)
+      (setq kvd (pkm2--db-get-or-insert-kvd kvd-key kvd-value))
+      (expect (oref kvd :key) :to-equal kvd-key)
+      (expect (oref kvd :value) :to-equal kvd-value)
+      (setq kvd2 (pkm2--db-get-or-insert-kvd kvd-key2 kvd-value2))
+      (expect (oref kvd2 :key) :to-equal kvd-key2)
+      (expect (oref kvd2 :value) :to-equal kvd-value2)
+      ))
 
   )
 

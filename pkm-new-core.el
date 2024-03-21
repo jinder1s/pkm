@@ -424,6 +424,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 (defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive no-new-event group-ids)
   ;; schema
   ;; (:action insert :what kvd-link :data (:node-id node-id :kvd-id kvd-id :timestamp timestamp :type type :context-node-id context-node-id :is-archive is-archive))
+  (message "Group id: %S" group-ids)
   (let* ((table-name (pkm2--db-get-kvd-link-table-for-type type))
          (value-names (-concat (list "node" "key_value_data" "created_at" "shadow_id")
                                (when context-node-id
@@ -431,6 +432,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                                (when is-archive
                                  '("is_archive"))
                                (when group-ids
+                                 (message "THERE are group ides")
                                  '("groups"))))
          (shadow-id (pkm-uuid))
 
@@ -440,10 +442,12 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                           (when is-archive
                             (list is-archive))
                           (when group-ids
-                            (list (format "%s;" (string-join group-ids ";"))))
+                            (message " THERE are group ids!")
+                            (list (format "%s" (string-join group-ids "---"))))
                           ))
          (output
           (--> (pkm2--db-compile-insert-statement table-name value-names values)
+               (progn (message "insert statement: %S, values: %S" it values) it)
                (sqlite-execute pkm2-database-connection it)
                (car it)
                (car it)
@@ -1050,17 +1054,13 @@ Returns output in two formats:
                (plist-put asset :link-to link-to))
              it)))
 (defun pkm2--get-behavior-assets2 (behavior-name link-to)
-  (message "In get behavior assets: %S %S %S" behavior-name link-to pkm-structure-behavior-schemas)
   (--> (object-assoc behavior-name :name pkm-structure-behavior-schemas)
-       (progn (message "Found behavior: %S, assets: %S" it (oref it :assets)) it)
        (oref it :assets)
        (-map (lambda (asset)
                (if (same-class-p asset 'kvd-schema)
                    (clone asset :link-to link-to)
                  asset))
-             it)
-       (progn (message "returning assets: %S" it) it)
-       ))
+             it)))
 
 ;;; pkm-object
 
@@ -1071,8 +1071,7 @@ Returns output in two formats:
 
 
 (defun pkm-register-structure (name structure-plist)
-  (--> (plist-put structure-plist :name name) (plist-put it :pkm-type name) (plist-put pkm-structure-undefined-schemas-plist name it) (setq pkm-structure-undefined-schemas-plist it))
-  )
+  (--> (plist-put structure-plist :name name) (plist-put it :pkm-type name) (plist-put pkm-structure-undefined-schemas-plist name it) (setq pkm-structure-undefined-schemas-plist it)))
 
 
 
@@ -1530,12 +1529,14 @@ TODO TEST!"
    (link-to :initarg :link-to :initform nil)
    (context :initarg :context :initform nil)
    ))
+(defclass kvd-group-schema ()
+  ((kvds :initarg :kvds :initform nil)
+   (name :initarg :name :initform nil)
+   ))
 
 (defclass container-schema (base-schema)
   ((assets :initarg :assets :initform nil)))
 
-(defclass kvd-group-schema (container-schema)
-  ((link-to :initarg :link-to :initform nil) ))
 
 (defclass node-schema (base-schema)
   ((content :initarg :content :initform nil)
@@ -1552,8 +1553,7 @@ TODO TEST!"
    (browse-insert-format-string :initarg :browse-insert-format-string :initform nil)
    (asset-modifications :initarg :asset-modifications :initform nil)
    (links :initarg :links :initform nil)
-   (groups :initarg :groups :initform nil)
-   ))
+   (groups :initarg :groups :initform nil)))
 
 (defclass behavior-schema (container-schema) ())
 
@@ -1569,8 +1569,7 @@ TODO TEST!"
 
 (defclass captured-base ()
   ((schema :initarg :schema :initform nil)
-   (name :initarg :name :initform nil)
-   ))
+   (name :initarg :name :initform nil)))
 
 (defclass captured-node (captured-base pkm-base-node)
   ((content :initarg :content :initform nil)
@@ -1578,8 +1577,6 @@ TODO TEST!"
 
 (defclass captured-kvd (captured-base pkm-base-kvd) ())
 
-(defclass captured-kvd-group (captured-base)
-  ((assets :initarg :assets :initform nil)))
 
 (defclass captured-compiled-object-schema (captured-base)
   ((assets :initarg :assets :initform nil)))
@@ -1592,8 +1589,6 @@ TODO TEST!"
    (db-id :initarg :db-id :initform nil)))
 (defclass committed-captured-kvd (committed-captured-base pkm-kvd) ())
 
-(defclass committed-captured-kvd-group (committed-captured-base)
-  ((assets :initarg :assets :initform nil) ))
 
 (defclass committed-captured-compiled-object-schema (committed-captured-base)
   ((assets :initarg :assets :initform nil)
@@ -1619,7 +1614,6 @@ with in the :initarg slot.  VALUE can be any Lisp object."
 (defvar pkm-structure-behavior-schemas ())
 (cl-defmethod schema-compile ((schema object-schema))
   "Used to create internal representation of pkm-object."
-  (message "compiling schema, behavior: S: %S, B: %S" schema (oref schema :behaviors))
   (let* ((behaviors (oref schema :behaviors))
          (behavior-assets (-map (lambda (behavior)
                                   (pkm2--get-behavior-assets2 (plist-get behavior :name) (plist-get behavior :link-to)))
@@ -1628,9 +1622,7 @@ with in the :initarg slot.  VALUE can be any Lisp object."
          (parent-schema (when parent-name (schema-compile (object-assoc parent-name :name pkm-structure-uncompiled-schemas))))
          (parent-assets (when parent-schema (-map #'-copy (oref parent-schema :assets)) ))
          (self-assets (-map #'-copy (oref schema :assets)))
-         (combined-assets (--> (-reduce-from #'pkm--object-nondestructively-combine-eieio (pkm--object-nondestructively-combine-eieio parent-assets self-assets) behavior-assets)
-                               (progn (message "HHAAHAHAH: combined-assets: %S" it)
-                                      it)))
+         (combined-assets (-reduce-from #'pkm--object-nondestructively-combine-eieio (pkm--object-nondestructively-combine-eieio parent-assets self-assets) behavior-assets))
          (asset-modifications (oref schema :asset-modifications))
          (combined-assets (-map (lambda (asset)
                                   (if-let*
@@ -1647,15 +1639,20 @@ with in the :initarg slot.  VALUE can be any Lisp object."
          (parent-links (when parent-schema (-map #'-copy (oref parent-schema :links)) ))
          (self-links (oref schema :links))
          (links-in-both (pkm--object-nondestructively-combine-eieio self-links parent-links))
+
+         (parent-groups (when parent-schema (-map #'-copy (oref parent-schema :groups)) ))
+         (self-groups (oref schema :groups))
+         (groups-in-both (pkm--object-nondestructively-combine-eieio self-groups parent-groups))
          (parents (-concat (when parent-name `(,parent-name) ) (when parent-schema (oref parent-schema :parents) ))) )
-      (compiled-object-schema
-       :parents parents
-       :links links-in-both
-       :assets combined-assets
-       :name (oref schema :name)
-       :log-primary (oref schema :log-primary)
-       :browse-insert-format-string (oref schema :browse-insert-format-string)
-       :original-schema schema)))
+    (compiled-object-schema
+     :parents parents
+     :links links-in-both
+     :groups groups-in-both
+     :assets combined-assets
+     :name (oref schema :name)
+     :log-primary (oref schema :log-primary)
+     :browse-insert-format-string (oref schema :browse-insert-format-string)
+     :original-schema schema)))
 
 (cl-defmethod pkm-capture-test ((schema compiled-object-schema) &optional values)
   (let* ((assets (oref schema :assets))
@@ -1740,15 +1737,22 @@ with in the :initarg slot.  VALUE can be any Lisp object."
          (group-ids (-map (lambda (group)
                             (pkm-uuid))
                           groups))
+         (blah (progn
+                 (message "groups: %S, group-ids: %S" groups group-ids)
+
+                 ))
          (committed-kvd-links (-map (lambda (asset)
+
                                       (when (same-class-p asset 'committed-captured-kvd)
-                                          (--> (oref asset :name)
-                                               (-map-indexed (lambda (index group)
-                                                               (when (member it (oref group :kvds))
-                                                                 (nth index group-ids)))
-                                                             groups)
-                                               (pkm-commit-kvd-link-test asset committed-assets nil it))))
+                                        (--> (oref asset :name)
+                                             (-map-indexed (lambda (index group)
+                                                             (message "index: %S, group: %S, name: %S, :kvds: %S" index group it (oref group :kvds))
+                                                             (when (member it (oref group :kvds))
+                                                               (nth index group-ids)))
+                                                           groups)
+                                             (pkm-commit-kvd-link-test asset committed-assets nil it))))
                                     committed-assets)))
+
     (committed-captured-compiled-object-schema :schema schema
                                                :assets committed-assets
                                                :nodes-links committed-node-links
@@ -1814,6 +1818,7 @@ with in the :initarg slot.  VALUE can be any Lisp object."
   (error "Not yet implemented"))
 
 (cl-defmethod pkm-commit-kvd-link-test ((c-kvd committed-captured-kvd) possible-assets &optional  context group-ids)
+  (message "group ids hahaah: %S" group-ids)
   (let* ((kvd-schema (oref c-kvd :schema))
          (node-specifiers (oref kvd-schema :link-to))
          (context (oref kvd-schema :context))
@@ -1833,7 +1838,11 @@ with in the :initarg slot.  VALUE can be any Lisp object."
                             kvd-id
                             (pkm2-get-current-timestamp)
                             data-type
-                            context))
+                            context
+                            nil
+                            nil
+                            group-ids
+                            ))
                          node-db-ids))
          (committed-links (-map (lambda (db-link)
                                   (committed-kvd-link :schema kvd-schema :db-kvd-link db-link :db-id (pkm-get-db-id db-link)))
