@@ -38,7 +38,6 @@
 (require 'pkm2-browse)
 (require 'pkm2-tasks)
 (require 'pkm2-clock )
-(require 'pkm2-habit )
 (require 'pkm2-object-registrations)
 (require 'pkm2-questions )
 (require 'pkm2-quick-capture )
