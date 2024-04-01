@@ -1043,8 +1043,6 @@ Returns output in two formats:
 
 (defvar pkm-structure-defined-behavior-plist ())
 
-(defun pkm2-register-behavior (behavior)
-  (setq pkm-structure-defined-behavior-plist (plist-put pkm-structure-defined-behavior-plist (plist-get behavior :name) behavior)))
 
 
 (defun pkm2--get-behavior-assets (behavior-name link-to)
@@ -1068,10 +1066,28 @@ Returns output in two formats:
 (defvar pkm-structure-defined-schemas-plist ())
 
 
+(setq pkm-structure-2-undefined-schemas-plist ())
+(setq pkm-structure-2-defined-schemas-plist ())
+
+(defvar pkm-structure-2-defined-behavior-plist ())
+
 
 
 (defun pkm-register-structure (name structure-plist)
   (--> (plist-put structure-plist :name name) (plist-put it :pkm-type name) (plist-put pkm-structure-undefined-schemas-plist name it) (setq pkm-structure-undefined-schemas-plist it)))
+
+(defun pkm2-register-behavior (behavior)
+  (setq pkm-structure-defined-behavior-plist (plist-put pkm-structure-defined-behavior-plist (plist-get behavior :name) behavior)))
+
+
+(defun pkm-register-structure-2 (structure-schema)
+  (-->   (plist-put pkm-structure-2-undefined-schemas-plist (oref structure-schema :name) structure-schema)
+         (setq pkm-structure-2-undefined-schemas-plist it)))
+
+(defun pkm2-register-behavior-2 (-behavior-schema)
+  (setq pkm-structure-2-defined-behavior-plist
+        (plist-put pkm-structure-2-defined-behavior-plist (oref -behavior-schema :name) -behavior-schema)))
+
 
 
 
@@ -1087,7 +1103,9 @@ Returns output in two formats:
 (defun pkm--object-psuedo-map-by-type-and-name-eieio (input-list)
   "INPUT-LIST should be formatted (type (plist)) plist might have :name key"
   (-map (lambda (item)
-          (let* ((type (object-class-name item ))
+          (message "item type: %S, %S" (type-of item) item)
+          (message "item: %S, %S, %S" item (same-class-p item 'kvd-schema) (same-class-p item 'node-schema))
+          (let* ((type (eieio-object-class-name item ))
                  (name (oref item :name)))
             (list (list type name) item)))
         input-list))
@@ -1346,6 +1364,8 @@ Returns output in two formats:
     (eq (length fully-specified ) (length has-kvd))))
 
 
+
+
 (defun pkm--object-cache-structure-info ()
   (let* ((structure-names  (doom-plist-keys pkm-structure-undefined-schemas-plist))
          (behavior-structures (-filter (lambda (s-name)
@@ -1378,7 +1398,7 @@ Returns output in two formats:
       (lambda (structure-name)
         (--> (pkm--object-find-unique-identifiers structure-name pkm-structure-defined-schemas-plist pkm-structure-required-kvds-plist)
              (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it)))))
-    ; For behaviour based structures, only compare with other behivor based structures
+                                        ; For behaviour based structures, only compare with other behivor based structures
     (let* ((structure-to-behavior-schema-plist  (mm-alist-to-plist (-map (lambda (s-name)
                                                                            (cons s-name
                                                                                  (--> (plist-get pkm-structure-undefined-schemas-plist s-name)
@@ -1395,6 +1415,61 @@ Returns output in two formats:
         (lambda (structure-name)
           (--> (pkm--object-find-unique-identifiers structure-name structure-to-behavior-schema-plist  required-kvds-plist)
                (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it))))))))
+
+
+(defun pkm--object-cache-structure-info-eieio ()
+  (let* ((structure-names  (doom-plist-keys pkm-structure-2-undefined-schemas-plist))
+         (behavior-structures (-filter (lambda (s-name)
+                                         (--> (plist-get pkm-structure-2-undefined-schemas-plist s-name)
+                                              (oref it :is-behavior)))
+                                       structure-names)))
+    (-each structure-names
+      (lambda (structure-name)
+        (let* ((schema (plist-get pkm-structure-2-undefined-schemas-plist structure-name #'equal)))
+          (message "structure %S" schema)
+          (message "compiled %S"  (schema-compile schema))
+          (setq pkm-structure-2-defined-schemas-plist
+                (plist-put pkm-structure-2-defined-schemas-plist structure-name (schema-compile schema))) )))
+    ;; (-each structure-names
+    ;;   (lambda (structure-name)
+    ;;     (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
+    ;;          (oref it :assets)
+    ;;          (-each it (lambda (asset)
+    ;;                      (when (equal (plist-get asset :pkm-type) 'kvd)
+    ;;                        (pkm-object-register-kvd-key-with-data-type asset)
+    ;;                        (pkm-object-register-structure-with-kvd  asset structure-name)))))))
+    ;; (-each  structure-names
+    ;;   (lambda (structure-name)
+    ;;     (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
+    ;;          (pkm--object-get-required-kvds it)
+    ;;          (setq pkm-structure-required-kvds-plist (plist-put pkm-structure-required-kvds-plist structure-name it)))))
+    ;; (-each  structure-names
+    ;;   (lambda (structure-name)
+    ;;     (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
+    ;;          (pkm--object-get-required-fully-specified-kvds it)
+    ;;          (setq pkm-structure-fully-specified-kvds-plist (plist-put pkm-structure-fully-specified-kvds-plist structure-name it)))))
+    ;; (-each  structure-names
+    ;;   (lambda (structure-name)
+    ;;     (--> (pkm--object-find-unique-identifiers structure-name pkm-structure-defined-schemas-plist pkm-structure-required-kvds-plist)
+    ;;          (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it)))))
+    ;; ; For behaviour based structures, only compare with other behivor based structures
+    ;; (let* ((structure-to-behavior-schema-plist  (mm-alist-to-plist (-map (lambda (s-name)
+    ;;                                                                        (cons s-name
+    ;;                                                                              (--> (plist-get pkm-structure-undefined-schemas-plist s-name)
+    ;;                                                                                   (plist-get it :is-behavior)
+    ;;                                                                                   (plist-get pkm-structure-defined-behavior-plist it) )))
+    ;;                                                                      behavior-structures) ))
+    ;;        (required-kvds-plist (mm-alist-to-plist (-map (lambda (s-name)
+    ;;                                                        (cons s-name
+    ;;                                                              (--> (plist-get structure-to-behavior-schema-plist s-name)
+    ;;                                                                   (pkm--behavior-get-required-kvds
+    ;;                                                                    it))))
+    ;;                                                      behavior-structures))))
+    ;;   (-each  behavior-structures
+    ;;     (lambda (structure-name)
+    ;;       (--> (pkm--object-find-unique-identifiers structure-name structure-to-behavior-schema-plist  required-kvds-plist)
+    ;;            (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it))))))
+    ))
 
 
 ;;; pkm-object-capture
@@ -1528,14 +1603,11 @@ TODO TEST!"
    (data-type :initarg :data-type :initform nil)
    (link-to :initarg :link-to :initform nil)
    (context :initarg :context :initform nil)
+   (managed :initarg :managed :initform nil)
    ))
 (defclass kvd-group-schema ()
-  ((kvds :initarg :kvds :initform nil)
-   (name :initarg :name :initform nil)
-   ))
-
-(defclass container-schema (base-schema)
-  ((assets :initarg :assets :initform nil)))
+  ((kvds :initarg :kvds :initform nil)  ; kvd names
+   (name :initarg :name :initform nil)))
 
 
 (defclass node-schema (base-schema)
@@ -1544,6 +1616,11 @@ TODO TEST!"
    (db-id :initarg :db-id :initform nil)
    (data-type :initarg :data-type :initform nil)
    (no-input :initarg :no-input :initform nil)))
+
+(defclass container-schema (base-schema)
+  ((assets :initarg :assets :initform nil)))
+
+(defclass behavior-schema (container-schema) ())
 
 (defclass object-schema (container-schema)
   ((parent-schema-name :initarg :parent-schema-name :initform nil)
@@ -1555,7 +1632,6 @@ TODO TEST!"
    (links :initarg :links :initform nil)
    (groups :initarg :groups :initform nil)))
 
-(defclass behavior-schema (container-schema) ())
 
 (defclass compiled-object-schema (container-schema)
   ((original-schema :initarg :original-schema :initform nil)
@@ -1610,8 +1686,6 @@ with in the :initarg slot.  VALUE can be any Lisp object."
   (declare (debug (form symbolp form)))
   `(eieio-oset ,obj ,slot ,value))
 
-(defvar pkm-structure-uncompiled-schemas ())
-(defvar pkm-structure-behavior-schemas ())
 (cl-defmethod schema-compile ((schema object-schema))
   "Used to create internal representation of pkm-object."
   (let* ((behaviors (oref schema :behaviors))
@@ -1619,7 +1693,7 @@ with in the :initarg slot.  VALUE can be any Lisp object."
                                   (pkm2--get-behavior-assets2 (plist-get behavior :name) (plist-get behavior :link-to)))
                                 behaviors))
          (parent-name (oref schema :parent-schema-name))
-         (parent-schema (when parent-name (schema-compile (object-assoc parent-name :name pkm-structure-uncompiled-schemas))))
+         (parent-schema (when parent-name (schema-compile (object-assoc parent-name :name pkm-structure-2-undefined-schemas-plist))))
          (parent-assets (when parent-schema (-map #'-copy (oref parent-schema :assets)) ))
          (self-assets (-map #'-copy (oref schema :assets)))
          (combined-assets (-reduce-from #'pkm--object-nondestructively-combine-eieio (pkm--object-nondestructively-combine-eieio parent-assets self-assets) behavior-assets))
