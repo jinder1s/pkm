@@ -45,7 +45,7 @@
            (base-schema (object-schema
                          :name "base-n"
                          :assets (list node-asset)))
-           (pkm-structure-uncompiled-schemas (list base-schema))
+           (pkm-structure-2-undefined-schemas-plist (list base-schema))
            (new-schema (object-schema
                         :parent-schema-name "base-n"))
 
@@ -84,7 +84,7 @@
                     :name "base-n"
                     :assets (list node-asset)
                     :behaviors '((:name "test-behavior" :link-to (primary)))))
-           (pkm-structure-behavior-schemas (list
+           (pkm-structure-2-defined-behavior-plist (list
                                             (behavior-schema :name "test-behavior"
                                                              :assets (list kvd-asset))))
            (object-def (schema-compile schema))

@@ -1051,8 +1051,9 @@ Returns output in two formats:
        (-map (lambda (asset)
                (plist-put asset :link-to link-to))
              it)))
+
 (defun pkm2--get-behavior-assets2 (behavior-name link-to)
-  (--> (object-assoc behavior-name :name pkm-structure-behavior-schemas)
+  (--> (object-assoc behavior-name :name pkm-structure-2-defined-behavior-plist)
        (oref it :assets)
        (-map (lambda (asset)
                (if (same-class-p asset 'kvd-schema)
@@ -1066,6 +1067,8 @@ Returns output in two formats:
 (defvar pkm-structure-defined-schemas-plist ())
 
 
+(defvar pkm-structure-2-undefined-schemas-plist ())
+(defvar pkm-structure-2-defined-schemas-plist ())
 (setq pkm-structure-2-undefined-schemas-plist ())
 (setq pkm-structure-2-defined-schemas-plist ())
 
@@ -1688,12 +1691,16 @@ with in the :initarg slot.  VALUE can be any Lisp object."
 
 (cl-defmethod schema-compile ((schema object-schema))
   "Used to create internal representation of pkm-object."
-  (let* ((behaviors (oref schema :behaviors))
+  (let* ((behaviors (--> (oref schema :behaviors)
+                         (if (listp it) it (error "Behaviors need to be a list, %S, %S, %S"  (oref schema :behaviors) (oref schema :parent-schema-name) schema) )))
          (behavior-assets (-map (lambda (behavior)
                                   (pkm2--get-behavior-assets2 (plist-get behavior :name) (plist-get behavior :link-to)))
                                 behaviors))
          (parent-name (oref schema :parent-schema-name))
-         (parent-schema (when parent-name (schema-compile (object-assoc parent-name :name pkm-structure-2-undefined-schemas-plist))))
+         (parent-schema (when parent-name (--> (object-assoc parent-name :name pkm-structure-2-undefined-schemas-plist)
+                                                 (if it it (error "Parent schema not found %S, %S" parent-name (object-assoc parent-name :name pkm-structure-2-undefined-schemas-plist) ) )
+                                                 (schema-compile it)
+                                                 )))
          (parent-assets (when parent-schema (-map #'-copy (oref parent-schema :assets)) ))
          (self-assets (-map #'-copy (oref schema :assets)))
          (combined-assets (-reduce-from #'pkm--object-nondestructively-combine-eieio (pkm--object-nondestructively-combine-eieio parent-assets self-assets) behavior-assets))
