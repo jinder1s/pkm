@@ -1536,6 +1536,16 @@ TODO TEST!"
          (structure-schema (pkm--object-define structure-name)))
     (pkm2--object-capture-object-verify structure-schema)))
 
+(defun pkm--object-capture-eieio ()
+  "if NUMERIC-PREFIX-ARGUMENT = 0: Assume point is on pkm-browse and is on the node that should be parent of to-be-captured node. Essentially, creating a sub node.
+TODO TEST!"
+  (interactive)
+  (pkm--object-cache-structure-info-eieio)
+  (let* ((structure-name (-->  (doom-plist-keys pkm-structure-2-defined-schemas-plist)
+                               (completing-read "What type of object would you like to create?" it)))
+         (structure-schema (plist-get pkm-structure-2-defined-schemas-plist structure-name #'equal)))
+    (pkm-capture-test structure-schema)))
+
 
 (defun pkm--object-capture-sub (parent-node-db-id &optional structure-name link-label)
   (interactive)
@@ -1560,32 +1570,56 @@ TODO TEST!"
                        :links (list link-definition))))
     (pkm2--object-capture-object-verify schema)))
 
+(defun pkm--object-capture-sub-eieio (parent-node-db-id &optional structure-name link-label)
+  (pkm--object-cache-structure-info-eieio)
+  (let* ((structure-name (or structure-name
+                             (-->  (doom-plist-keys pkm-structure-2-defined-schemas-plist)
+                                   (completing-read "What type of object would you like to create?" it))))
+         (link-type-between-objects (or 'HIERARCHICAL
+                                        (unless link-label
+                                          (--> (completing-read "What type of link do you want to make?" pkm-links-types)
+                                               (if (equal it (symbol-name 'HIERARCHICAL))
+                                                   it
+                                                 (error "Only Hierarchical types links are implemented right now."))
+                                               (intern it ) ) ) ))
+         (link-label  (or link-label (completing-read "What is the label for this link?" (plist-get pkm-links-type-to-label-eq-plist link-type-between-objects)) ))
+         (link-definition (hierarchy-nodes-link-schema
+                           :label link-label
+                           :parent 'parent
+                           :child 'child))
+         (schema (object-schema
+                  :name "parent-child-node"
+                  :assets (list
+                           (node-schema :name "parent-node" :parent-node t :db-id parent-node-db-id)
+                           (asset-object-schema :name "child-node" :child-node t :object-name structure-name))
+                  :links (list link-definition)))
+         (compiled-schema (schema-compile schema))
+         )
+    (pkm-capture-test compiled-schema)))
+
 
 ;; schema -> capture -> commit
 ;;; capture
-(defclass base-schema ()
-  ((name :initarg :name :initform nil)
-   (optional :initarg :optional :initform nil)
-   (managed :initarg :managed :initform nil)
-   (multiple :initarg :multiple :initform nil)
-   (prompt :initarg :prompt :initform nil)))
 
 (defclass hierarchy-nodes-link-schema ()
-  ((parent :initarg :parent :initform nil)
+  ((name :initarg :name :initform nil)
+   (parent :initarg :parent :initform nil)
    (child :initarg :child :initform nil)
-   (label :initarg :type :initform nil)
+   (label :initarg :label :initform nil)
    (context :initarg :context :initform nil)
    (groups :initarg :groups :initform nil)))
 
 (defclass sequencial-nodes-link-schema ()
-  ((start :initarg :start :initform nil)
+  ((name :initarg :name :initform nil)
+   (start :initarg :start :initform nil)
    (next :initarg :next :initform nil)
    (label :initarg :type :initform nil)
    (context :initarg :context :initform nil)
    (groups :initarg :groups :initform nil)))
 
 (defclass flat-nodes-link-schema ()
-  ((node_a :initarg :node_a :initform nil)
+  ((name :initarg :name :initform nil)
+   (node_a :initarg :node_a :initform nil)
    (node_b :initarg :node_b :initform nil)
    (label :initarg :type :initform nil)
    (context :initarg :context :initform nil)
@@ -1599,6 +1633,13 @@ TODO TEST!"
    (type :initarg :type :initform nil)
    (context :initarg :context :initform nil)))
 
+(defclass base-schema ()
+  ((name :initarg :name :initform nil)
+   (optional :initarg :optional :initform nil)
+   (managed :initarg :managed :initform nil)
+   (multiple :initarg :multiple :initform nil)
+   (prompt :initarg :prompt :initform nil)))
+
 (defclass kvd-schema (base-schema)
   ((key :initarg :key :initform nil)
    (value :initarg :value :initform nil)
@@ -1606,19 +1647,29 @@ TODO TEST!"
    (data-type :initarg :data-type :initform nil)
    (link-to :initarg :link-to :initform nil)
    (context :initarg :context :initform nil)
-   (managed :initarg :managed :initform nil)
-   ))
-(defclass kvd-group-schema ()
-  ((kvds :initarg :kvds :initform nil)  ; kvd names
-   (name :initarg :name :initform nil)))
-
+   (managed :initarg :managed :initform nil)))
 
 (defclass node-schema (base-schema)
   ((content :initarg :content :initform nil)
    (primary-node :initarg :primary-node :initform nil)
    (db-id :initarg :db-id :initform nil)
    (data-type :initarg :data-type :initform nil)
-   (no-input :initarg :no-input :initform nil)))
+   (no-input :initarg :no-input :initform nil)
+   (parent-node :initarg :parent-node :initform nil)
+   (child-node :initarg :child-node :initform nil)
+   ))
+
+(defclass asset-object-schema (base-schema)
+  ((object-name :initarg :object-name :initform nil)
+   (child-node :initarg :child-node :initform nil)))
+
+(defclass kvd-group-schema ()
+  ((kvds :initarg :kvds :initform nil)  ; kvd names
+   (name :initarg :name :initform nil)))
+
+
+
+
 
 (defclass container-schema (base-schema)
   ((assets :initarg :assets :initform nil)))
@@ -1741,6 +1792,11 @@ with in the :initarg slot.  VALUE can be any Lisp object."
                                   (pkm-capture-test asset (assoc-default (oref asset :name) values)))
                                 assets)))
     (captured-compiled-object-schema :schema schema :assets captured-assets)))
+(cl-defmethod pkm-capture-test ((schema asset-object-schema) &optional values)
+  (let* ((object-name (oref schema :object-name))
+         (compiled-object-schema (object-assoc object-name :name pkm-structure-2-defined-schemas-plist))
+         (captured-object (pkm-capture-test compiled-object-schema values)))
+    captured-object))
 
 (cl-defmethod pkm-capture-test ((schema node-schema) &optional value)
   (let* ((asset-name (oref schema :name))
@@ -1770,9 +1826,11 @@ with in the :initarg slot.  VALUE can be any Lisp object."
          (schema-value (oref schema :value))
          (name (oref schema :name))
          (value
-          (cond (input-value input-value)
-                ((functionp schema-value) (funcall schema-value))
-                ((and schema-value (not (listp schema-value))) schema-value)
+          (cond (input-value  input-value)
+                ((and schema-value (functionp schema-value))
+                 (funcall schema-value))
+                ((and schema-value (not (listp schema-value)))
+                 schema-value)
                 (t (pkm-read prompt type choices)))))
     (captured-kvd :schema schema :key key :value value :name name)))
 
