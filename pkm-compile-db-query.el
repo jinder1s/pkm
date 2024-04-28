@@ -192,7 +192,6 @@
          (structure-name (plist-get type-values :structure-name))
          (unique-required (plist-get pkm-structure-unique-required-plist-eieio structure-name #'equal))
          (u-r-keys (--> (car unique-required) (-filter (lambda (kvd)
-                                                         (message "filter kvd: %S" kvd)
                                                          (member (oref kvd :key) it))
                                                        (cadr unique-required))))
          (first-key-kvd-spec (car u-r-keys))
@@ -203,10 +202,12 @@
           (list (cond ((-find (lambda (kvd)
                                 (--> (oref kvd :value) (or (stringp it) (numberp it)))) fully-specified-kvds))
                       ((-find (lambda (kvd)
-                                (oref kvd :choices)) fully-specified-kvds))))))
-    (message "queryblaH: %S, %S" structure-name unique-required u-r-keys easiest-queriable-kvds)
-    (message "queryblaH2: %S, %S" u-r-keys easiest-queriable-kvds)
-    (cond (u-r-keys (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type nodes-table))
+                                (oref kvd :choices))
+                              fully-specified-kvds))))))
+
+
+    (cond (u-r-keys
+                    (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type nodes-table))
           (easiest-queriable-kvds (-->  (-map-indexed (lambda (index kvd)
                                                         (if (equal index 0)
                                                             `(:or kvd (:kvd ,kvd))

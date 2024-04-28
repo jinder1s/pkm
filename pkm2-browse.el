@@ -1102,7 +1102,7 @@
 (defun pkm2--browse-format-get-string (spec browse-node)
   ""
   (let* ((pkm-node (oref browse-node :datum))
-         (show-hidden (oref browse-node :show-hidden))
+         (show-hidden (or t (oref browse-node :show-hidden) ))
          (types (oref pkm-node :types))
          (types-definitions (-map (lambda (type)
                                     (plist-get pkm-structure-defined-schemas-plist type))
