@@ -20,6 +20,7 @@
 ;;; Code:
 
 (require 'lister)
+(require 'pkm2-browse)
 (cl-defmethod pkm-get-string-representation ((p-node pkm-node) browse-node)
   (let* ((browse-insert-format-string
           (or
@@ -71,7 +72,7 @@
     (display-buffer-same-window (get-buffer-create buffer-name) nil)))
 
 (defun pkm2--lister-browse (buffer-state &optional buffer-name)
-  (message "lister browse: %S" buffer-name)
+  (message "lister browse: %S, %S" buffer-name buffer-state)
   (with-current-buffer (get-buffer-create buffer-name )
     (erase-buffer)
     (setq pkm2-browse-ewoc nil)
