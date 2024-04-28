@@ -119,5 +119,5 @@
     (message "current output: %S" output)
     output))
 
-(provide 'test-lister)
+(provide 'pkm-lister-browser)
 ;;; test-lister.el ends here

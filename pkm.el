@@ -36,6 +36,7 @@
 
 (require 'pkm-new-core )
 (require 'pkm2-browse)
+(require 'pkm-lister-browser)
 (require 'pkm2-tasks)
 (require 'pkm2-clock )
 (require 'pkm2-object-registrations)
