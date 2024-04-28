@@ -1722,7 +1722,9 @@ TODO TEST!"
    (data-type :initarg :data-type :initform nil)
    (link-to :initarg :link-to :initform nil)
    (context :initarg :context :initform nil)
-   (managed :initarg :managed :initform nil)))
+   (managed :initarg :managed :initform nil)
+   (log-change :initarg :log-change :initform nil)
+   ))
 
 (defclass node-schema (base-schema)
   ((content :initarg :content :initform nil)
