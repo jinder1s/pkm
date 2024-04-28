@@ -19,6 +19,7 @@
 ;;
 ;;; Code:
 
+(require 'lister)
 (cl-defmethod pkm-get-string-representation ((p-node pkm-node) browse-node)
   (let* ((browse-insert-format-string
           (or
