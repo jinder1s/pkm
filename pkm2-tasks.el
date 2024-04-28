@@ -31,17 +31,16 @@
 (pkm2-register-behavior-2 (behavior-schema
                            :name "task"
                            :assets (list
-                                    (kvd-schema :name "is-todo" :key "node-type" :value "todo"  :data-type TEXT)
-                                    (kvd-schema :name "task-status" :key "task-status" :choices ,pkm2-task-status-types
-                                     :prompt "What is todo's status?"  :data-type TEXT :log-change t)
-                                    (kvd-schema :name "task-priority" :key "task-priority" :choices ,pkm2-tasks-priority-types
-                                     :prompt "What is todo's priority?"  :data-type INTEGER :log-change t))))
+                                    (kvd-schema :name "is-todo" :key "node-type" :value "todo"  :data-type 'TEXT)
+                                    (kvd-schema :name "task-status" :key "task-status" :choices pkm2-task-status-types
+                                     :prompt "What is todo's status?"  :data-type 'TEXT :log-change t)
+                                    (kvd-schema :name "task-priority" :key "task-priority" :choices pkm2-tasks-priority-types
+                                     :prompt "What is todo's priority?"  :data-type 'INTEGER :log-change t))))
 
 (pkm2-register-behavior `(:name deadline :assets ((:pkm-type kvd :name "deadline" :key "deadline" :value ,#'pkm2-get-user-selected-timestamp
                                                    :link-to ("base-node") :data-type DATETIME )
                                                   (:pkm-type kvd :name "deadline-alert-minutes" :key "deadline-alert-minutes"
-                                                   :link-to ("base-node") :data-type INTEGER :optional t )
-                                                  )))
+                                                   :link-to ("base-node") :data-type INTEGER :optional t))))
 
 (pkm-register-structure 'schedule-node
                         (list :parent 'dependent-node
@@ -81,7 +80,7 @@
                                                                    "<insert>(:display content)</insert>"
                                                                    "<insert>(:display hidden :prefix \"\\n\")</insert>")
                 :assets (list
-                         '(:pkm-type kvd :name "is-project" :key "node-type" :value "project" :link-to ("base-node") :data-type TEXT))))
+                         (kvd-schema :name "is-project" :key "node-type" :value "project" :link-to '("base-node") :data-type 'TEXT))))
 
 
 
