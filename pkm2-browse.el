@@ -1174,52 +1174,52 @@
       (setq output-string (propertize output-string 'face (plist-get spec :face))))
     output-string ))
 
-;;; browse-mode
+;;; browse-minor-mode
+
+;; TODO Implement a minor mode
+(setq
+   pkm2-browse-mode-map
+   (let ((map (make-sparse-keymap)))
+     (define-key map (kbd "C-c C-p <tab>" ) #'pkm2--browse-toggle-hidden-info-at-point )
+     (define-key map (kbd "C-c C-p e e" ) #'pkm2--browse-edit-object-at-point )
 
 
+     (define-key map (kbd "C-c C-p s r" ) #'pkm2--refresh-current-buffer )
+     (define-key map (kbd "C-c C-p s q" ) #'pkm2--add-query-to-section-at-point )
+     (define-key map (kbd "C-c C-p s e" ) #'pkm-browse-section-edit-spec )
+     (define-key map (kbd "C-c C-p s s" ) #'pkm-browse-section-save-spec )
 
+     (define-key map (kbd "C-c C-p b r" ) #'pkm2--refresh-current-buffer )
+     (define-key map (kbd "C-c C-p b a" ) #'pkm2-browse-add-section )
+     (define-key map (kbd "C-c C-p b s" ) #'pkm2-browse-save-browse-spec )
 
-(define-derived-mode pkm2-browse-mode special-mode "pkm2-browse"
-  "Major mode to browse pkm2 database.
-\\<pkm2-browse-mode-map>
-sfdsadfas
-\\{pkm2-browse-mode-map}
-")
+     (define-key map (kbd "C-c C-p n a r p" ) #'pkm2--browse-add-search-parent )
+     (define-key map (kbd "C-c C-p x a r c" ) #'pkm2--browse-add-search-child )
 
-(define-keymap
+     (define-key map (kbd "C-c C-p n a k" ) #'pkm2--browse-add-kvd-at-point )
+     (define-key map (kbd "C-c C-p n a c" ) #'pkm--browse-capture-node-as-child-of-node-at-point )
+     (define-key map (kbd "C-c C-p n a s" ) #'pkm--browse-capture-node-as-sibling-of-node-at-point )
+
+     (define-key map (kbd "C-c C-p n c e" ) #'pkm2-clock-edit-clock-at-point )
+     (define-key map (kbd "C-c C-p n c i" ) #'pkm2-clock-in )
+     (define-key map (kbd "C-c C-p n c o" ) #'pkm2-clock-out )
+     (define-key map (kbd "C-c C-p n c s" ) #'pkm2-clock-switch )
+
+     (define-key map (kbd "C-c C-p n s c" ) #'pkm2--browse-see-children-at-point )
+     (define-key map (kbd "C-c C-p n s n p" ) #'pkm2--browse-see-parents-at-point )
+
+     (define-key map (kbd "C-c C-p n f" ) #'pkm2--browse-filter-children-nodes-at-point )
+     (define-key map (kbd "C-c C-p n n" ) #'pkm2--narrow-to-node-and-children-at-point )
+     (define-key map (kbd "C-c C-p n d" ) #'pkm2--browse-delete-node-at-point )
+     map
+     
+     ) )
+
+(define-minor-mode pkm2-browse-mode
+  "A minor mode for browsing pkm2 nodes"
+  :lighter " pkm2-browse"
   :keymap pkm2-browse-mode-map
-  "<tab>" #'pkm2--browse-toggle-hidden-info-at-point
-  "e e" #'pkm2--browse-edit-object-at-point
-
-
-  "s r" #'pkm2--refresh-current-buffer
-  "s q" #'pkm2--add-query-to-section-at-point
-  "s e" #'pkm-browse-section-edit-spec
-  "s s" #'pkm-browse-section-save-spec
-
-  "b r" #'pkm2--refresh-current-buffer
-  "b a" #'pkm2-browse-add-section
-  "b s" #'pkm2-browse-save-browse-spec
-
-  "n a r p" #'pkm2--browse-add-search-parent
-  "x a r c" #'pkm2--browse-add-search-child
-
-  "n a k" #'pkm2--browse-add-kvd-at-point
-  "n a c" #'pkm--browse-capture-node-as-child-of-node-at-point
-  "n a s" #'pkm--browse-capture-node-as-sibling-of-node-at-point
-
-  "n c e" #'pkm2-clock-edit-clock-at-point
-  "n c i" #'pkm2-clock-in
-  "n c o" #'pkm2-clock-out
-  "n c s" #'pkm2-clock-switch
-
-  "n s c" #'pkm2--browse-see-children-at-point
-  "n s n p" #'pkm2--browse-see-parents-at-point
-
-  "n f" #'pkm2--browse-filter-children-nodes-at-point
-  "n n" #'pkm2--narrow-to-node-and-children-at-point
-  "n d" #'pkm2--browse-delete-node-at-point)
-
+  :group 'pkm2-browse)
 
 
 (defun pkm2-browse-add-section (&optional buffer-name)
