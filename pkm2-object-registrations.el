@@ -23,7 +23,7 @@
 
 ;; (pkm-register-structure-2 (object-schema :name "time-n" :parent-schema-name "base-n"
 ;;                                          :is-behavior "time-interval"
-;;                                          :behaviors (list `(:name "time-interval" :link-to '(primary)))))
+;;                                          :behaviors (list `(:name "time-interval" :link-to (primary)))))
 
 (pkm-register-structure-2
  (object-schema :name "base-n" :assets  (list
@@ -66,7 +66,7 @@
                                               "<insert>(:display content)</insert>"
                                               "<insert>(:display hidden :prefix \"\\n\")</insert>")
                 :is-behavior "log"
-                :behaviors (list `(:name "log" :link-to '(primary)))))
+                :behaviors (list `(:name "log" :link-to (primary)))))
 
 (pkm-register-structure-2
                         ; TODO this should be both a note and a log

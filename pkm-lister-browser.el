@@ -53,7 +53,7 @@
 
                 (datum (oref browse-node :datum))
                 (base-string (pkm-get-string-representation datum browse-node))
-                (output (string-split (propertize base-string 'field t 'inhibit-read-only t) "\n" )))
+                (output (string-split (propertize base-string 'field t 'inhibit-read-only nil) "\n" )))
            (message "Output: %S" output)
            output))
         ((stringp ewoc-item) ewoc-item)) )

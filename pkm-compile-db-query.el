@@ -31,9 +31,10 @@
 
 (defun pkm2--compile-db-query-kvd (type-values nodes-table)
   (message "nodes-table: %S" nodes-table)
+  (message "kvd, type-values: %S" type-values)
   (setq  nodes-table (or nodes-table "node"))
   (cond ((plist-get type-values :kvd) ; TODO Test
-         (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2 (plist-get type-values :kvd) nodes-table))
+         (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2-eieio (plist-get type-values :kvd) nodes-table))
         ((and (plist-get type-values :value) (plist-get type-values :key) (plist-get type-values :data-type)) ;TODO Test
          (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2
           (plist-get type-values :key)
@@ -171,6 +172,13 @@
          (type (plist-get kvd :data-type)))
     (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2 key values type nodes-table)))
 
+(defun pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2-eieio (kvd &optional nodes-table)
+  (let* ((key (oref kvd :key))
+         (values (cond ((list (oref kvd :value)))
+                       ((oref kvd :choices))))
+         (type (oref kvd :data-type)))
+    (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-and-values-2 key values type nodes-table)))
+
 (defun pkm2--object-db-query-get-nodes-with-links-to-kvds (kvds &optional nodes-table)
   (-reduce-from (lambda (init-subquery kvd)
                   (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd kvd init-subquery))
@@ -182,26 +190,29 @@
 (defun pkm2--db-compile-query-get-nodes-of-structure-type (type-values &optional nodes-table)
   (let* ((nodes-table (or nodes-table "node"))
          (structure-name (plist-get type-values :structure-name))
-         (unique-required (plist-get pkm-structure-unique-required-plist structure-name))
+         (unique-required (plist-get pkm-structure-unique-required-plist-eieio structure-name #'equal))
          (u-r-keys (--> (car unique-required) (-filter (lambda (kvd) (member (plist-get kvd :key) it))
                                                        (cadr unique-required))))
          (first-key-kvd-spec (car u-r-keys))
          (first-key (plist-get first-key-kvd-spec :key))
          (first-key-type (plist-get first-key-kvd-spec :data-type))
-         (fully-specified-kvds (pkm--object-get-required-fully-specified-kvds2 (cadr unique-required)))
+         (fully-specified-kvds (pkm--object-get-required-fully-specified-kvds2-eieio (cadr unique-required)))
          (easiest-queriable-kvds
           (list (cond ((-find (lambda (kvd)
-                                (--> (plist-get kvd :value) (or (stringp it) (numberp it)))) fully-specified-kvds))
+                                (--> (oref kvd :value) (or (stringp it) (numberp it)))) fully-specified-kvds))
                       ((-find (lambda (kvd)
-                                (plist-get kvd :choices)) fully-specified-kvds))))))
-    (message "%S, %S, %S" unique-required u-r-keys easiest-queriable-kvds)
+                                (oref kvd :choices)) fully-specified-kvds))))))
+    (message "queryblaH: %S, %S" structure-name unique-required u-r-keys easiest-queriable-kvds)
+    (message "queryblaH2: %S, %S" u-r-keys easiest-queriable-kvds)
     (cond (u-r-keys (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type nodes-table))
-          (easiest-queriable-kvds (pkm2--compile-full-db-query (-map-indexed (lambda (index kvd)
-                                                                                      (if (equal index 0)
-                                                                                          `(:or kvd (:kvd ,kvd))
-                                                                                        `(:and kvd (:kvd ,kvd))))
-                                                                                    easiest-queriable-kvds)
-                                                                      nodes-table))
+          (easiest-queriable-kvds (-->  (-map-indexed (lambda (index kvd)
+                                                        (if (equal index 0)
+                                                            `(:or kvd (:kvd ,kvd))
+                                                          `(:and kvd (:kvd ,kvd))))
+                                                      easiest-queriable-kvds)
+                                        (progn (message "query-plist: %S" it) it)
+                                        (pkm2--compile-full-db-query it
+                                                                     nodes-table) ))
           (t (error "Unable to get nodes for structure-type %S" structure-name)))))
 
 
@@ -374,6 +385,8 @@
                      "SELECT node_id, child_id FROM subs_table"
                    "SELECT node_id FROM subs_table"))))
     query))
+
+
 (defun pkm2--compile-db-query (single-query-spec &optional nodes-table)
   (if-let* ((type-strategies (plist-get pkm2--query-spec-options-plist (car single-query-spec)))
             (db-query-func (plist-get type-strategies :get-db-query))

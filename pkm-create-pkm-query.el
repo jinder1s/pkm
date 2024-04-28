@@ -135,7 +135,7 @@
 
 
 (defun pkm--convert-into-get-spec-structure-type ()
-  (list :structure-name (intern (completing-read "What structure-type?" (doom-plist-keys pkm-structure-undefined-schemas-plist)) )))
+  (list :structure-name (completing-read "What structure-type?" (doom-plist-keys pkm-structure-undefined-schemas-plist)) ))
 
 
 (defun pkm--convert-into-get-spec-between ()

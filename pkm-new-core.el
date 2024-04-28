@@ -602,11 +602,6 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
           :timestamp ,timestamp))))
     output))
 
-
-
-
-
-
 ;; ** log change
 (defun pkm2--update-node-with-log (pkm-node db-id new-content timestamp)
   (message "In update log node")
@@ -1069,12 +1064,8 @@ Returns output in two formats:
 
 (defvar pkm-structure-2-undefined-schemas-plist ())
 (defvar pkm-structure-2-defined-schemas-plist ())
-(setq pkm-structure-2-undefined-schemas-plist ())
-(setq pkm-structure-2-defined-schemas-plist ())
 
 (defvar pkm-structure-2-defined-behavior-plist ())
-
-
 
 (defun pkm-register-structure (name structure-plist)
   (--> (plist-put structure-plist :name name) (plist-put it :pkm-type name) (plist-put pkm-structure-undefined-schemas-plist name it) (setq pkm-structure-undefined-schemas-plist it)))
@@ -1106,8 +1097,6 @@ Returns output in two formats:
 (defun pkm--object-psuedo-map-by-type-and-name-eieio (input-list)
   "INPUT-LIST should be formatted (type (plist)) plist might have :name key"
   (-map (lambda (item)
-          (message "item type: %S, %S" (type-of item) item)
-          (message "item: %S, %S, %S" item (same-class-p item 'kvd-schema) (same-class-p item 'node-schema))
           (let* ((type (eieio-object-class-name item ))
                  (name (oref item :name)))
             (list (list type name) item)))
@@ -1232,16 +1221,28 @@ Returns output in two formats:
                   (pkm-objectp (plist-get pkm-structure-defined-schemas-plist structure-name) pkm-node)) it)))
 
 (defvar pkm-structure-fully-specified-kvds-plist ())
+(defvar pkm-structure-fully-specified-kvds-plist-eieio ())
 (defvar pkm-structure-required-kvds-plist ())
+(defvar pkm-structure-required-kvds-plist-eieio ())
 (defvar pkm-structure-unique-required-plist ())
+(defvar pkm-structure-unique-required-plist-eieio ())
 (defvar pkm-kvd-key-to-structure-plist ())
+(defvar pkm-kvd-key-to-structure-plist-eieio ())
 (defvar pkm-data-type-to-kvd-key-plist ())
+(defvar pkm-data-type-to-kvd-key-plist-eieio ())
 
 (defun pkm-object-register-structure-with-kvd (kvd structure-name)
   (let* ((key (plist-get kvd :key))
          (current-registrations  (plist-get pkm-kvd-key-to-structure-plist key #'equal)))
     (unless (member structure-name current-registrations)
       (setq  pkm-kvd-key-to-structure-plist (plist-put  pkm-kvd-key-to-structure-plist key (-concat `(,structure-name) current-registrations) #'equal)))))
+
+
+(defun pkm-object-register-structure-with-kvd-eieio (kvd structure-name)
+  (let* ((key (oref kvd :key))
+         (current-registrations  (plist-get pkm-kvd-key-to-structure-plist-eieio key #'equal)))
+    (unless (member structure-name current-registrations)
+      (setq  pkm-kvd-key-to-structure-plist-eieio (plist-put  pkm-kvd-key-to-structure-plist-eieio key (-concat `(,structure-name) current-registrations) #'equal)))))
 
 (defun pkm-object-register-kvd-key-with-data-type (kvd)
   (let* ((key (plist-get kvd :key))
@@ -1251,18 +1252,30 @@ Returns output in two formats:
       (setq  pkm-data-type-to-kvd-key-plist (plist-put  pkm-data-type-to-kvd-key-plist data-type (-concat `(,key) current-registrations) #'equal)))))
 
 
+(defun pkm-object-register-kvd-key-with-data-type-eieio (kvd)
+  (let* ((key (oref kvd :key))
+         (data-type (oref kvd :data-type))
+         (current-registrations  (plist-get pkm-data-type-to-kvd-key-plist-eieio data-type #'equal)))
+    (unless (member key current-registrations)
+      (setq  pkm-data-type-to-kvd-key-plist-eieio (plist-put  pkm-data-type-to-kvd-key-plist-eieio data-type (-concat `(,key) current-registrations) #'equal)))))
+
+
 (defun pkm-object-kvd-get-kvd-spec-for-key-in-structure (key structure-name)
   (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
        (plist-get it :assets)
        (-find (lambda (asset-spec)
-                  (when (and (equal (plist-get asset-spec :pkm-type) 'kvd)
-                             (equal (plist-get asset-spec :key) key))
-                    t))
-                it)))
+                (when (and (equal (plist-get asset-spec :pkm-type) 'kvd)
+                           (equal (plist-get asset-spec :key) key))
+                  t))
+              it)))
 
 (defun pkm--object-find-unique-identifiers (structure-name structure-plist required-kvds-plist)
   (list (pkm--object-find-unique-identifiers-unique-key structure-name structure-plist required-kvds-plist)
         (pkm--object-find-unique-identifiers-unique-kvds structure-name structure-plist required-kvds-plist)))
+
+(defun pkm--object-find-unique-identifiers-eieio (structure-name structure-plist required-kvds-plist)
+  (list (pkm--object-find-unique-identifiers-unique-key-eieio structure-name structure-plist required-kvds-plist)
+        (pkm--object-find-unique-identifiers-unique-kvds-eieio structure-name structure-plist required-kvds-plist)))
 
 (defun pkm--object-find-unique-identifiers-unique-key (structure-name  structure-plist required-kvds-plist)
   (let* ((self-fully-defined-kvds (plist-get required-kvds-plist structure-name))
@@ -1273,10 +1286,27 @@ Returns output in two formats:
                          (not (-any? (lambda (s-name)
                                        (unless (or (eq s-name structure-name)
                                                    (member structure-name (--> (plist-get structure-plist s-name) (plist-get it :parents))))
-                                           (--> (plist-get required-kvds-plist s-name)
-                                                (-map (lambda (kvd)
-                                                        (plist-get kvd :key)) it)
-                                                (member key it)) ))
+                                         (--> (plist-get required-kvds-plist s-name)
+                                              (-map (lambda (kvd)
+                                                      (plist-get kvd :key)) it)
+                                              (member key it)) ))
+                                     structure-names) ))
+                       keys)))
+    unique-keys))
+
+(defun pkm--object-find-unique-identifiers-unique-key-eieio (structure-name  structure-plist required-kvds-plist)
+  (let* ((self-fully-defined-kvds (plist-get required-kvds-plist structure-name))
+         (keys (-distinct (-map (lambda (kvd) (oref kvd :key)) self-fully-defined-kvds)))
+         (structure-names (doom-plist-keys required-kvds-plist))
+         (unique-keys (-filter
+                       (lambda (key)
+                         (not (-any? (lambda (s-name)
+                                       (unless (or (eq s-name structure-name)
+                                                   (member structure-name (--> (plist-get structure-plist s-name) (oref it :parents))))
+                                         (--> (plist-get required-kvds-plist s-name)
+                                              (-map (lambda (kvd)
+                                                      (oref kvd :key)) it)
+                                              (member key it)) ))
                                      structure-names) ))
                        keys)))
     unique-keys))
@@ -1302,6 +1332,27 @@ Returns output in two formats:
                        self-fully-defined-kvds)))
     unique-kvds))
 
+(defun pkm--object-find-unique-identifiers-unique-kvds-eieio (structure-name structure-plist required-kvds-plist)
+  (let* ((self-fully-defined-kvds (plist-get required-kvds-plist structure-name))
+         (structure-names (doom-plist-keys required-kvds-plist))
+         (unique-kvds (-filter
+                       (lambda (s-kvd)
+                         (not (-any? (lambda (temp-name)
+                                       (if (or (eq temp-name structure-name) (member structure-name (--> (plist-get structure-plist temp-name) (oref it :parents))))
+                                           nil
+                                         (--> (plist-get required-kvds-plist temp-name)
+                                              (-any? (lambda (kvd)
+                                                       (if (equal (oref s-kvd :key) (oref kvd :key))
+                                                           (or (equal (oref s-kvd :value) (oref kvd :value))
+                                                               (and (and (oref s-kvd :choices) (oref kvd :choices))
+                                                                    (or  (-intersection (oref s-kvd :choices) (oref kvd :choices))
+                                                                         (-intersection (oref kvd :choices) (oref s-kvd :choices))) ))
+                                                         nil))
+                                                     it))))
+                                     structure-names)))
+                       self-fully-defined-kvds)))
+    unique-kvds))
+
 
 
 (defun pkm--object-get-required-kvds (object-schema)
@@ -1315,9 +1366,24 @@ Returns output in two formats:
                                         (not (plist-get possibly-kvd :managed))
                                         (-any
                                          (lambda (specifier)
-                                           (message "Hello from before specidier match")
                                            (pkm--object-does-specifier-match specifier primary-asset))
                                          (plist-get possibly-kvd :link-to))))
+                                 assets)))
+    required-kvds))
+
+(defun pkm--object-get-required-kvds-eieio (object-schema)
+  (let* ((assets (oref object-schema :assets))
+         (primary-asset (-find (lambda (asset)
+                                 (and  (same-class-p asset 'node-schema) (oref asset :primary-node) ))
+                               assets))
+         (required-kvds (-filter (lambda (possibly-kvd)
+                                   (and  (same-class-p possibly-kvd 'kvd-schema)
+                                         (not (oref possibly-kvd :optional))
+                                         (not (oref possibly-kvd :managed))
+                                         (-any
+                                          (lambda (specifier)
+                                            (pkm--object-does-specifier-match specifier primary-asset))
+                                          (oref possibly-kvd :link-to))))
                                  assets)))
     required-kvds))
 
@@ -1336,13 +1402,26 @@ Returns output in two formats:
   (let* ((required-kvds (pkm--object-get-required-kvds object-schema))
          (fully-specified (pkm--object-get-required-fully-specified-kvds2 required-kvds) ))
     fully-specified))
+(defun pkm--object-get-required-fully-specified-kvds-eieio (object-schema)
+  (let* ((required-kvds (pkm--object-get-required-kvds-eieio object-schema))
+         (fully-specified (pkm--object-get-required-fully-specified-kvds2-eieio required-kvds) ))
+    fully-specified))
+
 (defun pkm--object-get-required-fully-specified-kvds2 (kvds)
-"TODO replace v1 of this function with this."
+  "TODO replace v1 of this function with this."
   (-filter (lambda (kvd-schema)
              (or (stringp (plist-get kvd-schema :value))
                  (when (plist-get kvd-schema :choices)
                    (listp (plist-get kvd-schema :choices)))))
-                                   kvds))
+           kvds))
+
+(defun pkm--object-get-required-fully-specified-kvds2-eieio (kvds)
+  "TODO replace v1 of this function with this."
+  (-filter (lambda (kvd-schema)
+             (or (stringp (oref kvd-schema :value))
+                 (when (oref kvd-schema :choices)
+                   (listp (oref kvd-schema :choices)))))
+           kvds))
 (defun pkm--object-get-time-related-kvd-keys ()
   (plist-get pkm-data-type-to-kvd-key-plist 'DATETIME))
 
@@ -1429,50 +1508,46 @@ Returns output in two formats:
     (-each structure-names
       (lambda (structure-name)
         (let* ((schema (plist-get pkm-structure-2-undefined-schemas-plist structure-name #'equal)))
-          (message "structure %S" schema)
-          (message "compiled %S"  (schema-compile schema))
           (setq pkm-structure-2-defined-schemas-plist
-                (plist-put pkm-structure-2-defined-schemas-plist structure-name (schema-compile schema))) )))
-    ;; (-each structure-names
-    ;;   (lambda (structure-name)
-    ;;     (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
-    ;;          (oref it :assets)
-    ;;          (-each it (lambda (asset)
-    ;;                      (when (equal (plist-get asset :pkm-type) 'kvd)
-    ;;                        (pkm-object-register-kvd-key-with-data-type asset)
-    ;;                        (pkm-object-register-structure-with-kvd  asset structure-name)))))))
-    ;; (-each  structure-names
-    ;;   (lambda (structure-name)
-    ;;     (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
-    ;;          (pkm--object-get-required-kvds it)
-    ;;          (setq pkm-structure-required-kvds-plist (plist-put pkm-structure-required-kvds-plist structure-name it)))))
-    ;; (-each  structure-names
-    ;;   (lambda (structure-name)
-    ;;     (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
-    ;;          (pkm--object-get-required-fully-specified-kvds it)
-    ;;          (setq pkm-structure-fully-specified-kvds-plist (plist-put pkm-structure-fully-specified-kvds-plist structure-name it)))))
-    ;; (-each  structure-names
-    ;;   (lambda (structure-name)
-    ;;     (--> (pkm--object-find-unique-identifiers structure-name pkm-structure-defined-schemas-plist pkm-structure-required-kvds-plist)
-    ;;          (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it)))))
-    ;; ; For behaviour based structures, only compare with other behivor based structures
-    ;; (let* ((structure-to-behavior-schema-plist  (mm-alist-to-plist (-map (lambda (s-name)
-    ;;                                                                        (cons s-name
-    ;;                                                                              (--> (plist-get pkm-structure-undefined-schemas-plist s-name)
-    ;;                                                                                   (plist-get it :is-behavior)
-    ;;                                                                                   (plist-get pkm-structure-defined-behavior-plist it) )))
-    ;;                                                                      behavior-structures) ))
-    ;;        (required-kvds-plist (mm-alist-to-plist (-map (lambda (s-name)
-    ;;                                                        (cons s-name
-    ;;                                                              (--> (plist-get structure-to-behavior-schema-plist s-name)
-    ;;                                                                   (pkm--behavior-get-required-kvds
-    ;;                                                                    it))))
-    ;;                                                      behavior-structures))))
-    ;;   (-each  behavior-structures
-    ;;     (lambda (structure-name)
-    ;;       (--> (pkm--object-find-unique-identifiers structure-name structure-to-behavior-schema-plist  required-kvds-plist)
-    ;;            (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it))))))
-    ))
+                (plist-put pkm-structure-2-defined-schemas-plist structure-name (schema-compile schema))))))
+    (-each structure-names
+      (lambda (structure-name)
+        (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
+             (oref it :assets)
+             (-each it (lambda (asset)
+                         (when (same-class-p asset 'kvd-schema)
+                           (pkm-object-register-kvd-key-with-data-type-eieio asset)
+                           (pkm-object-register-structure-with-kvd  asset structure-name)))))))
+    (-each  structure-names
+      (lambda (structure-name)
+        (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
+             (pkm--object-get-required-kvds-eieio it)
+             (setq pkm-structure-required-kvds-plist-eieio (plist-put pkm-structure-required-kvds-plist-eieio structure-name it)))))
+    (-each  structure-names
+      (lambda (structure-name)
+        (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
+             (pkm--object-get-required-fully-specified-kvds-eieio it)
+             (setq pkm-structure-fully-specified-kvds-plist-eieio (plist-put pkm-structure-fully-specified-kvds-plist-eieio structure-name it)))))
+    (-each  structure-names
+      (lambda (structure-name)
+        (--> (pkm--object-find-unique-identifiers-eieio structure-name pkm-structure-2-defined-schemas-plist pkm-structure-required-kvds-plist-eieio)
+             (setq pkm-structure-unique-required-plist-eieio (plist-put pkm-structure-unique-required-plist-eieio structure-name it)))))
+    ; For behaviour based structures, only compare with other behivor based structures
+    (let* ((structure-to-behavior-schema-plist  (mm-alist-to-plist (-map (lambda (s-name)
+                                                                           (cons s-name
+                                                                                 (--> (plist-get pkm-structure-2-undefined-schemas-plist s-name)
+                                                                                      (oref it :is-behavior)
+                                                                                      (plist-get pkm-structure-2-defined-schemas-plist s-name) )))
+                                                                         behavior-structures) ))
+           (required-kvds-plist (mm-alist-to-plist (-map (lambda (s-name)
+                                                           (cons s-name
+                                                                 (--> (plist-get structure-to-behavior-schema-plist s-name)
+                                                                      (pkm--object-get-required-kvds-eieio it))))
+                                                         behavior-structures))))
+      (-each  behavior-structures
+        (lambda (structure-name)
+          (--> (pkm--object-find-unique-identifiers-eieio structure-name structure-to-behavior-schema-plist  required-kvds-plist)
+               (setq pkm-structure-unique-required-plist-eieio (plist-put pkm-structure-unique-required-plist-eieio structure-name it))))))))
 
 
 ;;; pkm-object-capture
@@ -1543,8 +1618,9 @@ TODO TEST!"
   (pkm--object-cache-structure-info-eieio)
   (let* ((structure-name (-->  (doom-plist-keys pkm-structure-2-defined-schemas-plist)
                                (completing-read "What type of object would you like to create?" it)))
-         (structure-schema (plist-get pkm-structure-2-defined-schemas-plist structure-name #'equal)))
-    (pkm-capture-test structure-schema)))
+         (structure-schema (plist-get pkm-structure-2-defined-schemas-plist structure-name #'equal))
+         (captured-object (pkm-capture-test structure-schema)))
+    (pkm-commit-test captured-object)))
 
 
 (defun pkm--object-capture-sub (parent-node-db-id &optional structure-name link-label)
@@ -1594,13 +1670,12 @@ TODO TEST!"
                            (asset-object-schema :name "child-node" :child-node t :object-name structure-name))
                   :links (list link-definition)))
          (compiled-schema (schema-compile schema))
-         )
-    (pkm-capture-test compiled-schema)))
+         (captured-object  (pkm-capture-test compiled-schema)))
+    (pkm-commit-test captured-object)))
 
 
 ;; schema -> capture -> commit
 ;;; capture
-
 (defclass hierarchy-nodes-link-schema ()
   ((name :initarg :name :initform nil)
    (parent :initarg :parent :initform nil)

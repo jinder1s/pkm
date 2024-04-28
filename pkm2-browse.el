@@ -23,6 +23,15 @@
    (parent-id :initarg :parent-id :initform nil)
    (parent-link :initarg :parent-link :initform nil) ))
 
+(defclass pkm-browse-object (pkm-browse-base)
+  ((browse-id :initarg :browse-id :initform nil)
+   (level :initarg :level :initform nil)
+   (show-hidden :initarg :show-hidden :initform nil)
+   (children-ids :initarg :children-ids :initform nil)
+   (parents-ids :initarg :parents-ids :initform nil)
+   (parent-id :initarg :parent-id :initform nil)
+   (parent-link :initarg :parent-link :initform nil)))
+
 
 (cl-defmethod  pkm-get-db-id ((browse-node pkm-browse-node))
   (let* ((datum (oref browse-node :datum)))
@@ -31,8 +40,8 @@
       (error "No id slot in datum"))))
 
 (defclass pkm-browse-buffer (pkm-browse-base)
-  ((sections :initarg :sections :initform nil)))
-
+  ((sections :initarg :sections :initform nil)
+   (objects :initarg :objects :initform nil)))
 
 (defclass pkm-browse-section (pkm-browse-base)
   ((section-id :initarg :section-id :initform nil)
@@ -43,7 +52,14 @@
    (hidden :initarg :hidden :initform nil)
    (show-as-hierarchy :initarg :show-as-hierarchy :initform t)
    (show-active-specifiers :initarg :show-active-specifiers :initform nil)))
-
+(defclass pkm-spec-base ()
+  ((name :initarg :name :initform nil)))
+(defclass pkm-browse-spec (pkm-spec-base)
+  ())
+(defclass pkm-section-spec (pkm-spec-base)
+  ())
+(defclass pkm-query-spec (pkm-spec-base)
+  ())
 
 
 ;;;; Persistent buffer
@@ -100,13 +116,13 @@
               (sections (-map (lambda (sections-spec)
                                 (pkm2-browse-convert-section-spec-to-section sections-spec))
                               sections-specs)))
-         (pkm2--browse (pkm-browse-buffer :sections sections) buffer-name)))
+         (pkm2--lister-browse (pkm-browse-buffer :sections sections) buffer-name)))
     (3 (let* ((query-create-callback (lambda (browse-spec)
                                        (let* ((sections (-map
                                                          #'pkm2-browse-convert-section-spec-to-section
                                                          (plist-get browse-spec :sections)))
                                               (browse-state (pkm-browse-buffer :sections sections)))
-                                         (pkm2--browse browse-state nil)))))
+                                         (pkm2--lister-browse browse-state nil)))))
          (pkm-compile-create-browse-spec query-create-callback)))
     (2 (let* ((browse-spec-name (completing-read "Which Browse spec?" pkm2-browse-saved-named-browse-specs ))
               (browse-spec (--> (assoc-default browse-spec-name pkm2-browse-saved-named-browse-specs)
@@ -115,31 +131,7 @@
               (buffer-name (format "*%s-%s*" pkm2-browse-buffer browse-spec-name ))
               (sections (-map #'pkm2-browse-convert-section-spec-to-section (plist-get browse-spec :sections)))
               (browse-state (pkm-browse-buffer :sections sections)))
-         (pkm2--browse browse-state buffer-name)))))
-
-
-(defun pkm2--browse (buffer-state &optional buffer-name)
-  (let* ((buffer-name (or buffer-name (format "*%s-%s*" pkm2-browse-buffer (pkm-random-id))))
-         (buffer (get-buffer-create buffer-name))
-         (inhibit-read-only t))
-    ;; (display-buffer-in-side-window (get-buffer-create buffer-name) '((side . right)))
-    (with-current-buffer buffer-name
-      ;; (set-window-dedicated-p (get-buffer-window buffer-name) t)
-      (+word-wrap-mode )               ; TODO remove this doom specific function
-      (pkm2-browse-mode)
-      (tooltip-mode)
-      (erase-buffer)
-      (setq pkm2-browse-ewoc nil)
-      (setq pkm2-browse-ewoc (ewoc-create #'pkm-browse--insert-ewoc-item nil nil))
-      (setq pkm2-browse--browse-nodes-alist ())
-      (setq pkm2-browse--browse-sections-alist ())
-      (setq pkm2-browse-buffer-states-equal-plist (plist-put pkm2-browse-buffer-states-equal-plist buffer-name buffer-state #'equal))
-      (-each
-          (oref buffer-state :sections)
-        #'pkm2-browse--insert-section)
-      (setq buffer-read-only t) )
-    (persp-add-buffer  buffer-name)
-    (display-buffer-same-window (get-buffer-create buffer-name) nil)))
+         (pkm2--lister-browse browse-state buffer-name)))))
 
 
 (defun pkm2--browse-get-browse-id-of-node-with-db-id (db-id)
@@ -150,7 +142,6 @@
               pkm2-browse--browse-nodes-alist) ) )
 (defun pkm2-browse--organize-into-hierarchies (nodes)
   (pkm2-browse-hierarchy-organize-as-hierarchy nodes))
-
 
 (defun pkm2-sort-by-created-on (browse-nodes)
   (-sort (lambda (b-n1 b-n2)
@@ -170,41 +161,35 @@
 
 (defvar section-nodes-sorting-functions  (list #'pkm2-sort-by-created-on #'pkm2-sort-by-modified-on ))
 
+(cl-defmethod pkm2-browse-insert-node ((browse-node pkm-browse-node)  &optional where only-node)
+  (let* ((id (oref browse-node :browse-id))
+         ewoc-node
+         (children-browse-nodes (--> (oref browse-node :children-ids)
+                                     (-map (lambda (c-b-n-id)
+                                             (assoc-default c-b-n-id pkm2-browse--browse-nodes-alist))
+                                           it)))
+         (parents-browse-nodes (--> (oref browse-node :parents-ids)
+                                    (-map (lambda (c-b-n-id)
+                                            (assoc-default c-b-n-id pkm2-browse--browse-nodes-alist))
+                                          it))))
 
+    (setq ewoc-node (cond
+                     ((eq (car where) 'after)
+                      (ewoc-enter-after pkm2-browse-ewoc (cdr where) id))
+                     ((eq (car where) 'before)
+                      (ewoc-enter-before pkm2-browse-ewoc (cdr where) id))
+                     (t
+                      (ewoc-enter-last pkm2-browse-ewoc id))))
 
-(defun pkm2-browse--insert-section (section)
-  (when (not pkm2-browse-ewoc) (error (format "No ewoc, %S" (buffer-name) )))
-  (let* ((nodes-spec (oref section :spec))
-         (show-as-hierarchy (oref section :show-as-hierarchy))
-         (pkm-nodes (--> (pkm2--browse-get-section-nodes-db-ids nodes-spec)
-                         (-map #'pkm2--db-query-get-node-with-id it)))
-         (sorter (oref section :sorter))
-         (browse-nodes (when pkm-nodes (cond (show-as-hierarchy
-                              (--> (pkm2-browse-hierarchy-organize-as-hierarchy2 pkm-nodes)
-                                   (-map (lambda (branch)
-                                           (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree branch section 0)) it)))
-                             (t (-map (lambda (pkm-node)
-                                        (pkm-browse-node :datum pkm-node :section section :level 0))
-                                      pkm-nodes))) ))
-         (sorted-sorted-nodes  (if sorter
-                                  (pkm2-browse-sort-browse-nodes browse-nodes sorter)
-                                browse-nodes) )
-         (section-id (or (oref  section section-id)
-                         (oset section :section-id (pkm-random-id))))
-         (section-start-ewoc (when pkm-nodes (or
-                                              (oref section :start-ewoc)
-                                              (ewoc-enter-last pkm2-browse-ewoc (format "---%s---" (or (oref section :name) "section") )) ) ))
-         (section-end-ewoc (when pkm-nodes (or
-                                            (oref section :end-ewoc)
-                                            (ewoc-enter-after pkm2-browse-ewoc section-start-ewoc "\n")) )))
-    (-each sorted-sorted-nodes (lambda (b-n)
-                                 (pkm2-browse--insert-browse-node b-n `(before . ,section-end-ewoc))))
-
-    (oset section :start-ewoc section-start-ewoc)
-    (oset section :end-ewoc section-end-ewoc)
-    (setq pkm2-browse--browse-sections-alist (assoc-delete-all section-id pkm2-browse--browse-sections-alist) )
-    (push (cons section-id section) pkm2-browse--browse-sections-alist)))
-
+    (oset browse-node :start-ewoc ewoc-node)
+    (when (and children-browse-nodes (not only-node))
+      (-each children-browse-nodes (lambda (c-b-n)
+                                     (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
+                                     (pkm2-browse-insert-node c-b-n `(after . ,ewoc-node)))))
+    (when (and parents-browse-nodes (not only-node))
+      (-each parents-browse-nodes (lambda (p-b-n)
+                                        ; The seperator here can be better. Not the cleanest thing in the world
+                                    (pkm2-browse-insert-node p-b-n `(before . ,ewoc-node)))))))
 
 (defun pkm-browse--insert-ewoc-item (ewoc-item)
   (cond ((assoc-default ewoc-item pkm2-browse--browse-nodes-alist)
@@ -454,9 +439,7 @@
 (defun pkm2--browse-section-previous-sibling-node ()
   (pkm2--browse-section-next-sibling-node t))
 
-
 (defun pkm2--browse-section-parent-node ())
-
 
 ;;; interactivity
 (defun pkm2-browse-move-browse-node-at-point-up (&optional down)
@@ -501,7 +484,7 @@
 
 (defun pkm2--browse-get-browse-node-id-at-point (&optional current-point)
   (if-let* ((current-ewoc-node (when pkm2-browse-ewoc (ewoc-locate pkm2-browse-ewoc (or current-point (point)))))
-            (browse-node-id (ewoc-data current-ewoc-node)))
+            (browse-node-id (lister-get-data-at  pkm2-browse-ewoc current-ewoc-node)))
       browse-node-id))
 
 (defun pkm2--browse-get-browse-node-db-node-id-at-point (&optional current-point)
@@ -1182,8 +1165,6 @@
    (let ((map (make-sparse-keymap)))
      (define-key map (kbd "C-c C-p <tab>" ) #'pkm2--browse-toggle-hidden-info-at-point )
      (define-key map (kbd "C-c C-p e e" ) #'pkm2--browse-edit-object-at-point )
-
-
      (define-key map (kbd "C-c C-p s r" ) #'pkm2--refresh-current-buffer )
      (define-key map (kbd "C-c C-p s q" ) #'pkm2--add-query-to-section-at-point )
      (define-key map (kbd "C-c C-p s e" ) #'pkm-browse-section-edit-spec )
