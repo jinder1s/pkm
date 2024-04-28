@@ -26,12 +26,16 @@
 (defvar pkm2-tasks-status-face-plist '(TODO org-todo DOING org-todo DONE org-done KILL +org-todo-cancel HOLD +org-todo-onhold ))
 (defvar  pkm2-tasks-priority-types (list '("1" . 1) '("2" . 2) '("3" . 3) '("4" . 4) '("5" . 5)))
 
-(pkm2-register-behavior `(:name task
-                          :assets ((:pkm-type kvd :name "is-todo" :key "node-type" :value "todo"  :data-type TEXT)
-                                   (:pkm-type kvd :name "task-status" :key "task-status" :choices ,pkm2-task-status-types
-                                    :prompt "What is todo's status?"  :data-type TEXT :log-change t)
-                                   (:pkm-type kvd :name "task-priority" :key "task-priority" :choices ,pkm2-tasks-priority-types
-                                    :prompt "What is todo's priority?"  :data-type INTEGER :log-change t))))
+
+
+(pkm2-register-behavior-2 (behavior-schema
+                           :name "task"
+                           :assets (list
+                                    (kvd-schema :name "is-todo" :key "node-type" :value "todo"  :data-type TEXT)
+                                    (kvd-schema :name "task-status" :key "task-status" :choices ,pkm2-task-status-types
+                                     :prompt "What is todo's status?"  :data-type TEXT :log-change t)
+                                    (kvd-schema :name "task-priority" :key "task-priority" :choices ,pkm2-tasks-priority-types
+                                     :prompt "What is todo's priority?"  :data-type INTEGER :log-change t))))
 
 (pkm2-register-behavior `(:name deadline :assets ((:pkm-type kvd :name "deadline" :key "deadline" :value ,#'pkm2-get-user-selected-timestamp
                                                    :link-to ("base-node") :data-type DATETIME )
@@ -55,27 +59,29 @@
                                        `(:pkm-type kvd :name "schedule-end" :key "schedule-end" :value ,#'pkm2-get-user-selected-timestamp
                                          :link-to ("base-node") :data-type DATETIME :optional t))))
 
-(pkm-register-structure 'task-n
-                        (list :parent 'base-n
-                              :log-primary t
-                              :browse-insert-format-string (format "%s %s %s %s"
+(pkm-register-structure-2
+ (object-schema :name "task-n"
+                :parent-schema-name "base-n"
+                :is-behavior "task"
+                :behaviors (list `(:name "task" :link-to (primary)))
+                :log-primary t
+                :browse-insert-format-string (format "%s %s %s %s"
+                                                     "<insert>(:display kvd-value :key \"task-status\" :face-value pkm2-tasks-status-face-plist)</insert>"
+                                                     "<insert>(:display kvd-value :key \"task-priority\")</insert>"
+                                                     "<insert>(:display content)</insert>"
+                                                     "<insert>(:display hidden :prefix \"\\n\")</insert>")))
+
+
+(pkm-register-structure-2
+ (object-schema :name "project-s"
+                :parent-schema-name "task-n"
+                :browse-insert-format-string (format "%s %s PROJ %s %s"
                                                                    "<insert>(:display kvd-value :key \"task-status\" :face-value pkm2-tasks-status-face-plist)</insert>"
                                                                    "<insert>(:display kvd-value :key \"task-priority\")</insert>"
                                                                    "<insert>(:display content)</insert>"
                                                                    "<insert>(:display hidden :prefix \"\\n\")</insert>")
-                              :is-behavior 'task
-                              :behaviors (list `(:name task :link-to (primary)))))
-
-
-(pkm-register-structure 'project-s
-                        (list :parent 'task-n
-                              :browse-insert-format-string (format "%s %s PROJ %s %s"
-                                                                   "<insert>(:display kvd-value :key \"task-status\" :face-value pkm2-tasks-status-face-plist)</insert>"
-                                                                   "<insert>(:display kvd-value :key \"task-priority\")</insert>"
-                                                                   "<insert>(:display content)</insert>"
-                                                                   "<insert>(:display hidden :prefix \"\\n\")</insert>")
-                              :assets (list
-                                       '(:pkm-type kvd :name "is-project" :key "node-type" :value "project" :link-to ("base-node") :data-type TEXT))))
+                :assets (list
+                         '(:pkm-type kvd :name "is-project" :key "node-type" :value "project" :link-to ("base-node") :data-type TEXT))))
 
 
 
