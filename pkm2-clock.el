@@ -203,7 +203,7 @@
 
             (clocked-node-id (pkm-get-db-id clocked-node))
             (link-type (or link-type "sub")))
-      (pkm--object-capture-sub clocked-node-id structure-name link-type)
+      (pkm--object-capture-sub-eieio clocked-node-id structure-name link-type)
     (message "No active clocked-node")))
 
 (provide 'pkm2-clock)
