@@ -342,17 +342,15 @@
                          (format "types: %S" (oref pkm-node :types))
                          )))
     hidden-string))
-
 (defun pkm2--browse-convert-object-to-string (object)
   (cond ((stringp object) object)
         ((numberp object) (format "%d" object))))
 
 (defun pkm2-browse--refresh-insert-browse-node (browse-node)
-  (let* ((ewoc-node (oref browse-node :start-ewoc))
-         (inhibit-read-only t))
-    (ewoc-goto-node pkm2-browse-ewoc ewoc-node)
-    (pkm2-browse--insert-browse-node browse-node `(after . ,ewoc-node) t)
-    (ewoc-delete pkm2-browse-ewoc ewoc-node)))
+  (let* ((browse-id (oref browse-node :browse-id))
+         (lister-node (lister-next-matching pkm2-browse-ewoc :first (lambda (current-browse-node-id)
+                                                                      (equal browse-id current-browse-node-id)))))
+    (lister-replace-at pkm2-browse-ewoc lister-node browse-id)))
 
 
 (defun pkm2--browse-remove-node (browse-node-or-id &optional only-current-node)
@@ -1047,7 +1045,6 @@
   ""
   (let* ((pkm-node (oref browse-node :datum))
          (show-hidden (oref browse-node :show-hidden) )
-         (show-hidden t)
          (types (oref pkm-node :types))
          (types-definitions (-map (lambda (type)
                                     (plist-get pkm-structure-defined-schemas-plist type))
