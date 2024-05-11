@@ -27,9 +27,9 @@
            (-->
             (oref p-node :types)
             (-map (lambda (type)
-                    (let* ((schema (plist-get pkm-structure-defined-schemas-plist type) )
-                           (parents (plist-get schema :parents))
-                           (f-s (plist-get schema :browse-insert-format-string)))
+                    (let* ((schema (plist-get pkm-structure-2-defined-schemas-plist type) )
+                           (parents (oref schema :parents))
+                           (f-s (oref schema :browse-insert-format-string)))
                       (when f-s
                         (list type parents f-s))))
                   it)
@@ -43,7 +43,7 @@
                      (display-warning 'pkm2-browse (format "Node has multiple insert funcs: %S"   it )))
                    (car it))
             (-last-item it))
-           "<insert>(:display content)</insert>"))
+           "<insert>(:display content)</insert><insert>(:display hidden)</insert>"))
          (base-string (pkm2--browse-format-insert browse-insert-format-string browse-node)))
     base-string))
 
@@ -78,6 +78,7 @@
     (setq pkm2-browse-ewoc nil)
     (let* ((ewoc (lister-setup buffer-name #'pkm-lister-browse--insert-ewoc-item)))
       (message "After ewoc creation")
+
       (setq pkm2-browse-ewoc ewoc)
       (setq pkm2-browse--browse-nodes-alist ())
       (setq pkm2-browse--browse-sections-alist ())
@@ -86,7 +87,9 @@
           (oref buffer-state :sections)
         #'pkm2-lister-browse--insert-section)
       (persp-add-buffer  buffer-name)
-      (display-buffer-same-window (get-buffer-create buffer-name) nil))))
+      (display-buffer-same-window (get-buffer-create buffer-name) nil)))
+  (with-current-buffer buffer-name
+    (pkm2-browse-minor-mode)))
 
 (defun pkm2-lister-browse--insert-section (section)
   (when (not pkm2-browse-ewoc) (error (format "No ewoc, %S" (buffer-name) )))
@@ -103,9 +106,10 @@
                                                         (pkm-browse-node :datum pkm-node :section section :level 0))
                                                       pkm-nodes))) ))
          (browse-node-lister  (-map  #'pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree-lister browse-nodes) )
-         (final_list (list "section" browse-node-lister)))
+         (final_list (list "section" (-flatten-n 1 browse-node-lister ))))
     (message "Final list: %S" final_list)
     (lister-set-list pkm2-browse-ewoc final_list)))
+
 
 (defun pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree-lister (browse-node)
   (let* ((children (oref browse-node :children-ids))
@@ -113,13 +117,79 @@
          (current-id (oref browse-node :browse-id))
          (children-nodes-list (-map (lambda (child-id)
                                       (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree-lister (assoc-default child-id pkm2-browse--browse-nodes-alist) ))
-                                    children))
+                                    children) )
          (parents-nodes-list (-map (lambda (parent-id)
                                      (pkm2-convert-pkm-nodes-tree-to-browse-nodes-tree-lister (assoc-default parent-id pkm2-browse--browse-nodes-alist) ))
-                                   parents))
-         (output (-non-nil (list current-id children-nodes-list parents-nodes-list))))
+                                   parents) )
+         (output (-non-nil (list current-id (when children-nodes-list (-flatten-n 1 children-nodes-list)) (when parents-nodes-list (-flatten-n 1 parents-nodes-list))))))
     (message "current output: %S" output)
     output))
+
+(defun pkm2-lister-browser--move-up-or-down (direction)
+  ;; For now, this only handles hierarchial links,
+  ;; so this will only move node up if it has a sibling above
+
+  (if (equal direction 1)
+      (lister-move-item-up pkm2-browse-ewoc :point)
+    (lister-move-item-down pkm2-browse-ewoc :point)))
+(defun pkm2-lister-browser--move-up ()
+  (interactive)
+  (pkm2-lister-browser--move-up-or-down 1))
+
+(defun pkm2-lister-browser--move-down ()
+  (interactive)
+  (pkm2-lister-browser--move-up-or-down -1))
+
+
+(defun pkm2-lister-browser-promote-node ()
+  (let* ((current-point (point))
+         (browse-node (pkm2--browse-get-browse-node-at-point))
+         (section (oref browse-node :section))
+         (pkm-node (oref browse-node :datum))
+         (node-id (pkm-get-db-id pkm-node))
+         (parent-browse-node (--> (oref browse-node :parent-id)
+                                  (assoc-default it pkm2-browse--browse-nodes-alist)))
+         (connecting-link (oref browse-node :parent-link))
+         (connecting-link-id (pkm-get-db-id connecting-link))
+         (connecting-link-label  (oref connecting-link :type))
+         (connecting-context-id (oref connecting-link :context))
+         (grandparent-browse-node (--> (oref parent-browse-node :parent-id)
+                                       (assoc-default it pkm2-browse--browse-nodes-alist)))
+         (grandparent-pkm-node (oref grandparent-browse-node :datum))
+         (grandparent-node-id (pkm-get-db-id grandparent-pkm-node))
+         (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
+                                                                  grandparent-node-id
+                                                                  node-id
+                                                                  (pkm2-get-current-timestamp)
+                                                                  connecting-context-id)))
+    (pkm2--db-delete-link-between-nodes connecting-link-id)
+    (oset browse-node :parent-link new-link)
+    (goto-char current-point)
+    (lister-move-sublist-up pkm2-browse-ewoc :point)))
+
+(defun pkm2-lister-browser-demote-node ()
+  (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
+         (section (oref browse-node :section))
+         (pkm-node (oref browse-node :datum))
+         (node-id (pkm-get-db-id pkm-node))
+         (connecting-link (oref browse-node :parent-link))
+         (connecting-link-id (pkm-get-db-id connecting-link))
+         (connecting-link-label (oref connecting-link :type))
+         (connecting-context-id (oref connecting-link :context))
+         (sibling-above-browse-node (save-excursion
+                                      (pkm2--browse-section-previous-sibling-node)))
+         (sibling-above-pkm-node (oref sibling-above-browse-node :datum))
+         (sibling-above-node-id (pkm-get-db-id sibling-above-pkm-node))
+         (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
+                                                                  node-id
+                                                                  sibling-above-node-id
+                                                                  (pkm2-get-current-timestamp)
+                                                                  connecting-context-id)))
+    (pkm2--db-delete-link-between-nodes connecting-link-id)
+    (oset browse-node :parent-link new-link)
+    (lister-move-sublist-down pkm2-browse-ewoc :point)))
+
+
 
 (provide 'pkm-lister-browser)
 ;;; test-lister.el ends here

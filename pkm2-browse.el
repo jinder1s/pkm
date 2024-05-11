@@ -763,63 +763,6 @@
     (pkm2--browse-remove-node b-n)))
 
 
-(defun pkm2--browse-promote-node-at-point ()
-  "Move node higher in its current hierarchy."
-  (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
-         (section (oref browse-node :section))
-         (pkm-node (oref browse-node :datum))
-         (node-id (pkm-get-db-id pkm-node))
-         (parent-browse-node (--> (oref browse-node :parent-id)
-                                  (assoc-default it pkm2-browse--browse-nodes-alist)))
-         (connecting-link (--> (oref browse-node :parent-link)))
-         (connecting-link-id (pkm-get-db-id connecting-link))
-         (connecting-link-label  (oref connecting-link :type))
-         (connecting-context-id (oref connecting-link :context))
-         (grandparent-browse-node (--> (oref parent-browse-node :parent-id)
-                                       (assoc-default it pkm2-browse--browse-nodes-alist)))
-         (grandparent-pkm-node (oref grandparent-browse-node :datum))
-         (grandparent-node-id (pkm-get-db-id grandparent-pkm-node))
-         (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
-                                                                  grandparent-node-id
-                                                                  node-id
-                                                                  (pkm2-get-current-timestamp)
-                                                                  connecting-context-id))
-         (inhibit-read-only t))
-    (pkm2--db-delete-link-between-nodes connecting-link-id)
-    (pkm2--browse-remove-node browse-node)
-    (pkm2-browse-insert-node-in-hierarchy browse-node
-                                          grandparent-browse-node
-                                          new-link
-                                          section `(after . ,parent-browse-node))))
-
-
-(defun pkm2-browse-demote-node-at-point ()
-  "Move node lower in hierarchy."
-  ;; TODO TEST
-  (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
-         (section (oref browse-node :section))
-         (pkm-node (oref browse-node :datum))
-         (node-id (pkm-get-db-id pkm-node))
-         (connecting-link (--> (oref browse-node :parent-link)))
-         (connecting-link-id (pkm-get-db-id connecting-link))
-         (connecting-link-label (oref connecting-link :type))
-         (connecting-context-id (oref connecting-link :context))
-         (sibling-above-browse-node (save-excursion
-                                      (pkm2--browse-section-previous-sibling-node)))
-         (sibling-above-pkm-node (oref sibling-above-browse-node :datum))
-         (sibling-above-node-id (pkm-get-db-id sibling-above-pkm-node))
-         (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
-                                                                  node-id
-                                                                  sibling-above-node-id
-                                                                  (pkm2-get-current-timestamp)
-                                                                  connecting-context-id))
-         (inhibit-read-only t))
-    (pkm2--db-delete-link-between-nodes connecting-link-id)
-    (pkm2--browse-remove-node browse-node)
-    (pkm2-browse-insert-node-in-hierarchy browse-node
-                                          sibling-above-browse-node
-                                          new-link
-                                          section `last)))
 
 (defun pkm2--browse-filter-children-nodes-at-point (&optional arg)
   (interactive "p")
@@ -1088,6 +1031,7 @@
 
 (defun pkm2--browse-format-insert (input browse-node)
   "Single-quote (scalar) input for use in a SQL expression."
+  (message "input: %S" input)
   (with-temp-buffer
       (insert input)
       (goto-char (point-min))
@@ -1102,7 +1046,8 @@
 (defun pkm2--browse-format-get-string (spec browse-node)
   ""
   (let* ((pkm-node (oref browse-node :datum))
-         (show-hidden (or t (oref browse-node :show-hidden) ))
+         (show-hidden (oref browse-node :show-hidden) )
+         (show-hidden t)
          (types (oref pkm-node :types))
          (types-definitions (-map (lambda (type)
                                     (plist-get pkm-structure-defined-schemas-plist type))
@@ -1160,8 +1105,7 @@
 ;;; browse-minor-mode
 
 ;; TODO Implement a minor mode
-(setq
-   pkm2-browse-mode-map
+(setq pkm2-browse-mode-map
    (let ((map (make-sparse-keymap)))
      (define-key map (kbd "C-c C-p <tab>" ) #'pkm2--browse-toggle-hidden-info-at-point )
      (define-key map (kbd "C-c C-p e e" ) #'pkm2--browse-edit-object-at-point )
@@ -1170,16 +1114,23 @@
      (define-key map (kbd "C-c C-p s e" ) #'pkm-browse-section-edit-spec )
      (define-key map (kbd "C-c C-p s s" ) #'pkm-browse-section-save-spec )
 
-     (define-key map (kbd "C-c C-p b r" ) #'pkm2--refresh-current-buffer )
-     (define-key map (kbd "C-c C-p b a" ) #'pkm2-browse-add-section )
-     (define-key map (kbd "C-c C-p b s" ) #'pkm2-browse-save-browse-spec )
+     (define-key map (kbd "C-c C-p b r" ) #'pkm2--refresh-current-buffer)
+     (define-key map (kbd "C-c C-p b a" ) #'pkm2-browse-add-section)
+     (define-key map (kbd "C-c C-p b s" ) #'pkm2-browse-save-browse-spec)
 
-     (define-key map (kbd "C-c C-p n a r p" ) #'pkm2--browse-add-search-parent )
-     (define-key map (kbd "C-c C-p x a r c" ) #'pkm2--browse-add-search-child )
+     (define-key map (kbd "C-c C-p n a r p" ) #'pkm2--browse-add-search-parent)
+     (define-key map (kbd "C-c C-p x a r c" ) #'pkm2--browse-add-search-child)
 
-     (define-key map (kbd "C-c C-p n a k" ) #'pkm2--browse-add-kvd-at-point )
-     (define-key map (kbd "C-c C-p n a c" ) #'pkm--browse-capture-node-as-child-of-node-at-point )
-     (define-key map (kbd "C-c C-p n a s" ) #'pkm--browse-capture-node-as-sibling-of-node-at-point )
+     (define-key map (kbd "C-c C-p n a k" ) #'pkm2--browse-add-kvd-at-point)
+     (define-key map (kbd "C-c C-p n a c" ) #'pkm--browse-capture-node-as-child-of-node-at-point)
+     (define-key map (kbd "C-c C-p n a s" ) #'pkm--browse-capture-node-as-sibling-of-node-at-point)
+
+
+     (define-key map (kbd "C-c C-p n m h" ) #'pkm2-lister-browser--move-up)
+     (define-key map (kbd "C-c C-p n m l" ) #'pkm2-lister-browser--move-down)
+     (define-key map (kbd "C-c C-p n m p" ) #'pkm2-lister-browser-promote-node)
+     (define-key map (kbd "C-c C-p n m d" ) #'pkm2-lister-browser-demote-node)
+
 
      (define-key map (kbd "C-c C-p n c e" ) #'pkm2-clock-edit-clock-at-point )
      (define-key map (kbd "C-c C-p n c i" ) #'pkm2-clock-in )
@@ -1196,7 +1147,7 @@
      
      ) )
 
-(define-minor-mode pkm2-browse-mode
+(define-minor-mode pkm2-browse-minor-mode
   "A minor mode for browsing pkm2 nodes"
   :lighter " pkm2-browse"
   :keymap pkm2-browse-mode-map

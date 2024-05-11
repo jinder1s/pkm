@@ -1216,9 +1216,9 @@ Returns output in two formats:
 
 
 (defun pkm-object-get-structures (pkm-node)
-  (--> (doom-plist-keys pkm-structure-defined-schemas-plist)
+  (--> (doom-plist-keys pkm-structure-2-defined-schemas-plist)
        (-filter (lambda (structure-name)
-                  (pkm-objectp (plist-get pkm-structure-defined-schemas-plist structure-name) pkm-node)) it)))
+                  (pkm-objectp (plist-get pkm-structure-2-defined-schemas-plist structure-name) pkm-node)) it)))
 
 (defvar pkm-structure-fully-specified-kvds-plist ())
 (defvar pkm-structure-fully-specified-kvds-plist-eieio ())
@@ -1429,22 +1429,21 @@ Returns output in two formats:
   "Check if pkm-NODE is the primary pkm-node of OBJECT-SCHEMA"
 
   ; (message "schema: %S" object-schema)
-  (let* ((name (plist-get object-schema :name))
-         (fully-specified (plist-get pkm-structure-fully-specified-kvds-plist name))
+  (let* ((name (oref object-schema :name))
+         (fully-specified (plist-get pkm-structure-fully-specified-kvds-plist-eieio name #'equal))
          (has-kvd (-non-nil (-map (lambda (kvd-schema)
-                                    (cond ((plist-get kvd-schema :value)
-                                           (pkm2-node-has-key-value pkm-node (plist-get kvd-schema :key) (plist-get kvd-schema :value)))
-                                          ((plist-get kvd-schema :choices)
+                                    (cond ((oref kvd-schema :value)
+                                           (pkm2-node-has-key-value pkm-node (oref kvd-schema :key) (oref kvd-schema :value)))
+                                          ((oref kvd-schema :choices)
                                            (-any (lambda (choice)
                                                    (let* ((actual-choice (if (listp choice) (cdr choice) choice))
-                                                          (key (plist-get kvd-schema :key)))
-                                                     ; (message "in choices: %S, key: %s, choice: %s, %S" name key actual-choice (pkm2-node-has-key-value pkm-node key actual-choice))
+                                                          (key (oref kvd-schema :key)))
+                                        ; (message "in choices: %S, key: %s, choice: %s, %S" name key actual-choice (pkm2-node-has-key-value pkm-node key actual-choice))
                                                      (pkm2-node-has-key-value pkm-node key actual-choice)))
-                                                 (plist-get kvd-schema :choices)))))
+                                                 (oref kvd-schema :choices)))))
                                   fully-specified) )))
     ; (message "fs: %S, hk: %S\nkvd:%S" fully-specified has-kvd (oref pkm-node :kvds))
     (eq (length fully-specified ) (length has-kvd))))
-
 
 
 

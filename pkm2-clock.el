@@ -46,7 +46,6 @@
          (-map #'pkm2--db-query-get-node-with-id it)) )
 
 (defun pkm2-clock--get-current-clock-parent-pkm-nodes ()
-                                        ; TODO implment and test this
   (--> `((:or structure-type (:structure-name clock-node))
          (:not kvd (:key "clock-end" :data-type INTEGER))
          (:convert-and convert-to-parents (:levels 1 :link-type "clock")) )
