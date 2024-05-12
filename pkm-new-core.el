@@ -424,7 +424,6 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
 (defun pkm2--db-insert-link-between-node-and-kvd (node-id key_value_data-id timestamp &optional type context-node-id is-archive no-new-event group-ids)
   ;; schema
   ;; (:action insert :what kvd-link :data (:node-id node-id :kvd-id kvd-id :timestamp timestamp :type type :context-node-id context-node-id :is-archive is-archive))
-  (message "Group id: %S" group-ids)
   (let* ((table-name (pkm2--db-get-kvd-link-table-for-type type))
          (value-names (-concat (list "node" "key_value_data" "created_at" "shadow_id")
                                (when context-node-id
@@ -432,7 +431,6 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                                (when is-archive
                                  '("is_archive"))
                                (when group-ids
-                                 (message "THERE are group ides")
                                  '("groups"))))
          (shadow-id (pkm-uuid))
 
@@ -442,12 +440,10 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                           (when is-archive
                             (list is-archive))
                           (when group-ids
-                            (message " THERE are group ids!")
                             (list (format "%s" (string-join group-ids "---"))))
                           ))
          (output
           (--> (pkm2--db-compile-insert-statement table-name value-names values)
-               (progn (message "insert statement: %S, values: %S" it values) it)
                (sqlite-execute pkm2-database-connection it)
                (car it)
                (car it)
@@ -1210,6 +1206,22 @@ Returns output in two formats:
                   (t (progn (display-warning 'pkm-object "node-specifier is ambigious: %S" specifier)
                             (error "node-specifier was ambigious, be better! %S" specifier))))) )
     output))
+(defun pkm--object-does-specifier-match-eieio (specifier asset-schema)
+  (let* ((output (cond
+                  ((stringp specifier)  ; node-specifier is a name
+                   (equal (oref asset-schema :name) specifier))
+                  ((eq specifier 'primary)
+                   (if (and (object-p asset-schema) (same-class-p asset-schema 'node-schema))
+                       (oref asset-schema :primary-node)
+                     nil))
+                  ((eq specifier 'parent)
+                   (oref asset-schema :parent-node))
+                  ((eq specifier 'child)
+                   (message "in child asset, returning: %S, got: %S" (oref asset-schema :child-node) asset-schema)
+                   (oref asset-schema :child-node))
+                  (t (progn (display-warning 'pkm-object "node-specifier is ambigious: %S" specifier)
+                            (error "node-specifier was ambigious, be better! %S" specifier))))) )
+    output))
 
 
 
@@ -1382,7 +1394,7 @@ Returns output in two formats:
                                          (not (oref possibly-kvd :managed))
                                          (-any
                                           (lambda (specifier)
-                                            (pkm--object-does-specifier-match specifier primary-asset))
+                                            (pkm--object-does-specifier-match-eieio specifier primary-asset))
                                           (oref possibly-kvd :link-to))))
                                  assets)))
     required-kvds))
@@ -1504,11 +1516,13 @@ Returns output in two formats:
                                          (--> (plist-get pkm-structure-2-undefined-schemas-plist s-name)
                                               (oref it :is-behavior)))
                                        structure-names)))
+    ;; Compiles schemas
     (-each structure-names
       (lambda (structure-name)
         (let* ((schema (plist-get pkm-structure-2-undefined-schemas-plist structure-name #'equal)))
           (setq pkm-structure-2-defined-schemas-plist
                 (plist-put pkm-structure-2-defined-schemas-plist structure-name (schema-compile schema))))))
+    ;; Register kvds with schema and vice versa
     (-each structure-names
       (lambda (structure-name)
         (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
@@ -1516,12 +1530,14 @@ Returns output in two formats:
              (-each it (lambda (asset)
                          (when (same-class-p asset 'kvd-schema)
                            (pkm-object-register-kvd-key-with-data-type-eieio asset)
-                           (pkm-object-register-structure-with-kvd  asset structure-name)))))))
+                           (pkm-object-register-structure-with-kvd-eieio  asset structure-name)))))))
+    ;; Get require kvds for each type
     (-each  structure-names
       (lambda (structure-name)
         (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
              (pkm--object-get-required-kvds-eieio it)
              (setq pkm-structure-required-kvds-plist-eieio (plist-put pkm-structure-required-kvds-plist-eieio structure-name it)))))
+    ;; Get fully specified kvds for each type
     (-each  structure-names
       (lambda (structure-name)
         (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
@@ -1550,7 +1566,6 @@ Returns output in two formats:
 
 
 ;;; pkm-object-capture
-
 (defun pkm--object-add-node-to-db (s-node)
   (when (plist-get s-node :asset-capture-info)
     (let* ((temp (plist-get s-node :asset-capture-info))
@@ -1952,16 +1967,11 @@ with in the :initarg slot.  VALUE can be any Lisp object."
          (group-ids (-map (lambda (group)
                             (pkm-uuid))
                           groups))
-         (blah (progn
-                 (message "groups: %S, group-ids: %S" groups group-ids)
-
-                 ))
          (committed-kvd-links (-map (lambda (asset)
 
                                       (when (same-class-p asset 'committed-captured-kvd)
                                         (--> (oref asset :name)
                                              (-map-indexed (lambda (index group)
-                                                             (message "index: %S, group: %S, name: %S, :kvds: %S" index group it (oref group :kvds))
                                                              (when (member it (oref group :kvds))
                                                                (nth index group-ids)))
                                                            groups)
@@ -2033,17 +2043,14 @@ with in the :initarg slot.  VALUE can be any Lisp object."
   (error "Not yet implemented"))
 
 (cl-defmethod pkm-commit-kvd-link-test ((c-kvd committed-captured-kvd) possible-assets &optional  context group-ids)
-  (message "group ids hahaah: %S" group-ids)
   (let* ((kvd-schema (oref c-kvd :schema))
          (node-specifiers (oref kvd-schema :link-to))
          (context (oref kvd-schema :context))
-         (node-db-ids (cond ((--> (-flatten (-map (lambda (node-specifier)
-                                                    (pkm--object-get-specified-node-db-ids
-                                                     node-specifier
-                                                     possible-assets))
-                                                  node-specifiers))
-                                  (progn (when it (message "Got node db ids: %S" it) )
-                                         it)))
+         (node-db-ids (cond ((-flatten (-map (lambda (node-specifier)
+                                               (pkm--object-get-specified-node-db-ids
+                                                node-specifier
+                                                possible-assets))
+                                             node-specifiers)))
                             (t (error "Got nothing for node specifier %S %S" node-specifiers possible-assets))))
          (kvd-id (pkm-get-db-id c-kvd))
          (data-type (oref kvd-schema :data-type))
@@ -2409,7 +2416,7 @@ Commit everything.
          (list  (plist-get node-specifier :db-id)))
         ((-flatten
           (--> (-filter (lambda (asset-info)
-                          (pkm--object-does-specifier-match
+                          (pkm--object-does-specifier-match-eieio
                            node-specifier
                            (if (plistp asset-info)
                                (plist-get asset-info :asset-schema)

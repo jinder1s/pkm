@@ -1338,8 +1338,6 @@
 
 
 ;;; Lister stuff
-;;;
-;;;
 (cl-defmethod pkm-get-string-representation ((p-node pkm-node) browse-node)
   (let* ((browse-insert-format-string
           (or
@@ -1396,8 +1394,6 @@
     (erase-buffer)
     (setq pkm2-browse-ewoc nil)
     (let* ((ewoc (lister-setup buffer-name #'pkm-lister-browse--insert-ewoc-item)))
-      (message "After ewoc creation")
-
       (setq pkm2-browse-ewoc ewoc)
       (setq pkm2-browse--browse-nodes-alist ())
       (setq pkm2-browse--browse-sections-alist ())

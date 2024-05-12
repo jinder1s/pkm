@@ -171,9 +171,6 @@
                                                          :data-type 'TEXT))
                                     :groups (list group)))
            (compiled-schema (schema-compile s-schema))
-           (blah (progn
-                   (message "compiles schema: %S\nGROUPS %S" compiled-schema (oref compiled-schema :groups))
-                   ))
            (values `(("first-node" . ,node-content)))
            (captured-structure (pkm-capture-test compiled-schema values))
            (committed-structure (pkm-commit-test captured-structure))
@@ -188,7 +185,7 @@
            (database-kvd-links (sqlite-select pkm2-database-connection link-sql-query))
            kvd
            node)
-      (message "compiles schema: %S\nGROUPS %S" compiled-schema (oref compiled-schema :groups))
+
       (expect (oref compiled-schema :groups) :to-equal (list group))
       (expect (length database-nodes) :to-equal 1)
       (expect (length database-kvds) :to-equal 2)
@@ -208,16 +205,12 @@
       (expect (nth 1 (car database-kvds)) :to-equal kvd-key2)
       (expect (nth 2 (car database-kvds)) :to-equal kvd-value2)
       (expect (nth 4 (car database-kvd-links)) :to-equal (nth 4 (cadr database-kvd-links)))
-      (message "KVD Links: %S" database-kvd-links)
       (setq kvd (pkm2--db-get-or-insert-kvd kvd-key kvd-value))
       (expect (oref kvd :key) :to-equal kvd-key)
       (expect (oref kvd :value) :to-equal kvd-value)
       (setq kvd2 (pkm2--db-get-or-insert-kvd kvd-key2 kvd-value2))
       (expect (oref kvd2 :key) :to-equal kvd-key2)
-      (expect (oref kvd2 :value) :to-equal kvd-value2)
-      ))
-
-  )
+      (expect (oref kvd2 :value) :to-equal kvd-value2))))
 
 (provide 'test-eieio-capture)
 ;;; test-eieio-capture.el ends here

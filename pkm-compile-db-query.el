@@ -30,8 +30,6 @@
           (when limit (format " LIMIT %s" limit)) ))
 
 (defun pkm2--compile-db-query-kvd (type-values nodes-table)
-  (message "nodes-table: %S" nodes-table)
-  (message "kvd, type-values: %S" type-values)
   (setq  nodes-table (or nodes-table "node"))
   (cond ((plist-get type-values :kvd) ; TODO Test
          (pkm2--object-db-compile-query-to-get-nodes-with-link-to-kvd-2-eieio (plist-get type-values :kvd) nodes-table))
@@ -191,32 +189,31 @@
   (let* ((nodes-table (or nodes-table "node"))
          (structure-name (plist-get type-values :structure-name))
          (unique-required (plist-get pkm-structure-unique-required-plist-eieio structure-name #'equal))
-         (u-r-keys (--> (car unique-required) (-filter (lambda (kvd)
-                                                         (member (oref kvd :key) it))
-                                                       (cadr unique-required))))
+         (u-r-keys (--> (car unique-required)
+                        (-filter (lambda (kvd)
+                                   (member (oref kvd :key) it))
+                                 (cadr unique-required))))
          (first-key-kvd-spec (car u-r-keys))
-         (first-key (oref first-key-kvd-spec :key))
-         (first-key-type (oref first-key-kvd-spec :data-type))
+         (first-key (when first-key-kvd-spec (oref first-key-kvd-spec :key) ))
+         (first-key-type (when first-key-kvd-spec (oref first-key-kvd-spec :data-type) ))
          (fully-specified-kvds (pkm--object-get-required-fully-specified-kvds2-eieio (cadr unique-required)))
          (easiest-queriable-kvds
           (list (cond ((-find (lambda (kvd)
                                 (--> (oref kvd :value) (or (stringp it) (numberp it)))) fully-specified-kvds))
                       ((-find (lambda (kvd)
                                 (oref kvd :choices))
-                              fully-specified-kvds))))))
-
-
-    (cond (u-r-keys
-                    (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type nodes-table))
-          (easiest-queriable-kvds (-->  (-map-indexed (lambda (index kvd)
-                                                        (if (equal index 0)
-                                                            `(:or kvd (:kvd ,kvd))
-                                                          `(:and kvd (:kvd ,kvd))))
-                                                      easiest-queriable-kvds)
-                                        (progn (message "query-plist: %S" it) it)
-                                        (pkm2--compile-full-db-query it
-                                                                     nodes-table) ))
-          (t (error "Unable to get nodes for structure-type %S" structure-name)))))
+                              fully-specified-kvds)))))
+         (output   (cond (u-r-keys
+                          (pkm2--db-compile-query-get-nodes-with-links-to-kvds-with-key-2 first-key first-key-type nodes-table))
+                         (easiest-queriable-kvds (-->  (-map-indexed (lambda (index kvd)
+                                                                       (if (equal index 0)
+                                                                           `(:or kvd (:kvd ,kvd))
+                                                                         `(:and kvd (:kvd ,kvd))))
+                                                                     easiest-queriable-kvds)
+                                                       (pkm2--compile-full-db-query it
+                                                                                    nodes-table) ))
+                         (t (error "Unable to get nodes for structure-type %S" structure-name)))))
+    output))
 
 
 
