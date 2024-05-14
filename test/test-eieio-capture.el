@@ -27,6 +27,11 @@
 (require 'pkm-new-core)
 
 (describe "Eieio object definition tests"
+  :var (database-file)
+  (before-each
+    (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
+    (setq pkm2-database-connection (sqlite-open database-file))
+    (pkm2-setup-database pkm2-database-connection))
   (it "Define base node"
     (let* ((node-asset (node-schema :name "base-node" :primary-node t))
            (schema (object-schema
@@ -104,11 +109,16 @@
     (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
     (setq pkm2-database-connection (sqlite-open database-file))
     (pkm2-setup-database pkm2-database-connection))
+  (after-each
+    (sqlite-close  pkm2-database-connection)
+    (setq pkm2-database-connection nil)
+
+    )
   (it "Creating a basic node with kvd(node-type, first)"
     (let* ((node-content "First node content")
            (kvd-key "node-type")
            (kvd-value "first")
-           (s-schema (object-schema :name 'basic
+           (s-schema (object-schema :name "basic"
                                     :assets (list
                                              (node-schema :name "first-node" :primary-node t)
                                              (kvd-schema :name "is-first-note"
@@ -149,14 +159,14 @@
       (setq kvd (pkm2--db-get-or-insert-kvd kvd-key kvd-value))
       (expect (oref kvd :key) :to-equal kvd-key)
       (expect (oref kvd :value) :to-equal kvd-value)))
-(it "Creating a basic node with kvd group"
+  (it "Creating a basic node with kvd group"
     (let* ((node-content "First node content")
            (kvd-key "node-type")
            (kvd-value "first")
            (kvd-key2 "node-type2")
            (kvd-value2 "second")
            (group (kvd-group-schema :kvds (list "is-first-note" "is-first-note-2") :name "test-group"))
-           (s-schema (object-schema :name 'basic
+           (s-schema (object-schema :name "basic"
                                     :assets (list
                                              (node-schema :name "first-node" :primary-node t)
                                              (kvd-schema :name "is-first-note"
@@ -210,7 +220,54 @@
       (expect (oref kvd :value) :to-equal kvd-value)
       (setq kvd2 (pkm2--db-get-or-insert-kvd kvd-key2 kvd-value2))
       (expect (oref kvd2 :key) :to-equal kvd-key2)
-      (expect (oref kvd2 :value) :to-equal kvd-value2))))
+      (expect (oref kvd2 :value) :to-equal kvd-value2)))
+  (it "Creating a sub object"
+    (let* ((node-content "First node content")
+           (s-schema (object-schema :name "basic"
+                                    :assets (list
+                                             (node-schema :name "first-node" :primary-node t))))
+           (compiled-schema (progn
+                              (pkm-register-structure-2 s-schema)
+                              (pkm--object-cache-structure-info-eieio)
+                              (schema-compile s-schema) ))
+           (values `(("first-node" . ,node-content)))
+           (captured-structure (pkm-capture-test compiled-schema values))
+           (committed-structure (pkm-commit-test captured-structure))
+           (link-definition (hierarchy-nodes-link-schema
+                             :label "sub"
+                             :parent 'parent
+                             :child 'child))
+           (schema (object-schema
+                    :name "parent-child-node"
+                    :assets (list
+                             (node-schema :name "parent-node" :parent-node t :db-id 1)
+                             (asset-object-schema :name "child-node" :child-node t :object-name "basic"))
+                    :links (list link-definition)))
+           (compiled-schema (schema-compile schema))
+           (values `(("child-node" . (("first-node". "Testing")))))
+           (captured-object  (pkm-capture-test compiled-schema values))
+           (commited-object (pkm-commit-test captured-object))
+
+           (sql-query "SELECT id, content, created_at, modified_at FROM node;")
+           (type 'TEXT)
+           (data-table (pkm2--db-get-kvd-data-table-for-type type))
+           (link-table (pkm2--db-get-kvd-link-table-for-type type))
+           (nodes-link-sql-query (format "SELECT id, node_a, node_b from nodes_link"))
+           (database-nodes (sqlite-select pkm2-database-connection sql-query))
+           (database-nodes-links (sqlite-select  pkm2-database-connection nodes-link-sql-query))
+           kvd
+           node)
+      (expect (length database-nodes) :to-equal 2)
+      (expect (length database-nodes-links) :to-equal 1)
+      (expect (nth 1 (car database-nodes)) :to-equal node-content)
+      (expect (nth 3 (car database-nodes)) :to-equal nil) ; modified_at should be nil
+      (setq node (pkm2--db-query-get-node-with-id 1))
+      (expect (oref node :content) :to-equal node-content)
+      (expect (length (oref node :children-links) ) :to-be 1)
+      (expect (oref node :parent-links) :to-be nil)
+      (expect (oref node :previous-sequencial-links) :to-be nil)
+      (expect (oref node :next-sequencial-links) :to-be nil)
+      (expect (oref node :flat-links) :to-be nil))))
 
 (provide 'test-eieio-capture)
 ;;; test-eieio-capture.el ends here

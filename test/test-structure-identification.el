@@ -29,6 +29,22 @@
 (require 'org)
 
 (describe "Eieio object identification tests"
+  :var (database-file)
+  (before-each
+    (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
+    (setq pkm2-database-connection nil)
+
+    (setq pkm2-database-connection (sqlite-open database-file))
+    (setq pkm-structure-2-undefined-schemas-plist ())
+    (setq pkm-data-type-to-kvd-key-plist-eieio ())
+    (setq pkm-kvd-key-to-structure-plist-eieio ())
+    (setq pkm-structure-2-defined-schemas-plist ())
+
+    (pkm2-setup-database pkm2-database-connection))
+  (after-each
+    (setq pkm2-database-connection nil))
+
+
   (it "Identify objects with different schemas"
     (let* ((node-asset (node-schema :name "base-node" :primary-node t))
            (schema (object-schema
@@ -49,8 +65,7 @@
            (query-first-n nil)
            (query-second-n nil)
            (first-n-nodes nil)
-           (second-n-nodes nil)
-           )
+           (second-n-nodes nil))
       (pkm-register-structure-2 schema)
       (pkm-register-structure-2 first-schema)
       (pkm-register-structure-2 second-schema)

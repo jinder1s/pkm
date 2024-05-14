@@ -185,6 +185,7 @@ The original alist is not modified."
 (cl-defmethod pkm-get-db-id ((link pkm-db-nodes-link))
   (oref link :id))
 
+
 (defvar pkm2-database-connection nil)
 (defvar pkm2-database-file-path nil)
 
@@ -1206,6 +1207,7 @@ Returns output in two formats:
                   (t (progn (display-warning 'pkm-object "node-specifier is ambigious: %S" specifier)
                             (error "node-specifier was ambigious, be better! %S" specifier))))) )
     output))
+
 (defun pkm--object-does-specifier-match-eieio (specifier asset-schema)
   (let* ((output (cond
                   ((stringp specifier)  ; node-specifier is a name
@@ -1215,10 +1217,13 @@ Returns output in two formats:
                        (oref asset-schema :primary-node)
                      nil))
                   ((eq specifier 'parent)
-                   (oref asset-schema :parent-node))
+                   (if (and (object-p asset-schema) (same-class-p asset-schema 'node-schema))
+                       (oref asset-schema :parent-node)
+                     nil))
                   ((eq specifier 'child)
-                   (message "in child asset, returning: %S, got: %S" (oref asset-schema :child-node) asset-schema)
-                   (oref asset-schema :child-node))
+                   (if (and (object-p asset-schema) (same-class-p asset-schema 'asset-object-schema))
+                       (oref asset-schema :child-node)
+                     nil))
                   (t (progn (display-warning 'pkm-object "node-specifier is ambigious: %S" specifier)
                             (error "node-specifier was ambigious, be better! %S" specifier))))) )
     output))
@@ -1345,14 +1350,15 @@ Returns output in two formats:
     unique-kvds))
 
 (defun pkm--object-find-unique-identifiers-unique-kvds-eieio (structure-name structure-plist required-kvds-plist)
-  (let* ((self-fully-defined-kvds (plist-get required-kvds-plist structure-name))
+
+  (let* ((self-fully-defined-kvds (plist-get required-kvds-plist structure-name #'equal))
          (structure-names (doom-plist-keys required-kvds-plist))
          (unique-kvds (-filter
                        (lambda (s-kvd)
                          (not (-any? (lambda (temp-name)
-                                       (if (or (eq temp-name structure-name) (member structure-name (--> (plist-get structure-plist temp-name) (oref it :parents))))
+                                       (if (or (eq temp-name structure-name) (member structure-name (--> (plist-get structure-plist temp-name #'equal) (oref it :parents))))
                                            nil
-                                         (--> (plist-get required-kvds-plist temp-name)
+                                         (--> (plist-get required-kvds-plist temp-name #'equal)
                                               (-any? (lambda (kvd)
                                                        (if (equal (oref s-kvd :key) (oref kvd :key))
                                                            (or (equal (oref s-kvd :value) (oref kvd :value))
@@ -1511,6 +1517,11 @@ Returns output in two formats:
 
 
 (defun pkm--object-cache-structure-info-eieio ()
+  (setq pkm-structure-2-defined-schemas-plist ())
+  (setq pkm-structure-required-kvds-plist-eieio ())
+  (setq pkm-structure-fully-specified-kvds-plist-eieio ())
+  (setq pkm-structure-unique-required-plist-eieio ())
+
   (let* ((structure-names  (doom-plist-keys pkm-structure-2-undefined-schemas-plist))
          (behavior-structures (-filter (lambda (s-name)
                                          (--> (plist-get pkm-structure-2-undefined-schemas-plist s-name)
@@ -1521,22 +1532,23 @@ Returns output in two formats:
       (lambda (structure-name)
         (let* ((schema (plist-get pkm-structure-2-undefined-schemas-plist structure-name #'equal)))
           (setq pkm-structure-2-defined-schemas-plist
-                (plist-put pkm-structure-2-defined-schemas-plist structure-name (schema-compile schema))))))
+                (plist-put pkm-structure-2-defined-schemas-plist structure-name (schema-compile schema) #'equal)))))
     ;; Register kvds with schema and vice versa
     (-each structure-names
       (lambda (structure-name)
-        (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
+        (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name #'equal)
              (oref it :assets)
              (-each it (lambda (asset)
                          (when (same-class-p asset 'kvd-schema)
+                           ;; TODO should these registers be reset before each cache?
                            (pkm-object-register-kvd-key-with-data-type-eieio asset)
                            (pkm-object-register-structure-with-kvd-eieio  asset structure-name)))))))
     ;; Get require kvds for each type
     (-each  structure-names
       (lambda (structure-name)
-        (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
+        (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name #'equal)
              (pkm--object-get-required-kvds-eieio it)
-             (setq pkm-structure-required-kvds-plist-eieio (plist-put pkm-structure-required-kvds-plist-eieio structure-name it)))))
+             (setq pkm-structure-required-kvds-plist-eieio (plist-put pkm-structure-required-kvds-plist-eieio structure-name it #'equal)))))
     ;; Get fully specified kvds for each type
     (-each  structure-names
       (lambda (structure-name)
@@ -1547,7 +1559,7 @@ Returns output in two formats:
       (lambda (structure-name)
         (--> (pkm--object-find-unique-identifiers-eieio structure-name pkm-structure-2-defined-schemas-plist pkm-structure-required-kvds-plist-eieio)
              (setq pkm-structure-unique-required-plist-eieio (plist-put pkm-structure-unique-required-plist-eieio structure-name it)))))
-    ; For behaviour based structures, only compare with other behivor based structures
+                                        ; For behaviour based structures, only compare with other behivor based structures
     (let* ((structure-to-behavior-schema-plist  (mm-alist-to-plist (-map (lambda (s-name)
                                                                            (cons s-name
                                                                                  (--> (plist-get pkm-structure-2-undefined-schemas-plist s-name)
@@ -1795,6 +1807,11 @@ TODO TEST!"
 (defclass captured-node (captured-base pkm-base-node)
   ((content :initarg :content :initform nil)
    (db-id :initarg :db-id :initform nil)))
+(cl-defmethod pkm-get-db-id ((node captured-node))
+  (oref node :db-id))
+
+(defclass captured-asset-object (captured-base)
+  ((captured-object :initarg :captured-object :initform nil)))
 
 (defclass captured-kvd (captured-base pkm-base-kvd) ())
 
@@ -1802,20 +1819,36 @@ TODO TEST!"
 (defclass captured-compiled-object-schema (captured-base)
   ((assets :initarg :assets :initform nil)))
 
+
 (defclass committed-captured-base ()
   ((schema :initarg :schema :initform nil)
    (name :initarg :name :initform nil)))
+
 (defclass committed-captured-node (committed-captured-base pkm-node)
   ((content :initarg :content :initform nil)
    (db-id :initarg :db-id :initform nil)))
 (defclass committed-captured-kvd (committed-captured-base pkm-kvd) ())
 
 
+(defclass committed-captured-asset-object (committed-captured-base)
+  ((committed-captured-object :initarg :committed-captured-object :initform nil))
+  )
+
+(cl-defmethod pkm-get-db-id ((commited-asset committed-captured-asset-object))
+  (pkm-get-db-id (oref commited-asset committed-captured-object)))
+
 (defclass committed-captured-compiled-object-schema (committed-captured-base)
   ((assets :initarg :assets :initform nil)
    (nodes-links :initarg :nodes-links :initform nil)
    (kvd-links :initarg :kvd-links :initform nil)
    ))
+
+(cl-defmethod pkm-get-db-id ((committed-object committed-captured-compiled-object-schema))
+  (--> (-find (lambda (committed-asset)
+                (and (same-class-p (oref committed-asset :schema) node-schema)
+                     (oref (oref committed-asset :schema) :primary-node)))
+              (oref committed-object :assets))
+       (pkm-get-db-id it)))
 
 (defclass committed-nodes-link (committed-captured-base)
   ((db-nodes-link :initarg :db-nodes-link :initform nil)
@@ -1887,7 +1920,7 @@ with in the :initarg slot.  VALUE can be any Lisp object."
   (let* ((object-name (oref schema :object-name))
          (compiled-object-schema (object-assoc object-name :name pkm-structure-2-defined-schemas-plist))
          (captured-object (pkm-capture-test compiled-object-schema values)))
-    captured-object))
+    (captured-asset-object :schema schema :captured-object captured-object)))
 
 (cl-defmethod pkm-capture-test ((schema node-schema) &optional value)
   (let* ((asset-name (oref schema :name))
@@ -1952,6 +1985,14 @@ with in the :initarg slot.  VALUE can be any Lisp object."
                             :value value
                             :name name
                             :id (pkm-get-db-id db-kvd))))
+(cl-defmethod pkm-commit-test ((captured-asset captured-asset-object))
+  (let* ((captured-object (oref captured-asset :captured-object))
+         (name (oref captured-asset :name))
+         (schema (oref captured-asset :schema))
+         (committed-object (pkm-commit-test captured-object)))
+    (committed-captured-asset-object :committed-captured-object committed-object
+                                     :schema schema
+                                     :name name)))
 
 (cl-defmethod pkm-commit-test ((captured-object captured-compiled-object-schema))
   (let* ((schema (oref captured-object :schema))
@@ -1961,7 +2002,7 @@ with in the :initarg slot.  VALUE can be any Lisp object."
                                  assets))
          (uncommited-node-links (oref (oref captured-object :schema) :links))
          (committed-node-links (-map (lambda (link)
-                                       (pkm-commit-nodes-link-test link assets))
+                                       (pkm-commit-nodes-link-test link committed-assets))
                                      uncommited-node-links))
          (groups (oref (oref captured-object :schema) :groups))
          (group-ids (-map (lambda (group)
@@ -1977,7 +2018,6 @@ with in the :initarg slot.  VALUE can be any Lisp object."
                                                            groups)
                                              (pkm-commit-kvd-link-test asset committed-assets nil it))))
                                     committed-assets)))
-
     (committed-captured-compiled-object-schema :schema schema
                                                :assets committed-assets
                                                :nodes-links committed-node-links
