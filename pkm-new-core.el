@@ -256,6 +256,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   FOREIGN KEY(node) REFERENCES node(id) ON DELETE CASCADE,
   FOREIGN KEY(key_value_data) REFERENCES key_value_data(id) ON DELETE CASCADE);")
 
+
   (sqlite-execute database_handle "CREATE TABLE IF NOT EXISTS data_or_properties_link_integer (
   id INTEGER PRIMARY KEY NOT NULL,
   shadow_id TEXT,
@@ -321,6 +322,56 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                       DELETE FROM search_node
                       WHERE node = OLD.id;
                    end;")
+  (sqlite-execute database_handle
+                  "CREATE TABLE IF NOT EXISTS device_sync (
+   id INTEGER PRIMARY KEY NOT NULL,
+   laptop_id TEXT NOT NULL,
+
+   node_lower_limit INTEGER,
+   node_higher_limit INTEGER,
+   node_next_id INTEGER,
+
+   nodes_link_lower_limit INTEGER,
+   nodes_link_higher_limit INTEGER,
+   nodes_link_next_id INTEGER,
+
+   key_value_data_lower_limit INTEGER,
+   key_value_data_higher_limit INTEGER,
+   key_value_data_next_id INTEGER,
+
+   key_value_data_integer_lower_limit INTEGER,
+   key_value_data_integer_higher_limit INTEGER,
+   key_value_data_integer_next_id INTEGER,
+
+   key_value_data_real_lower_limit INTEGER,
+   key_value_data_real_higher_limit INTEGER,
+   key_value_data_real_next_id INTEGER,
+
+   key_value_data_blob_lower_limit INTEGER,
+   key_value_data_blob_higher_limit INTEGER,
+   key_value_data_blob_next_id INTEGER,
+
+
+   data_or_properties_link_lower_limit INTEGER,
+   data_or_properties_link_higher_limit INTEGER,
+   data_or_properties_link_next_id INTEGER,
+
+
+   data_or_properties_link_integer_lower_limit INTEGER,
+   data_or_properties_link_integer_higher_limit INTEGER,
+   data_or_properties_link_integer_next_id INTEGER,
+
+
+   data_or_properties_link_real_lower_limit INTEGER,
+   data_or_properties_link_real_higher_limit INTEGER,
+   data_or_properties_link_real_next_id INTEGER,
+
+
+   data_or_properties_link_blob_lower_limit INTEGER,
+   data_or_properties_link_blob_higher_limit INTEGER,
+   data_or_properties_link_blob_next_id INTEGER,
+
+   created_at INTEGER NOT NULL);")
 
   (sqlite-execute database_handle "CREATE UNIQUE INDEX IF NOT EXISTS unique_key_value_pair ON key_value_data(key, value);")
   (sqlite-execute database_handle "CREATE UNIQUE INDEX IF NOT EXISTS unique_key_value_pair_integer ON key_value_data(key, value);")
@@ -338,8 +389,12 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                                                    TEXT (:data-table "key_value_data" :link-table "data_or_properties_link" )
                                                    BLOB (:data-table "key_value_data_blob" :link-table "data_or_properties_link_blob" )
                                                    REAL (:data-table "key_value_data_real" :link-table "data_or_properties_link_real" )))
-
-
+(defvar pkm-core-db-tables '("node" "nodes_link"
+                             "key_value_data" "key_value_data_integer" "key_value_data_real" "key_value_data_blob"
+                             "data_or_properties_link"
+                             "data_or_properties_link_integer"
+                             "data_or_properties_link_real"
+                             "data_or_properties_link_blob"))
 
 
 
