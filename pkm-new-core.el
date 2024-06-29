@@ -325,52 +325,11 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   (sqlite-execute database_handle
                   "CREATE TABLE IF NOT EXISTS device_sync (
    id INTEGER PRIMARY KEY NOT NULL,
+   table_name TEXT NOT NULL,
    laptop_id TEXT NOT NULL,
-
-   node_lower_limit INTEGER,
-   node_higher_limit INTEGER,
-   node_next_id INTEGER,
-
-   nodes_link_lower_limit INTEGER,
-   nodes_link_higher_limit INTEGER,
-   nodes_link_next_id INTEGER,
-
-   key_value_data_lower_limit INTEGER,
-   key_value_data_higher_limit INTEGER,
-   key_value_data_next_id INTEGER,
-
-   key_value_data_integer_lower_limit INTEGER,
-   key_value_data_integer_higher_limit INTEGER,
-   key_value_data_integer_next_id INTEGER,
-
-   key_value_data_real_lower_limit INTEGER,
-   key_value_data_real_higher_limit INTEGER,
-   key_value_data_real_next_id INTEGER,
-
-   key_value_data_blob_lower_limit INTEGER,
-   key_value_data_blob_higher_limit INTEGER,
-   key_value_data_blob_next_id INTEGER,
-
-
-   data_or_properties_link_lower_limit INTEGER,
-   data_or_properties_link_higher_limit INTEGER,
-   data_or_properties_link_next_id INTEGER,
-
-
-   data_or_properties_link_integer_lower_limit INTEGER,
-   data_or_properties_link_integer_higher_limit INTEGER,
-   data_or_properties_link_integer_next_id INTEGER,
-
-
-   data_or_properties_link_real_lower_limit INTEGER,
-   data_or_properties_link_real_higher_limit INTEGER,
-   data_or_properties_link_real_next_id INTEGER,
-
-
-   data_or_properties_link_blob_lower_limit INTEGER,
-   data_or_properties_link_blob_higher_limit INTEGER,
-   data_or_properties_link_blob_next_id INTEGER,
-
+   lower_limit INTEGER NOT NULL,
+   higher_limit INTEGER NOT NULL,
+   next_id INTEGER NOT NULL,
    created_at INTEGER NOT NULL);")
 
   (sqlite-execute database_handle "CREATE UNIQUE INDEX IF NOT EXISTS unique_key_value_pair ON key_value_data(key, value);")
@@ -481,6 +440,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   ;; schema
   ;; (:action insert :what kvd-link :data (:node-id node-id :kvd-id kvd-id :timestamp timestamp :type type :context-node-id context-node-id :is-archive is-archive))
   (let* ((table-name (pkm2--db-get-kvd-link-table-for-type type))
+         (sync-id (pkm-device-get-next-id pkm2-database-connection table-name))
          (value-names (-concat (list "node" "key_value_data" "created_at" "shadow_id")
                                (when context-node-id
                                  '("context"))
@@ -510,6 +470,8 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                                 :context context-node-id
                                 :created_at timestamp
                                 :is_archive is-archive))))
+    (when output
+      (pkm-device-set-next-id pkm2-database-connection pkm2-device-name table-name sync-id))
     (when (and output (not no-new-event))
       (pkm2--sync-add-event
        `(:action insert
@@ -529,6 +491,8 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   ;; (:action insert :what nodes-link :data (:type type :from-node-id node-a :to-node-id node-b :timestamp timestamp :context-node-id context-node-id))
   (let* ((table-name "nodes_link")
          (shadow-id (pkm-uuid))
+
+         (sync-id (pkm-device-get-next-id pkm2-database-connection table-name))
          (value-names (-concat (list "type" "node_a" "node_b" "created_at" "shadow_id")
                                (when context-node-id
                                  '("context"))))
@@ -547,6 +511,8 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                 :node_b node-b
                 :context context-node-id
                 :created_at timestamp))))
+    (when output
+      (pkm-device-set-next-id pkm2-database-connection pkm2-device-name table-name sync-id))
     (when (and output (not no-new-event))
       (pkm2--sync-add-event
        `(:action insert
@@ -570,17 +536,22 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   ;; (:action insert :what node :data (:content content :timestamp timestamp))
   (let* ((table-name "node")
          (shadow-id (pkm-uuid))
-         (value-names (-concat (list "created_at" "shadow_id")
+         (sync-id (pkm-device-get-next-id pkm2-database-connection table-name))
+         (value-names (-concat (list "id" "created_at" "shadow_id")
                                (when content
                                  '("content"))))
-         (values (-concat `(,timestamp ,shadow-id)
+         (values (-concat `(,sync-id ,timestamp ,shadow-id)
                           (when content
                             (list content))))
-         (output (--> (pkm2--db-compile-insert-statement table-name value-names values)
-                      (sqlite-execute pkm2-database-connection it)
-                      (car it)
-                      (car it)
-                      (pkm-db-node :id it :content content :created_at timestamp))))
+         (output (if nil (--> (pkm2--db-compile-insert-statement table-name value-names values)
+                              (sqlite-execute pkm2-database-connection it)
+                              (car it)
+                              (car it)
+                              (pkm-db-node :id it :content content :created_at timestamp))
+                   "hello"
+                   )))
+    (when output
+      (pkm-device-set-next-id pkm2-database-connection pkm2-device-name table-name sync-id))
     (when (and output (not no-new-event))
       (pkm2--sync-add-event
        `(:action insert
@@ -596,6 +567,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   ;; (:action insert :what kvd :data (:key key :value value :timestamp timestamp :type type))
   (let* ((table-name (pkm2--db-get-kvd-data-table-for-type type))
          (shadow-id  (pkm-uuid))
+         (sync-id (pkm-device-get-next-id pkm2-database-connection table-name))
          (value-names (-concat '("key" "value" "created_at" "shadow_id")))
          (values (-concat `(,key ,value ,timestamp ,shadow-id)))
          (output (--> (pkm2--db-compile-insert-statement table-name value-names values)
@@ -603,6 +575,8 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
                       (car it)
                       (car it)
                       (pkm-db-kvd :type type :id it :key key :value value :created_at timestamp))))
+    (when output
+      (pkm-device-set-next-id pkm2-database-connection pkm2-device-name table-name sync-id))
     (when (and output (not no-new-event))
       (pkm2--sync-add-event
        `(:action insert
