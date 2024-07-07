@@ -34,6 +34,7 @@
 
 ; Happy coding! ;)
 
+(require 'pkm-device-handlers)
 (require 'pkm-new-core )
 (require 'pkm2-browse)
 (require 'pkm-lister-browser)

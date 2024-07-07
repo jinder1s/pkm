@@ -37,18 +37,23 @@
     (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
     (setq pkm2-database-connection (sqlite-open database-file))
     (pkm2-setup-database pkm2-database-connection)
-    (setq events (list :main ())))
+    (setq pkm2-device-name "tests")
+    (setup-new-device2 pkm2-database-connection "tests"))
 
   (it "Creating sync event for insert node"
-    (let* ((pkm-sync-add-event-func (lambda (event)
-                                      (setq events (plist-put events :main (cons event (plist-get events :main))))))
-           (content "Hello, This is my first node.")
+    (let* ((content "Hello, This is my first node.")
            (timestamp (pkm2-get-current-timestamp))
            (sql-query "SELECT id, content, created_at, modified_at FROM node;")
+           (sql-local-sync-query "SELECT id, timestamp, event FROM local_events;")
+           (sql-all-sync-query "SELECT id, timestamp, event FROM all_events;")
            database-nodes
+           all-events
+           local-events
+           event
            node)
       (pkm2--db-insert-node content timestamp)
       (setq database-nodes (sqlite-select pkm2-database-connection sql-query))
+      (setq local-events (sqlite-select pkm2-database-connection sql-local-sync-query))
       (expect (length database-nodes) :to-equal 1)
       (expect (nth 1 (car database-nodes)) :to-equal content)
       (expect (nth 2 (car database-nodes)) :to-equal timestamp) ; created_at
@@ -56,7 +61,12 @@
       (setq node (pkm2--db-query-get-node-with-id 1))
       (expect (oref node :content) :to-equal content)
       (expect (oref node :created_at) :to-equal timestamp)
-      (expect (length (plist-get events :main)) :to-be 1)))
+      (expect (length local-events) :to-equal 1)
+      (expect (nth 0 (car local-events) ) :to-equal 1)
+      (setq event (read (nth 2 (car local-events))))
+      (expect (plist-get event :action) :to-equal 'insert)
+      (expect (plist-get event :what) :to-equal 'node)
+      (expect (plist-get (plist-get event :data) :content) :to-equal content)))
   (it "Creating sync event for inserting text kvd"
     (let* ((pkm-sync-add-event-func (lambda (event)
                                       (setq events (plist-put events :main (cons event (plist-get events :main))))))
@@ -66,11 +76,15 @@
            (timestamp (pkm2-get-current-timestamp))
            (data-table (pkm2--db-get-kvd-data-table-for-type type))
            (sql-query (format "SELECT id, key, value, created_at FROM %s;" data-table))
+           (sql-local-sync-query "SELECT id, timestamp, event FROM local_events;")
+           (sql-all-sync-query "SELECT id, timestamp, event FROM all_events;")
+           local-events
            (inserted-kvd (pkm2--db-insert-kvd key value timestamp type))
            (kvds (sqlite-select pkm2-database-connection sql-query))
            kvd)
 
       (expect (length kvds) :to-equal 1)
+      (setq local-events (sqlite-select pkm2-database-connection sql-local-sync-query))
       (expect (nth 1 (car kvds)) :to-equal key)
       (expect (nth 2 (car kvds)) :to-equal value)
       (expect (nth 3 (car kvds)) :to-equal timestamp) ; created_at
@@ -79,13 +93,14 @@
       (expect (oref kvd :key) :to-equal key)
       (expect (oref kvd :value) :to-equal value)
       (expect (oref kvd :created_at) :to-equal timestamp)
-      (expect (length (plist-get events :main)) :to-be 1)))
-
+      (expect (length local-events) :to-be 1)))
   (it "Test inserting kvd link"
-    (let* ((pkm-sync-add-event-func (lambda (event)
-                                      (setq events (plist-put events :main (cons event (plist-get events :main))))))
-           (type 'TEXT)
+    (let* ((type 'TEXT)
            (inserted-kvd (pkm2--db-insert-kvd "kvd-key" "kvd-value" (pkm2-get-current-timestamp) type))
+
+           (sql-local-sync-query "SELECT id, timestamp, event FROM local_events;")
+           (sql-all-sync-query "SELECT id, timestamp, event FROM all_events;")
+           local-events
            (inserted-node (pkm2--db-insert-node "node-content" (pkm2-get-current-timestamp)))
            (inserted-link (pkm2--db-insert-link-between-node-and-kvd
                            (pkm-get-db-id inserted-node)
@@ -95,13 +110,16 @@
            (pkm-node (pkm2--db-query-get-node-with-id 1))
            (kvds (oref pkm-node :kvds)))
       (expect (length kvds) :to-equal 1)
+
+      (setq local-events (sqlite-select pkm2-database-connection sql-local-sync-query))
       (expect (pkm-get-db-id inserted-kvd) :to-equal (oref (car kvds) :id))
       (expect (pkm-get-db-id inserted-link) :to-equal (oref (car kvds) :id))
-      (expect (length (plist-get events :main)) :to-be 3)
-      (expect (-map (lambda (event) (plist-get event :action)) (plist-get events :main))
+      (expect (length local-events) :to-be 3)
+      (expect (-map (lambda (sql-event-row) (--> (nth 2 sql-event-row) (read it) (plist-get it :action) )) local-events)
               :to-equal '(insert insert insert))
-      (expect (-map (lambda (event) (plist-get event :what)) (plist-get events :main))
-              :to-equal '(kvd-link node kvd))))
+      (expect (-map (lambda (sql-event-row) (--> (nth 2 sql-event-row) (read it) (plist-get it :what) )
+                      ) local-events)
+              :to-equal '(kvd  node kvd-link))))
 
   (it "Test inserting node link"
     (let* ((pkm-sync-add-event-func (lambda (event)

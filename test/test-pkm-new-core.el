@@ -37,16 +37,23 @@
   (before-each
     (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
     (setq pkm2-database-connection (sqlite-open  database-file) )
-    (pkm2-setup-database pkm2-database-connection))
+    (pkm2-setup-database pkm2-database-connection)
+    (setq pkm2-device-name "tests")
+    (setup-new-device2 pkm2-database-connection "tests"))
+
   (it "Database creation: make sure rerunning setup database does not throw error"
     (expect (pkm2-setup-database pkm2-database-connection) :not :to-throw))
+  (it "Basic device handler tests"
+    (let* ((initial_node_id (pkm-device-get-next-id pkm2-database-connection "node")))
+      (expect initial_node_id :to-equal '(1 1))))
   (it "Inserting node"
     (let* ((content "Hello, This is my first node.")
            (timestamp (pkm2-get-current-timestamp))
            (sql-query "SELECT id, content, created_at, modified_at FROM node;")
            database-nodes
-           node)
-      (pkm2--db-insert-node content timestamp)
+           node
+           (insert-node-info (pkm2--db-insert-node content timestamp)))
+      (message "Inserted node info: %S" insert-node-info)
       (setq database-nodes (sqlite-select pkm2-database-connection sql-query))
       (expect (length database-nodes ) :to-equal 1)
       (expect (nth 1 (car database-nodes)) :to-equal content)

@@ -33,14 +33,14 @@
   (before-each
     (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
     (setq pkm2-database-connection nil)
-
     (setq pkm2-database-connection (sqlite-open database-file))
     (setq pkm-structure-2-undefined-schemas-plist ())
     (setq pkm-data-type-to-kvd-key-plist-eieio ())
     (setq pkm-kvd-key-to-structure-plist-eieio ())
     (setq pkm-structure-2-defined-schemas-plist ())
-
-    (pkm2-setup-database pkm2-database-connection))
+    (pkm2-setup-database pkm2-database-connection)
+    (setq pkm2-device-name "tests")
+    (setup-new-device2 pkm2-database-connection "tests"))
   (after-each
     (setq pkm2-database-connection nil))
 

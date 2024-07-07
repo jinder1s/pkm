@@ -27,11 +27,6 @@
 (require 'pkm-new-core)
 
 (describe "Eieio object definition tests"
-  :var (database-file)
-  (before-each
-    (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
-    (setq pkm2-database-connection (sqlite-open database-file))
-    (pkm2-setup-database pkm2-database-connection))
   (it "Define base node"
     (let* ((node-asset (node-schema :name "base-node" :primary-node t))
            (schema (object-schema
@@ -108,7 +103,10 @@
   (before-each
     (setq database-file (make-temp-file "pkm-test" nil ".sqlite3"))
     (setq pkm2-database-connection (sqlite-open database-file))
-    (pkm2-setup-database pkm2-database-connection))
+    (pkm2-setup-database pkm2-database-connection)
+    (setq pkm2-device-name "tests")
+    (setup-new-device2 pkm2-database-connection "tests")
+    )
   (after-each
     (sqlite-close  pkm2-database-connection)
     (setq pkm2-database-connection nil)

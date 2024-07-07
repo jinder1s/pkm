@@ -16,6 +16,7 @@
 (depends-on "dash" "2.13")
 (depends-on "ts" "0.3")
 (depends-on "persist" "0.5")
+(depends-on "request" "01e338c335c07e4407239619e57361944a82cb8a")
 
 
 (development
