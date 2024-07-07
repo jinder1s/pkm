@@ -21,12 +21,13 @@
 
 (defun pkm-device-get-min-available-for-table (database-connection table-name)
   (let* ((query (format "SELECT max(higher_limit) from device_sync WHERE table_name LIKE '%s';" table-name))
-         (values (-flatten (sqlite-select database-connection query) ))
-         (max_range (if values (car values) 1)))
+         (values (-flatten (sqlite-select database-connection query)))
+         (max_current_used (unless values (--> (format "SELECT id FROM %s ORDER BY id DESC LIMIT 1;" table-name ) (sqlite-select database-connection it) (caar it))))
+         (max_range (if values (car values) (if max_current_used (+ max_current_used 1) 1))))
     max_range))
 
 (defun pkm-device-get-next-id (database-connection table-name)
-  (let* ((query (format "SELECT id, next_id from device_sync WHERE table_name like '%s' ORDER BY next_id DESC LIMIT 1;" table-name))
+  (let* ((query (format "SELECT id, next_id from device_sync WHERE table_name like '%s' AND laptop_id LIKE '%s' ORDER BY next_id DESC LIMIT 1;" table-name pkm2-device-name))
          (values (sqlite-select database-connection query) ))
     (car values)))
 
@@ -46,20 +47,20 @@
       (pkm-device-set-limits-for-table database-connection device-id table_name (pkm2-get-current-timestamp)))))
 
 
-(defun pkm-device-set-limits-for-table (database-connection device-id table-name created-at)
-  (let* ((min-value (pkm-device-get-min-available-for-table database-connection table-name))
+(defun pkm-device-set-limits-for-table (database-connection device-id table-name created-at &optional min-value)
+  (let* ((min-value (or min-value (pkm-device-get-min-available-for-table database-connection table-name) ))
          (higher_limit (+ min-value pkm-device-range-length))
          (next-id min-value)
          (column-names (list "table_name" "laptop_id" "lower_limit" "higher_limit" "next_id" "created_at"))
          (column-values `(,table-name ,device-id ,min-value ,higher_limit ,next-id ,created-at))
          (insert-statement (pkm2--db-compile-insert-statement "device_sync" column-names column-values)))
     (sqlite-execute database-connection insert-statement)))
-(defun setup-new-device2 (database-connection device-id)
+
+(defun setup-new-device2 (database-connection device-id &optional table-settings)
   (--> (pkm2-get-current-timestamp)
        (-each pkm-core-db-tables
          (lambda (table-name)
-           (pkm-device-set-limits-for-table database-connection device-id table-name it)))))
-
+           (pkm-device-set-limits-for-table database-connection device-id table-name it (plist-get table-settings table-name #'equal))))))
 
 (defvar laptop-addresses
   '(("work-tufts-1" . "mcttsu14588")
