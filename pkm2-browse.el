@@ -1099,6 +1099,14 @@
      map
      
      ) )
+(defhydra hydra-pkm (global-map "C-c C-p C-p")
+  "zoom"
+  ("e" pkm2--browse-edit-object-at-point "edit")
+  ("k" pkm2-lister-browser--move-up "up")
+  ("j" pkm2-lister-browser--move-down "down")
+  ("h" pkm2-lister-browser-promote-node "promote")
+  ("l" pkm2-lister-browser-demote-node "demote")
+  )
 
 (define-minor-mode pkm2-browse-minor-mode
   "A minor mode for browsing pkm2 nodes"
@@ -1422,6 +1430,7 @@
 
 
 (defun pkm2-lister-browser-promote-node ()
+  (interactive)
   (let* ((current-point (point))
          (browse-node (pkm2--browse-get-browse-node-at-point))
          (section (oref browse-node :section))
@@ -1448,6 +1457,7 @@
     (lister-move-sublist-up pkm2-browse-ewoc :point)))
 
 (defun pkm2-lister-browser-demote-node ()
+  (interactive)
   (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
          (section (oref browse-node :section))
          (pkm-node (oref browse-node :datum))
