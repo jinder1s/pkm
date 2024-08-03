@@ -657,7 +657,7 @@ DATABASE_HANDLE is object returned from `sqlite-open` function"
   (message "In update log node")
   (let* ((node-types (oref pkm-node :types))
          (log-node (-any (lambda (type)
-                           (--> (plist-get pkm-structure-defined-schemas-plist type)
+                           (--> (plist-get pkm-structure-2-defined-schemas-plist type)
                                 (plist-get it :log-primary)))
                          node-types))
          (old-content (when log-node (oref pkm-node :content)))
@@ -1129,22 +1129,10 @@ Returns output in two formats:
              it)))
 
 ;;; pkm-object
-
-(defvar pkm-structure-undefined-schemas-plist ())
-(defvar pkm-structure-defined-schemas-plist ())
-
-
 (defvar pkm-structure-2-undefined-schemas-plist ())
 (defvar pkm-structure-2-defined-schemas-plist ())
 
 (defvar pkm-structure-2-defined-behavior-plist ())
-
-(defun pkm-register-structure (name structure-plist)
-  (--> (plist-put structure-plist :name name) (plist-put it :pkm-type name) (plist-put pkm-structure-undefined-schemas-plist name it) (setq pkm-structure-undefined-schemas-plist it)))
-
-(defun pkm2-register-behavior (behavior)
-  (setq pkm-structure-defined-behavior-plist (plist-put pkm-structure-defined-behavior-plist (plist-get behavior :name) behavior)))
-
 
 (defun pkm-register-structure-2 (structure-schema)
   (-->   (plist-put pkm-structure-2-undefined-schemas-plist (oref structure-schema :name) structure-schema)
@@ -1353,7 +1341,7 @@ Returns output in two formats:
 
 
 (defun pkm-object-kvd-get-kvd-spec-for-key-in-structure (key structure-name)
-  (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
+  (--> (plist-get pkm-structure-2-defined-schemas-plist structure-name)
        (plist-get it :assets)
        (-find (lambda (asset-spec)
                 (when (and (equal (plist-get asset-spec :pkm-type) 'kvd)
@@ -1538,59 +1526,6 @@ Returns output in two formats:
     ; (message "fs: %S, hk: %S\nkvd:%S" fully-specified has-kvd (oref pkm-node :kvds))
     (eq (length fully-specified ) (length has-kvd))))
 
-
-
-(defun pkm--object-cache-structure-info ()
-  (let* ((structure-names  (doom-plist-keys pkm-structure-undefined-schemas-plist))
-         (behavior-structures (-filter (lambda (s-name)
-                                         (--> (plist-get pkm-structure-undefined-schemas-plist s-name)
-                                              (plist-get it :is-behavior)))
-                                       structure-names)))
-    (-each structure-names
-      (lambda (structure-name)
-        (setq pkm-structure-defined-schemas-plist
-              (plist-put pkm-structure-defined-schemas-plist structure-name (pkm--object-define structure-name)))))
-    (-each structure-names
-      (lambda (structure-name)
-        (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
-             (plist-get it :assets)
-             (-each it (lambda (asset)
-                         (when (equal (plist-get asset :pkm-type) 'kvd)
-                           (pkm-object-register-kvd-key-with-data-type asset)
-                           (pkm-object-register-structure-with-kvd  asset structure-name)))))))
-    (-each  structure-names
-      (lambda (structure-name)
-        (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
-             (pkm--object-get-required-kvds it)
-             (setq pkm-structure-required-kvds-plist (plist-put pkm-structure-required-kvds-plist structure-name it)))))
-    (-each  structure-names
-      (lambda (structure-name)
-        (--> (plist-get pkm-structure-defined-schemas-plist structure-name)
-             (pkm--object-get-required-fully-specified-kvds it)
-             (setq pkm-structure-fully-specified-kvds-plist (plist-put pkm-structure-fully-specified-kvds-plist structure-name it)))))
-    (-each  structure-names
-      (lambda (structure-name)
-        (--> (pkm--object-find-unique-identifiers structure-name pkm-structure-defined-schemas-plist pkm-structure-required-kvds-plist)
-             (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it)))))
-                                        ; For behaviour based structures, only compare with other behivor based structures
-    (let* ((structure-to-behavior-schema-plist  (mm-alist-to-plist (-map (lambda (s-name)
-                                                                           (cons s-name
-                                                                                 (--> (plist-get pkm-structure-undefined-schemas-plist s-name)
-                                                                                      (plist-get it :is-behavior)
-                                                                                      (plist-get pkm-structure-defined-behavior-plist it) )))
-                                                                         behavior-structures) ))
-           (required-kvds-plist (mm-alist-to-plist (-map (lambda (s-name)
-                                                           (cons s-name
-                                                                 (--> (plist-get structure-to-behavior-schema-plist s-name)
-                                                                      (pkm--behavior-get-required-kvds
-                                                                       it))))
-                                                         behavior-structures))))
-      (-each  behavior-structures
-        (lambda (structure-name)
-          (--> (pkm--object-find-unique-identifiers structure-name structure-to-behavior-schema-plist  required-kvds-plist)
-               (setq pkm-structure-unique-required-plist (plist-put pkm-structure-unique-required-plist structure-name it))))))))
-
-
 (defun pkm--object-cache-structure-info-eieio ()
   (setq pkm-structure-2-defined-schemas-plist ())
   (setq pkm-structure-required-kvds-plist-eieio ())
@@ -1701,16 +1636,6 @@ Returns output in two formats:
 
 (defvar pkm--object-add-to-db-alist `((node ,#'pkm--object-add-node-to-db)
                                     (kvd ,#'pkm--object-add-kvd-to-db)))
-
-(defun pkm--object-capture ()
-  "if NUMERIC-PREFIX-ARGUMENT = 0: Assume point is on pkm-browse and is on the node that should be parent of to-be-captured node. Essentially, creating a sub node.
-TODO TEST!"
-  (interactive)
-  (let* ((structure-name (-->  (doom-plist-keys pkm-structure-undefined-schemas-plist)
-                               (completing-read "What type of object would you like to create?" it)
-                               (intern it)))
-         (structure-schema (pkm--object-define structure-name)))
-    (pkm2--object-capture-object-verify structure-schema)))
 
 (defun pkm--object-capture-eieio ()
   "if NUMERIC-PREFIX-ARGUMENT = 0: Assume point is on pkm-browse and is on the node that should be parent of to-be-captured node. Essentially, creating a sub node.

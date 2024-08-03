@@ -1003,7 +1003,7 @@
          (show-hidden (oref browse-node :show-hidden) )
          (types (oref pkm-node :types))
          (types-definitions (-map (lambda (type)
-                                    (plist-get pkm-structure-defined-schemas-plist type))
+                                    (plist-get pkm-structure-2-defined-schemas-plist type))
                                   types))
          (type-parents (-map (lambda (type-definition)
                                (plist-get type-definition :parents)) types-definitions))
@@ -1096,9 +1096,7 @@
      (define-key map (kbd "C-c C-p n f" ) #'pkm2--browse-filter-children-nodes-at-point )
      (define-key map (kbd "C-c C-p n n" ) #'pkm2--narrow-to-node-and-children-at-point )
      (define-key map (kbd "C-c C-p n d" ) #'pkm2--browse-delete-node-at-point )
-     map
-     
-     ) )
+     map))
 (defhydra hydra-pkm (global-map "C-c C-p C-p")
   "zoom"
   ("e" pkm2--browse-edit-object-at-point "edit")
