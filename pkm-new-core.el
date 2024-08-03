@@ -1777,7 +1777,9 @@ TODO TEST!"
 (defclass container-schema (base-schema)
   ((assets :initarg :assets :initform nil)))
 
-(defclass behavior-schema (container-schema) ())
+(defclass behavior-schema (container-schema)
+  ((groups :initarg :groups :initform nil))
+  )
 
 (defclass object-schema (container-schema)
   ((parent-schema-name :initarg :parent-schema-name :initform nil)
@@ -1873,9 +1875,9 @@ with in the :initarg slot.  VALUE can be any Lisp object."
                                 behaviors))
          (parent-name (oref schema :parent-schema-name))
          (parent-schema (when parent-name (--> (object-assoc parent-name :name pkm-structure-2-undefined-schemas-plist)
-                                                 (if it it (error "Parent schema not found %S, %S" parent-name (object-assoc parent-name :name pkm-structure-2-undefined-schemas-plist) ) )
-                                                 (schema-compile it)
-                                                 )))
+                                               (if it it (error "Parent schema not found %S, %S" parent-name (object-assoc parent-name :name pkm-structure-2-undefined-schemas-plist) ) )
+                                               (schema-compile it)
+                                               )))
          (parent-assets (when parent-schema (-map #'-copy (oref parent-schema :assets)) ))
          (self-assets (-map #'-copy (oref schema :assets)))
          (combined-assets (-reduce-from #'pkm--object-nondestructively-combine-eieio (pkm--object-nondestructively-combine-eieio parent-assets self-assets) behavior-assets))
@@ -1895,10 +1897,12 @@ with in the :initarg slot.  VALUE can be any Lisp object."
          (parent-links (when parent-schema (-map #'-copy (oref parent-schema :links)) ))
          (self-links (oref schema :links))
          (links-in-both (pkm--object-nondestructively-combine-eieio self-links parent-links))
-
+         (behavior-groups (-map (lambda (behavior)
+                                  (oref behavior :groups)) behaviors))
          (parent-groups (when parent-schema (-map #'-copy (oref parent-schema :groups)) ))
          (self-groups (oref schema :groups))
-         (groups-in-both (pkm--object-nondestructively-combine-eieio self-groups parent-groups))
+         (groups-in-both (pkm--object-nondestructively-combine-eieio behavior-groups
+                                                                     (pkm--object-nondestructively-combine-eieio self-groups parent-groups) ))
          (parents (-concat (when parent-name `(,parent-name) ) (when parent-schema (oref parent-schema :parents) ))) )
     (compiled-object-schema
      :parents parents

@@ -37,26 +37,26 @@
                                     (kvd-schema :name "task-priority" :key "task-priority" :choices pkm2-tasks-priority-types
                                      :prompt "What is todo's priority?"  :data-type 'INTEGER :log-change t))))
 
-(pkm2-register-behavior `(:name deadline :assets ((:pkm-type kvd :name "deadline" :key "deadline" :value ,#'pkm2-get-user-selected-timestamp
-                                                   :link-to ("base-node") :data-type DATETIME )
-                                                  (:pkm-type kvd :name "deadline-alert-minutes" :key "deadline-alert-minutes"
-                                                   :link-to ("base-node") :data-type INTEGER :optional t))))
+;; (pkm2-register-behavior `(:name deadline :assets ((:pkm-type kvd :name "deadline" :key "deadline" :value ,#'pkm2-get-user-selected-timestamp
+;;                                                    :link-to ("base-node") :data-type DATETIME )
+;;                                                   (:pkm-type kvd :name "deadline-alert-minutes" :key "deadline-alert-minutes"
+;;                                                    :link-to ("base-node") :data-type INTEGER :optional t))))
 
-(pkm-register-structure 'schedule-node
-                        (list :parent 'dependent-node
-                              :browse-insert-format-string (concat
-                                                            "[<insert>(:display kvd-value :key \"schedule-start\")</insert>]"
-                                                            "--"
-                                                            "[<insert>(:display kvd-value :key \"schedule-end\")</insert>]"
-                                                            "<insert>(:display hidden :prefix \"\\n\")</insert>")
-                              :managed-type t
-                              :assets (list
-                                       '(:pkm-type node :name "base-node" :primary-node t :no-input t)
-                                       '(:pkm-type kvd :name "is-schedule" :key "node-type" :value "schedule" :link-to ("base-node") :data-type TEXT)
-                                       `(:pkm-type kvd :name "schedule-start" :key "schedule-start" :value ,#'pkm2-get-user-selected-timestamp
-                                         :link-to ("base-node") :data-type DATETIME )
-                                       `(:pkm-type kvd :name "schedule-end" :key "schedule-end" :value ,#'pkm2-get-user-selected-timestamp
-                                         :link-to ("base-node") :data-type DATETIME :optional t))))
+;; (pkm-register-structure 'schedule-node
+;;                         (list :parent 'dependent-node
+;;                               :browse-insert-format-string (concat
+;;                                                             "[<insert>(:display kvd-value :key \"schedule-start\")</insert>]"
+;;                                                             "--"
+;;                                                             "[<insert>(:display kvd-value :key \"schedule-end\")</insert>]"
+;;                                                             "<insert>(:display hidden :prefix \"\\n\")</insert>")
+;;                               :managed-type t
+;;                               :assets (list
+;;                                        '(:pkm-type node :name "base-node" :primary-node t :no-input t)
+;;                                        '(:pkm-type kvd :name "is-schedule" :key "node-type" :value "schedule" :link-to ("base-node") :data-type TEXT)
+;;                                        `(:pkm-type kvd :name "schedule-start" :key "schedule-start" :value ,#'pkm2-get-user-selected-timestamp
+;;                                          :link-to ("base-node") :data-type DATETIME )
+;;                                        `(:pkm-type kvd :name "schedule-end" :key "schedule-end" :value ,#'pkm2-get-user-selected-timestamp
+;;                                          :link-to ("base-node") :data-type DATETIME :optional t))))
 
 (pkm-register-structure-2
  (object-schema :name "task-n"
@@ -85,57 +85,57 @@
 
 
 
-(defun pkm2-tasks-schedule-node (&optional db-id)
-  (interactive)
-  (let* ((structure-name 'schedule-node)
-         (parent-node-db-id (or db-id
-                                (--> (funcall pkm2-get-pkm-node-at-point-func)
-                                     (when it (pkm-get-db-id it)))
-                                (pkm2-nodes-search "Search node to schedule into: ")))
-         (link-label "instance")
-         (link-definition (list :pkm-link-label link-label
-                                :parent 'parent
-                                :child 'child))
-         (structure-schema (list :name 'parent-child-node
-                                 :assets (list
-                                          `(:pkm-type node :name "parent-node" :parent-node t :db-id ,parent-node-db-id)
-                                          `(:pkm-type ,structure-name :name "child-node" :child-node t))
-                                 :links (list link-definition))))
+;; (defun pkm2-tasks-schedule-node (&optional db-id)
+;;   (interactive)
+;;   (let* ((structure-name 'schedule-node)
+;;          (parent-node-db-id (or db-id
+;;                                 (--> (funcall pkm2-get-pkm-node-at-point-func)
+;;                                      (when it (pkm-get-db-id it)))
+;;                                 (pkm2-nodes-search "Search node to schedule into: ")))
+;;          (link-label "instance")
+;;          (link-definition (list :pkm-link-label link-label
+;;                                 :parent 'parent
+;;                                 :child 'child))
+;;          (structure-schema (list :name 'parent-child-node
+;;                                  :assets (list
+;;                                           `(:pkm-type node :name "parent-node" :parent-node t :db-id ,parent-node-db-id)
+;;                                           `(:pkm-type ,structure-name :name "child-node" :child-node t))
+;;                                  :links (list link-definition))))
 
-    (pkm2--object-capture-object-verify structure-schema "pkm-schedule" t)))
+;;     (pkm2--object-capture-object-verify structure-schema "pkm-schedule" t)))
 
-(defun pkm2-tasks-set-node-deadline (&optional db-id)
-  (interactive)
-  (let* ((target-node (or db-id (--> (funcall pkm2-get-pkm-node-at-point-func)
-                                     (when it (pkm-get-db-id it)))
-                          (pkm2-nodes-search "Search node to schedule into: ")))
-         (link-label "instance")
-         (structure-schema (list :name 'parent-child-node
-                                 :assets (list
-                                          `(:pkm-type node :name "target-node" :db-id ,target-node)
-                                          `(:pkm-type kvd :name "deadline" :key "deadline" :value ,#'pkm2-get-user-selected-timestamp :link-to ("target-node") :data-type DATETIME )))))
+;; (defun pkm2-tasks-set-node-deadline (&optional db-id)
+;;   (interactive)
+;;   (let* ((target-node (or db-id (--> (funcall pkm2-get-pkm-node-at-point-func)
+;;                                      (when it (pkm-get-db-id it)))
+;;                           (pkm2-nodes-search "Search node to schedule into: ")))
+;;          (link-label "instance")
+;;          (structure-schema (list :name 'parent-child-node
+;;                                  :assets (list
+;;                                           `(:pkm-type node :name "target-node" :db-id ,target-node)
+;;                                           `(:pkm-type kvd :name "deadline" :key "deadline" :value ,#'pkm2-get-user-selected-timestamp :link-to ("target-node") :data-type DATETIME )))))
 
-    (pkm2--object-capture-object-verify structure-schema "pkm-schedule" t)))
+;;     (pkm2--object-capture-object-verify structure-schema "pkm-schedule" t)))
 
-(defun pkm2-tasks-alert ()
-  (let* ((node-with-deadline
-          (pkm2-get-nodes-with-pkm-query `((:or kvd (:key "deadline" :data-type INTEGER :after (hour -1) :before (hour 1)))
-                                           (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "TODO" "HOLD"))))))
-         (deadlines (-map  (lambda (h-i-d)
-                             (pkm2-node-get-kvd-value-with-key h-i-d "deadline"))
-                           node-with-deadline))
-         (alert-seconds (-map  (lambda (h-i-d)
-                                 (--> (pkm2-node-get-kvd-value-with-key h-i-d "deadline-alert-minutes")
-                                      (when it (* 60 it))))
-                               node-with-deadline)))
-    (-each-indexed node-with-deadline
-      (lambda (index h-i-d)
-        (when (nth index alert-seconds)
-          (when  (< (- (nth index deadlines)
-                       (nth index alert-seconds))
-                    (pkm2-get-current-timestamp))
-            (--> (oref h-i-d :content)
-                 (pkm-hammerspoon-alert it))))))))
+;; (defun pkm2-tasks-alert ()
+;;   (let* ((node-with-deadline
+;;           (pkm2-get-nodes-with-pkm-query `((:or kvd (:key "deadline" :data-type INTEGER :after (hour -1) :before (hour 1)))
+;;                                            (:and kvd (:key "task-status" :data-type TEXT :choices ("DOING" "TODO" "HOLD"))))))
+;;          (deadlines (-map  (lambda (h-i-d)
+;;                              (pkm2-node-get-kvd-value-with-key h-i-d "deadline"))
+;;                            node-with-deadline))
+;;          (alert-seconds (-map  (lambda (h-i-d)
+;;                                  (--> (pkm2-node-get-kvd-value-with-key h-i-d "deadline-alert-minutes")
+;;                                       (when it (* 60 it))))
+;;                                node-with-deadline)))
+;;     (-each-indexed node-with-deadline
+;;       (lambda (index h-i-d)
+;;         (when (nth index alert-seconds)
+;;           (when  (< (- (nth index deadlines)
+;;                        (nth index alert-seconds))
+;;                     (pkm2-get-current-timestamp))
+;;             (--> (oref h-i-d :content)
+;;                  (pkm-hammerspoon-alert it))))))))
 
 (provide 'pkm2-tasks)
 ;;; pkm2-tasks.el ends here

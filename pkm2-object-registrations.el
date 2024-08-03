@@ -61,10 +61,11 @@
 
 (pkm-register-structure-2
  (object-schema :parent-schema-name "base-n" :name "log-n"
-                :browse-insert-format-string (concat
-                                              "<insert>(:display kvd-value :key \"timestamp\")</insert> "
-                                              "<insert>(:display content)</insert>"
-                                              "<insert>(:display hidden :prefix \"\\n\")</insert>")
+                :browse-insert-format-string
+                (concat
+                 "<insert>(:display kvd-value :key \"timestamp\")</insert> "
+                 "<insert>(:display content)</insert>"
+                 "<insert>(:display hidden :prefix \"\\n\")</insert>")
                 :is-behavior "log"
                 :behaviors (list `(:name "log" :link-to (primary)))))
 
