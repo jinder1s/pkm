@@ -67,6 +67,7 @@
       (expect (plist-get event :action) :to-equal 'insert)
       (expect (plist-get event :what) :to-equal 'node)
       (expect (plist-get (plist-get event :data) :content) :to-equal content)))
+
   (it "Creating sync event for inserting text kvd"
     (let* ((pkm-sync-add-event-func (lambda (event)
                                       (setq events (plist-put events :main (cons event (plist-get events :main))))))
@@ -94,6 +95,7 @@
       (expect (oref kvd :value) :to-equal value)
       (expect (oref kvd :created_at) :to-equal timestamp)
       (expect (length local-events) :to-be 1)))
+
   (it "Test inserting kvd link"
     (let* ((type 'TEXT)
            (inserted-kvd (pkm2--db-insert-kvd "kvd-key" "kvd-value" (pkm2-get-current-timestamp) type))
@@ -115,16 +117,16 @@
       (expect (pkm-get-db-id inserted-kvd) :to-equal (oref (car kvds) :id))
       (expect (pkm-get-db-id inserted-link) :to-equal (oref (car kvds) :id))
       (expect (length local-events) :to-be 3)
-      (expect (-map (lambda (sql-event-row) (--> (nth 2 sql-event-row) (read it) (plist-get it :action) )) local-events)
+      (expect (-map (lambda (sql-event-row)
+                      (--> (nth 2 sql-event-row) (read it) (plist-get it :action) ))
+                    local-events)
               :to-equal '(insert insert insert))
       (expect (-map (lambda (sql-event-row) (--> (nth 2 sql-event-row) (read it) (plist-get it :what) )
                       ) local-events)
               :to-equal '(kvd  node kvd-link))))
 
   (it "Test inserting node link"
-    (let* ((pkm-sync-add-event-func (lambda (event)
-                                      (setq events (plist-put events :main (cons event (plist-get events :main))))))
-           (inserted-node (pkm2--db-insert-node "node-content1" (pkm2-get-current-timestamp)))
+    (let* ((inserted-node (pkm2--db-insert-node "node-content1" (pkm2-get-current-timestamp)))
            (inserted-node2 (pkm2--db-insert-node "node-content2" (pkm2-get-current-timestamp)))
            (inserted-link (pkm2--db-insert-link-between-nodeA-and-nodeB
                            "test-link-label"
@@ -134,29 +136,34 @@
            (pkm-node (pkm2--db-query-get-node-with-id 1))
            (pkm-node-2 (pkm2--db-query-get-node-with-id 2))
            (nodes-links-query "SELECT id, type, node_a, node_b, created_at FROM nodes_link;")
-           (nodes-links (sqlite-select pkm2-database-connection nodes-links-query)))
+           (nodes-links (sqlite-select pkm2-database-connection nodes-links-query))
+           (sql-local-sync-query "SELECT id, timestamp, event FROM local_events;")
+           (sql-all-sync-query "SELECT id, timestamp, event FROM all_events;")
+           local-events
+           )
       (expect (length nodes-links) :to-equal 1)
       (expect (pkm-get-db-id inserted-link) :to-equal (caar nodes-links))
-      (expect  (nth 2 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node)
-                                                        )
-      (expect  (nth 3 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node-2)
-                                                        )
-
-
-
-      (expect (-map (lambda (event) (plist-get event :action)) (plist-get events :main))
+      (expect  (nth 2 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node))
+      (expect  (nth 3 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node-2))
+      (setq local-events (sqlite-select pkm2-database-connection sql-local-sync-query))
+      (expect (-map (lambda (sql-event-row)
+                      (--> (nth 2 sql-event-row) (read it) (plist-get it :action) ))
+                    local-events)
               :to-equal '(insert insert insert))
-      (expect (-map (lambda (event) (plist-get event :what)) (plist-get events :main))
-              :to-equal '(nodes-link node node))))
 
+      (expect (-map (lambda (sql-event-row) (--> (nth 2 sql-event-row) (read it) (plist-get it :what) )
+                      ) local-events)
+              :to-equal '(node node nodes-link))))
   (it "Creating sync event for insert, update, and deleting node"
-    (let* ((pkm-sync-add-event-func (lambda (event)
-                                      (setq events (plist-put events :main (cons event (plist-get events :main))))))
-           (content "Hello, This is my first node.")
+    (let* ((content "Hello, This is my first node.")
            (timestamp (pkm2-get-current-timestamp))
            (timestamp2 (pkm2-get-current-timestamp))
            (sql-query "SELECT id, content, created_at, modified_at FROM node;")
            (inserted-node (pkm2--db-insert-node content timestamp))
+           (sql-local-sync-query "SELECT id, timestamp, event FROM local_events;")
+           (sql-all-sync-query "SELECT id, timestamp, event FROM all_events;")
+           local-events
+
            database-nodes
            node)
       (setq database-nodes (sqlite-select pkm2-database-connection sql-query))
@@ -167,17 +174,25 @@
       (setq node (pkm2--db-query-get-node-with-id 1))
       (expect (oref node :content) :to-equal content)
       (expect (oref node :created_at) :to-equal timestamp)
-      (expect (length (plist-get events :main)) :to-be 1)
+      (setq local-events (sqlite-select pkm2-database-connection sql-local-sync-query))
+      (expect (length local-events) :to-be 1)
       (pkm2--db-update-node
        (pkm-get-db-id inserted-node)
        "Updated content"
        timestamp2)
-      (expect (length (plist-get events :main)) :to-be 2)
+      (setq local-events (sqlite-select pkm2-database-connection sql-local-sync-query))
+      (expect (length local-events) :to-be 2)
       (pkm2--db-delete-node (pkm-get-db-id inserted-node))
-      (expect (length (plist-get events :main)) :to-be 3)
-      (expect (-map (lambda (event) (plist-get event :action)) (plist-get events :main)) :to-equal '(delete update insert))
+      (setq local-events (sqlite-select pkm2-database-connection sql-local-sync-query))
+      (expect (length local-events) :to-be 3)
+      (expect (-map (lambda (sql-event-row)
+                      (--> (nth 2 sql-event-row) (read it) (plist-get it :action) ))
+                    local-events)
+              :to-equal '(insert  update delete))
       (setq database-nodes (sqlite-select pkm2-database-connection sql-query))
       (expect (length database-nodes) :to-equal 0)))
+
+  ;; TODO fix all hte tests below
 
   (it "Test deleting kvd-link"
     (let* ((pkm-sync-add-event-func (lambda (event)
@@ -219,9 +234,9 @@
       (expect (length nodes-links) :to-equal 1)
       (expect (pkm-get-db-id inserted-link) :to-equal (caar nodes-links))
       (expect  (nth 2 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node)
-                                                        )
+               )
       (expect  (nth 3 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node-2)
-                                                        )
+               )
 
 
       (pkm2--db-delete-link-between-nodes (pkm-get-db-id inserted-link))
@@ -353,9 +368,9 @@
            (nodes-links (sqlite-select pkm2-database-connection nodes-links-query)))
       (expect (length nodes-links) :to-equal 1)
       (expect  (nth 2 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node)
-                                                        )
+               )
       (expect  (nth 3 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node-2)
-                                                        )
+               )
       (expect (-map (lambda (event) (plist-get event :action)) (plist-get events :main))
               :to-equal '(insert insert insert))
       (expect (-map (lambda (event) (plist-get event :what)) (plist-get events :main))
@@ -476,9 +491,9 @@
            (nodes-links (sqlite-select pkm2-database-connection nodes-links-query)))
       (expect (length nodes-links) :to-equal 1)
       (expect  (nth 2 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node)
-                                                        )
+               )
       (expect  (nth 3 (car nodes-links)) :to-equal (pkm-get-db-id pkm-node-2)
-                                                        )
+               )
       (pkm-sync--apply-remote-events (list delete-nodes-link-event) nil)
       (setq nodes-links (sqlite-select pkm2-database-connection nodes-links-query))
       (expect (length nodes-links) :to-equal 0)
