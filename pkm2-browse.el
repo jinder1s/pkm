@@ -177,6 +177,7 @@
                       (ewoc-enter-before pkm2-browse-ewoc (cdr where) id))
                      (t
                       (ewoc-enter-last pkm2-browse-ewoc id))))
+    (message "new ewoc-node: %S" ewoc-node)
 
     (oset browse-node :start-ewoc ewoc-node)
     (when (and children-browse-nodes (not only-node))
@@ -298,6 +299,7 @@
                       (ewoc-enter-before pkm2-browse-ewoc (cdr where) id))
                      (t
                       (ewoc-enter-last pkm2-browse-ewoc id))))
+    (message "ewoc-node: %S" ewoc-node)
 
     (oset browse-node :start-ewoc ewoc-node)
     (when (and children-browse-nodes (not only-node))
@@ -388,32 +390,32 @@
 
 (defun pkm2--browse-section-next-sibling-node (&optional reverse)
   (let* ((current-node (pkm2--browse-get-browse-node-at-point))
+         (current-browse-id (oref current-node :browse-id))
          (level (when current-node (oref current-node :level) ) )
          (section (when current-node (oref current-node :section) ))
-         (current-ewoc (when current-node (oref current-node :start-ewoc) ))
-         (next-ewoc (when current-ewoc
-                      (if reverse (ewoc-prev pkm2-browse-ewoc current-ewoc)
-                        (ewoc-next pkm2-browse-ewoc current-ewoc))))
-         found-next-ewoc-node
+         (next-browse-id (progn (if reverse (lister-goto pkm2-browse-ewoc :prev)
+                                  (lister-goto pkm2-browse-ewoc :next))
+                                (lister-get-data-at pkm2-browse-ewoc :point)))
+         (next-browse-id (when (not (equal current-browse-id next-browse-id) )
+                           next-browse-id))
          found-next-browse-node)
-    (while (and next-ewoc (not found-next-ewoc-node))
-      (let* ((next-b-n-id (ewoc-data next-ewoc))
-             (next-b-n (assoc-default next-b-n-id pkm2-browse--browse-nodes-alist))
+    (message "%S,\n %S,\n %S,\n %S" current-node level section  next-browse-id)
+    (while (and next-browse-id (not found-next-browse-node))
+      (let* ((next-b-n (assoc-default next-browse-id pkm2-browse--browse-nodes-alist))
              (n-section (when next-b-n
                           (oref next-b-n :section) ))
              (n-level (when next-b-n
                         (oref next-b-n :level) )))
         (if (and section (eq section n-section) )
             (if (and level (equal level n-level) )
-                (progn (setq found-next-ewoc-node next-ewoc)
-                       (setq found-next-browse-node next-b-n))
+                (setq found-next-browse-node next-b-n)
               (if (< level n-level)
-                  (setq next-ewoc (if reverse (ewoc-prev pkm2-browse-ewoc next-ewoc)
-                                    (ewoc-next pkm2-browse-ewoc next-ewoc) ))
-                (setq next-ewoc nil)))
-          (setq next-ewoc nil))))
-    (when found-next-ewoc-node
-      (ewoc-goto-node pkm2-browse-ewoc found-next-ewoc-node))
+                  (setq next-browse-id
+                        (progn (if reverse (lister-goto pkm2-browse-ewoc :prev)
+                                  (lister-goto pkm2-browse-ewoc :next))
+                                (lister-get-data-at pkm2-browse-ewoc :point)))
+                (setq next-browse-id nil)))
+          (setq next-browse-id nil))))
     found-next-browse-node))
 
 (defun pkm2--browse-section-previous-sibling-node ()
@@ -453,8 +455,8 @@
 (setq pkm2-get-pkm-node-at-point-func #'pkm2-get-pkm-node-at-point)
 
 (defun pkm2--browse-get-browse-node-id-at-point (&optional current-point)
-  (if-let* ((current-ewoc-node (when pkm2-browse-ewoc (ewoc-locate pkm2-browse-ewoc (or current-point (point)))))
-            (browse-node-id (lister-get-data-at  pkm2-browse-ewoc current-ewoc-node)))
+  (if-let* ((goto-char (or current-point (point)))
+            (browse-node-id (lister-get-data-at  pkm2-browse-ewoc :point)))
       browse-node-id))
 
 (defun pkm2--browse-get-browse-node-db-node-id-at-point (&optional current-point)
@@ -1442,39 +1444,47 @@
          (connecting-context-id (oref connecting-link :context))
          (grandparent-browse-node (--> (oref parent-browse-node :parent-id)
                                        (assoc-default it pkm2-browse--browse-nodes-alist)))
-         (grandparent-pkm-node (oref grandparent-browse-node :datum))
-         (grandparent-node-id (pkm-get-db-id grandparent-pkm-node))
-         (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
-                                                                  grandparent-node-id
-                                                                  node-id
-                                                                  (pkm2-get-current-timestamp)
-                                                                  connecting-context-id)))
+         (grandparent-pkm-node (when grandparent-browse-node  (oref grandparent-browse-node :datum) ))
+         (grandparent-node-id (when grandparent-browse-node (pkm-get-db-id grandparent-pkm-node) ))
+         (new-link (when grandparent-browse-node
+                     (pkm2--db-insert-link-between-parent-and-child connecting-link-label
+                                                                    grandparent-node-id
+                                                                    node-id
+                                                                    (pkm2-get-current-timestamp)
+                                                                    connecting-context-id) )))
     (pkm2--db-delete-link-between-nodes connecting-link-id)
-    (oset browse-node :parent-link new-link)
+    (when new-link (oset browse-node :parent-link new-link) )
     (goto-char current-point)
-    (lister-move-sublist-up pkm2-browse-ewoc :point)))
+    (pkm2--refresh-current-buffer)))
 
 (defun pkm2-lister-browser-demote-node ()
   (interactive)
   (let* ((browse-node (pkm2--browse-get-browse-node-at-point))
          (section (oref browse-node :section))
-         (pkm-node (oref browse-node :datum))
-         (node-id (pkm-get-db-id pkm-node))
+         (a-pkm-node (oref browse-node :datum))
+         (node-id (pkm-get-db-id a-pkm-node))
          (connecting-link (oref browse-node :parent-link))
-         (connecting-link-id (pkm-get-db-id connecting-link))
-         (connecting-link-label (oref connecting-link :type))
-         (connecting-context-id (oref connecting-link :context))
+         (connecting-link-id (when connecting-link (pkm-get-db-id connecting-link) ))
+         (connecting-link-label (when connecting-link (oref connecting-link :type) ))
+         (link-type-between-objects (unless connecting-link
+                                        (intern (completing-read "What type of link do you want to make?" pkm-links-types) ) ))
+         (link-label  (unless connecting-link
+                        (completing-read "What is the label for this link?" (plist-get pkm-links-type-to-label-eq-plist link-type-between-objects)) ))
+         (new-link-label (or connecting-link-label link-label))
+         ;; TODO add ability to specify context id
+         (connecting-context-id (when connecting-link (oref connecting-link :context) ))
          (sibling-above-browse-node (save-excursion
                                       (pkm2--browse-section-previous-sibling-node)))
          (sibling-above-pkm-node (oref sibling-above-browse-node :datum))
          (sibling-above-node-id (pkm-get-db-id sibling-above-pkm-node))
-         (new-link (pkm2--db-insert-link-between-parent-and-child connecting-link-label
-                                                                  node-id
+         (new-link (pkm2--db-insert-link-between-parent-and-child new-link-label
                                                                   sibling-above-node-id
+                                                                  node-id
                                                                   (pkm2-get-current-timestamp)
                                                                   connecting-context-id)))
-    (pkm2--db-delete-link-between-nodes connecting-link-id)
+    (when connecting-link (pkm2--db-delete-link-between-nodes connecting-link-id) )
     (oset browse-node :parent-link new-link)
-    (lister-move-sublist-down pkm2-browse-ewoc :point)))
+    (pkm2--refresh-current-buffer)
+    ))
 
 (provide 'pkm2-browse)
