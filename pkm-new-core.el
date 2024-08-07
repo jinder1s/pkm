@@ -1111,14 +1111,6 @@ Returns output in two formats:
 (defvar pkm-structure-defined-behavior-plist ())
 
 
-
-(defun pkm2--get-behavior-assets (behavior-name link-to)
-  (--> (plist-get pkm-structure-defined-behavior-plist behavior-name)
-       (plist-get it :assets)
-       (-map (lambda (asset)
-               (plist-put asset :link-to link-to))
-             it)))
-
 (defun pkm2--get-behavior-assets2 (behavior-name link-to)
   (--> (object-assoc behavior-name :name pkm-structure-2-defined-behavior-plist)
        (oref it :assets)
@@ -1127,6 +1119,10 @@ Returns output in two formats:
                    (clone asset :link-to link-to)
                  asset))
              it)))
+
+(defun pkm2--get-behavior-groups (behavior-name)
+  (--> (object-assoc behavior-name :name pkm-structure-2-defined-behavior-plist)
+       (oref it :groups)))
 
 ;;; pkm-object
 (defvar pkm-structure-2-undefined-schemas-plist ())
@@ -1898,7 +1894,8 @@ with in the :initarg slot.  VALUE can be any Lisp object."
          (self-links (oref schema :links))
          (links-in-both (pkm--object-nondestructively-combine-eieio self-links parent-links))
          (behavior-groups (-map (lambda (behavior)
-                                  (oref behavior :groups)) behaviors))
+                                  (pkm2--get-behavior-groups (plist-get behavior :name)))
+                                behaviors))
          (parent-groups (when parent-schema (-map #'-copy (oref parent-schema :groups)) ))
          (self-groups (oref schema :groups))
          (groups-in-both (pkm--object-nondestructively-combine-eieio behavior-groups
